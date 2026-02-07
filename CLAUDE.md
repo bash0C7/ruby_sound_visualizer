@@ -377,6 +377,19 @@ js_obj.typeof   # => "function" （OK: JS::Object 固有メソッド）
 js_obj.class    # => NoMethodError （NG: BasicObject に .class はない → method_missing → JS の obj.class を探す → 存在しない）
 ```
 
+**JS::Object を Ruby メソッドで操作したい場合は `.to_s` で変換必須**:
+
+```ruby
+# NG: JS::Object のまま Ruby の .match や比較を使う → method_missing で JS 側に転送されて誤動作
+search_params = JS.global[:location][:search]         # => JS::Object
+search_params.match(/sensitivity=([0-9.]+)/)          # => JS の String.match() が呼ばれ、Ruby Regexp を渡しても動かない
+search_params != ""                                    # => JS 側の比較になり期待通りに動かない
+
+# OK: .to_s で Ruby String に変換してから操作する
+search_str = JS.global[:location][:search].to_s       # => Ruby String
+search_str.match(/sensitivity=([0-9.]+)/)             # => 正しく Ruby の正規表現マッチが動く
+```
+
 ### パフォーマンスのボトルネック
 
 1. **パーティクル更新**: 10,000 個 × フレーム数のループが最大の負荷
@@ -443,7 +456,9 @@ console.error = function(...args) {
 - **JS → Ruby コールバック**: `JS.global[:name] = lambda { |args| ... }` で登録。JS 側から `window.name(args)` で呼べる
 - **JS Array の受け取り**: Ruby lambda の引数として渡された JS Array は `.to_a` で Ruby Array に変換できる
 - **Ruby Array の受け渡し**: Ruby Array をそのまま JS 関数に渡せる。JS 側で `Array.from()` で変換可能
+- **JS の値を Ruby で操作**: `JS.global[:prop]` の戻り値は `JS::Object`。Ruby の `.match`, `.include?`, `!=` 等を使う前に **必ず `.to_s` で Ruby String に変換**すること
 - **URL のキャッシュ回避**: ブラウザ確認時は `?nocache=N` をクエリパラメータに付けてリロードすると確実
+- **AudioContext の suspended 対策**: Chrome のオートプレイポリシーにより `new AudioContext()` は `suspended` 状態で作成される。`audioContext.resume()` を明示的に呼ぶこと。フォールバックとしてユーザーのクリックイベントでも resume する
 
 ## ライセンス
 

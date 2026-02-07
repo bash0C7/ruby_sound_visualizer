@@ -634,11 +634,14 @@ $frame_count = 0
 $sensitivity = 1.0
 
 # URL パラメーターから sensitivity を読取
+# 注意: JS.global[:location][:search] は JS::Object を返す。
+# JS::Object は BasicObject 継承のため、.match 等の Ruby メソッドが
+# method_missing 経由で JS 側に転送されてしまう。
+# 必ず .to_s で Ruby String に変換してから操作すること。
 begin
-  search_params = JS.global[:location][:search]
-  if search_params && search_params != ""
-    # ?sensitivity=0.5 形式から値を抽出
-    match = search_params.match(/sensitivity=([0-9.]+)/)
+  search_str = JS.global[:location][:search].to_s
+  if search_str.is_a?(String) && search_str.length > 0
+    match = search_str.match(/sensitivity=([0-9.]+)/)
     if match
       $sensitivity = match[1].to_f
       $sensitivity = [$sensitivity, 0.1].max  # 最小 0.1
