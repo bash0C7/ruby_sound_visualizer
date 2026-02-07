@@ -780,8 +780,8 @@ end
       particleSystem = new THREE.Points(geometry, material);
       scene.add(particleSystem);
 
-      // Morphing geometry (torus)
-      const torusGeometry = new THREE.TorusGeometry(1, 0.4, 32, 64);
+      // Morphing geometry (torus) - ポリゴン削減で FPS 改善（32,64 → 24,32）
+      const torusGeometry = new THREE.TorusGeometry(1, 0.4, 24, 32);
       const torusMaterial = new THREE.MeshBasicMaterial({
         color: 0x00ff00,
         wireframe: true,
