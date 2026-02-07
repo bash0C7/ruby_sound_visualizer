@@ -601,11 +601,20 @@ class EffectManager
     @camera_controller = CameraController.new
   end
 
-  def update(analysis)
-    @particle_system.update(analysis)
-    @geometry_morpher.update(analysis)
-    @bloom_controller.update(analysis)
-    @camera_controller.update(analysis)
+  def update(analysis, sensitivity = 1.0)
+    # 感度スケーリング: エネルギー値を感度で掛ける
+    scaled_analysis = {
+      bass: [analysis[:bass] * sensitivity, 1.0].min,
+      mid: [analysis[:mid] * sensitivity, 1.0].min,
+      high: [analysis[:high] * sensitivity, 1.0].min,
+      overall_energy: [analysis[:overall_energy] * sensitivity, 1.0].min,
+      dominant_frequency: analysis[:dominant_frequency]
+    }
+
+    @particle_system.update(scaled_analysis)
+    @geometry_morpher.update(scaled_analysis)
+    @bloom_controller.update(scaled_analysis)
+    @camera_controller.update(scaled_analysis)
 
     @particle_data = @particle_system.get_data
     @geometry_data = @geometry_morpher.get_data
@@ -622,9 +631,26 @@ $initialized = false
 $audio_analyzer = nil
 $effect_manager = nil
 $frame_count = 0
+$sensitivity = 1.0
+
+# URL パラメーターから sensitivity を読取
+begin
+  search_params = JS.global[:location][:search]
+  if search_params && search_params != ""
+    # ?sensitivity=0.5 形式から値を抽出
+    match = search_params.match(/sensitivity=([0-9.]+)/)
+    if match
+      $sensitivity = match[1].to_f
+      $sensitivity = [$sensitivity, 0.1].max  # 最小 0.1
+    end
+  end
+rescue => e
+  # URLパラメーター読取失敗時はデフォルト値を使用
+  $sensitivity = 1.0
+end
 
 begin
-  JSBridge.log "Ruby VM started, initializing..."
+  JSBridge.log "Ruby VM started, initializing... (Sensitivity: #{$sensitivity})"
 
   $audio_analyzer = AudioAnalyzer.new
   $effect_manager = EffectManager.new
@@ -637,7 +663,7 @@ begin
       end
 
       analysis = $audio_analyzer.analyze(freq_array)
-      $effect_manager.update(analysis)
+      $effect_manager.update(analysis, $sensitivity)
 
       JSBridge.update_particles($effect_manager.particle_data)
       JSBridge.update_geometry($effect_manager.geometry_data)
@@ -645,12 +671,17 @@ begin
       JSBridge.update_camera($effect_manager.camera_data)
 
       $frame_count += 1
+
+      # JavaScript側に sensitivity を常に渡す（表示用）
+      JS.global[:currentSensitivity] = $sensitivity
+
       if $frame_count % 60 == 0
         bass = (analysis[:bass] * 100).round(1)
         mid = (analysis[:mid] * 100).round(1)
         high = (analysis[:high] * 100).round(1)
         overall = (analysis[:overall_energy] * 100).round(1)
-        JSBridge.log "Audio: Bass=#{bass}% Mid=#{mid}% High=#{high}% Overall=#{overall}%"
+        sensitivity_str = $sensitivity.round(2).to_s
+        JSBridge.log "Audio: Bass=#{bass}% Mid=#{mid}% High=#{high}% Overall=#{overall}% | Sensitivity: #{sensitivity_str}x"
       end
     rescue => e
       JSBridge.error "Error in rubyUpdateVisuals: #{e.class} #{e.message}"
@@ -928,7 +959,8 @@ end
       frameCount++;
       const now = Date.now();
       if (now - lastFrameTime >= 1000) {
-        document.getElementById('fpsCounter').textContent = 'FPS: ' + frameCount;
+        const sensitivity = window.currentSensitivity !== undefined ? window.currentSensitivity.toFixed(2) : '1.00';
+        document.getElementById('fpsCounter').textContent = 'FPS: ' + frameCount + '  |  Sensitivity: ' + sensitivity + 'x';
         frameCount = 0;
         lastFrameTime = now;
       }
