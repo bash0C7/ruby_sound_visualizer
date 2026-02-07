@@ -125,12 +125,24 @@ module JSBridge
     begin
       scale = data[:scale].to_f
       rotation = data[:rotation]
+      emissive = data[:emissive_intensity].to_f
 
       if rotation.is_a?(Array)
-        JS.global.updateGeometry(scale, rotation)
+        JS.global.updateGeometry(scale, rotation, emissive)
       end
     rescue => e
       JS.global[:console].error("JSBridge error updating geometry: #{e.message}")
+    end
+  end
+
+  def self.update_bloom(data)
+    begin
+      strength = data[:strength].to_f
+      threshold = data[:threshold].to_f
+
+      JS.global.updateBloom(strength, threshold)
+    rescue => e
+      JS.global[:console].error("JSBridge error updating bloom: #{e.message}")
     end
   end
 
@@ -331,36 +343,66 @@ class ParticleSystem
 
   def update(analysis)
     energy = analysis[:overall_energy]
-    color = ColorPalette.frequency_to_color(analysis)
-    brightness = ColorPalette.energy_to_brightness(energy)
+    bass = analysis[:bass]
+    mid = analysis[:mid]
+    high = analysis[:high]
 
-    @particles.each do |particle|
-      explosion_force = energy * 0.1
+    # 動的爆発確率（15-50%、エネルギーに応じて変化）
+    explosion_probability = 0.15 + energy * 0.35
+    # 爆発力を3.5倍に増強
+    explosion_force = energy * 0.35
 
-      if energy > 0.5 && rand < 0.05
-        particle[:velocity] = [
-          rand_range(-explosion_force, explosion_force),
-          rand_range(-explosion_force, explosion_force),
-          rand_range(-explosion_force, explosion_force)
-        ]
+    @particles.each_with_index do |particle, idx|
+      # パーティクルを3タイプに分類（0=bass, 1=mid, 2=high）
+      freq_type = idx % 3
+
+      case freq_type
+      when 0  # 低音パーティクル: 放射状爆発
+        if bass > 0.4 && rand < explosion_probability
+          direction = normalize_vector(particle[:position])
+          particle[:velocity] = direction.map { |d| d * explosion_force * 2.0 }
+        end
+        particle[:color] = [bass * 2.0, mid * 0.3, high * 0.3]
+
+      when 1  # 中音パーティクル: 螺旋運動
+        if mid > 0.3 && rand < explosion_probability * 0.8
+          angle = rand * Math::PI * 2
+          particle[:velocity] = [
+            Math.cos(angle) * explosion_force * 1.5,
+            explosion_force * 1.5,
+            Math.sin(angle) * explosion_force * 1.5
+          ]
+        end
+        particle[:color] = [bass * 0.3, mid * 2.0, high * 0.3]
+
+      when 2  # 高音パーティクル: 上向き噴出
+        if high > 0.3 && rand < explosion_probability * 0.7
+          particle[:velocity] = [
+            rand_range(-explosion_force, explosion_force) * 0.5,
+            explosion_force * 2.5,
+            rand_range(-explosion_force, explosion_force) * 0.5
+          ]
+        end
+        particle[:color] = [bass * 0.3, mid * 0.3, high * 2.0]
       end
 
+      # 位置更新
       particle[:position][0] += particle[:velocity][0]
       particle[:position][1] += particle[:velocity][1]
       particle[:position][2] += particle[:velocity][2]
 
-      particle[:velocity][0] *= 0.95
-      particle[:velocity][1] *= 0.95
-      particle[:velocity][2] *= 0.95
+      # 摩擦（やや強化）
+      particle[:velocity][0] *= 0.93
+      particle[:velocity][1] *= 0.93
+      particle[:velocity][2] *= 0.93
 
+      # 境界処理
       3.times do |i|
         if particle[:position][i].abs > 10
           particle[:position][i] = rand_range(-5, 5)
           particle[:velocity][i] = 0
         end
       end
-
-      particle[:color] = color.map { |c| c * brightness }
     end
   end
 
@@ -378,6 +420,12 @@ class ParticleSystem
 
   private
 
+  def normalize_vector(vec)
+    magnitude = Math.sqrt(vec[0]**2 + vec[1]**2 + vec[2]**2)
+    return [0, 0, 0] if magnitude < 0.001
+    vec.map { |v| v / magnitude }
+  end
+
   def rand_range(min, max)
     min + rand * (max - min)
   end
@@ -390,6 +438,7 @@ class GeometryMorpher
     @rotation = [0, 0, 0]
     @base_scale = 1.0
     @scale = 1.0
+    @emissive_intensity = 0.0
   end
 
   def update(analysis)
@@ -398,37 +447,70 @@ class GeometryMorpher
     mid = analysis[:mid]
     high = analysis[:high]
 
-    @scale = @base_scale + energy * 0.5
+    # スケールを大幅に強化（最大3.5倍）
+    @scale = @base_scale + energy * 2.5
 
-    @rotation[0] += bass * 0.05
-    @rotation[1] += mid * 0.03
-    @rotation[2] += high * 0.02
+    # 回転速度を3倍に強化
+    @rotation[0] += bass * 0.15
+    @rotation[1] += mid * 0.1
+    @rotation[2] += high * 0.08
+
+    # 発光強度を計算
+    @emissive_intensity = energy * 2.0
   end
 
   def get_data
     {
       scale: @scale,
-      rotation: @rotation
+      rotation: @rotation,
+      emissive_intensity: @emissive_intensity
     }
+  end
+end
+  </script>
+
+  <script type="text/ruby" id="ruby-bloom-controller">
+class BloomController
+  def initialize
+    @base_strength = 1.5
+    @base_threshold = 0.85
+  end
+
+  def update(analysis)
+    energy = analysis[:overall_energy]
+
+    # エネルギーに応じてBloom強度を動的調整（1.5-4.5）
+    @strength = @base_strength + energy * 3.0
+
+    # エネルギーが高いほどthresholdを下げる（より多く発光）
+    @threshold = 0.3 - energy * 0.2
+    @threshold = [@threshold, 0.0].max
+  end
+
+  def get_data
+    { strength: @strength, threshold: @threshold }
   end
 end
   </script>
 
   <script type="text/ruby" id="ruby-effect-manager">
 class EffectManager
-  attr_reader :particle_data, :geometry_data
+  attr_reader :particle_data, :geometry_data, :bloom_data
 
   def initialize
     @particle_system = ParticleSystem.new
     @geometry_morpher = GeometryMorpher.new
+    @bloom_controller = BloomController.new
   end
 
   def update(analysis)
     @particle_system.update(analysis)
     @geometry_morpher.update(analysis)
+    @bloom_controller.update(analysis)
 
     @particle_data = @particle_system.get_data
     @geometry_data = @geometry_morpher.get_data
+    @bloom_data = @bloom_controller.get_data
   end
 end
   </script>
@@ -459,6 +541,7 @@ begin
 
       JSBridge.update_particles($effect_manager.particle_data)
       JSBridge.update_geometry($effect_manager.geometry_data)
+      JSBridge.update_bloom($effect_manager.bloom_data)
 
       $frame_count += 1
       if $frame_count % 60 == 0
@@ -486,6 +569,7 @@ end
     let audioContext, analyser, dataArray;
     let scene, camera, renderer, composer;
     let particleSystem, geometryMesh;
+    let bloomPass;
     let lastFrameTime = Date.now();
     let frameCount = 0;
 
@@ -539,7 +623,7 @@ end
       const renderPass = new RenderPass(scene, camera);
       composer.addPass(renderPass);
 
-      const bloomPass = new UnrealBloomPass(
+      bloomPass = new UnrealBloomPass(
         new THREE.Vector2(window.innerWidth, window.innerHeight),
         1.5,
         0.4,
@@ -627,7 +711,7 @@ end
       }
     };
 
-    window.updateGeometry = function(scale, rotation) {
+    window.updateGeometry = function(scale, rotation, emissiveIntensity) {
       if (!geometryMesh) {
         console.warn('[JS] geometryMesh is not initialized');
         return;
@@ -641,6 +725,32 @@ end
         geometryMesh.rotation.y = Number(rotation[1]) || 0;
         geometryMesh.rotation.z = Number(rotation[2]) || 0;
       }
+
+      // 発光強度を動的調整
+      if (emissiveIntensity !== undefined && geometryMesh.material) {
+        const intensity = Number(emissiveIntensity) || 0;
+        const r = Math.min(1.0, intensity * 0.3);
+        const g = Math.min(1.0, intensity * 1.0);
+        const b = Math.min(1.0, intensity * 0.5);
+
+        // THREE.Colorオブジェクトで直接色を設定
+        if (geometryMesh.material.emissive) {
+          geometryMesh.material.emissive.setRGB(r, g, b);
+        }
+        if (geometryMesh.material.color) {
+          geometryMesh.material.color.setRGB(r, g, b);
+        }
+      }
+    };
+
+    window.updateBloom = function(strength, threshold) {
+      if (!bloomPass) {
+        console.warn('[JS] bloomPass is not initialized');
+        return;
+      }
+
+      bloomPass.strength = Number(strength) || 1.5;
+      bloomPass.threshold = Number(threshold) || 0.85;
     };
 
     // Animation loop
