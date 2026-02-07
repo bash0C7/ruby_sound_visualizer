@@ -60,8 +60,7 @@ ruby_sound_visualizer/
 ├── CLAUDE.md           # 詳細ドキュメント
 ├── Gemfile             # Ruby依存関係管理
 ├── .ruby-version       # Ruby バージョン指定 (3.4.7)
-├── index.html          # メインアプリケーション（全コード含む）
-└── src/                # （参考用）個別Rubyファイル
+└── index.html          # メインアプリケーション（全コード含む）
 ```
 
 ## トラブルシューティング

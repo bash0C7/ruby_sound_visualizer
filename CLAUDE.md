@@ -69,10 +69,6 @@ ruby_sound_visualizer/
 │       ├── GeometryMorpher
 │       ├── EffectManager
 │       └── Main (初期化・メインループ)
-├── src/                       # （参考用）個別ファイル（実装時のソース）
-│   ├── utils/
-│   ├── audio/
-│   └── visuals/
 └── CLAUDE.md                  # このファイル
 ```
 

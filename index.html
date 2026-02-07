@@ -347,6 +347,9 @@ class ParticleSystem
     mid = analysis[:mid]
     high = analysis[:high]
 
+    # 最低明るさを保証（音が無くても見える）
+    brightness = 0.3 + (energy ** 0.5) * 1.7
+
     # 動的爆発確率（15-50%、エネルギーに応じて変化）
     explosion_probability = 0.15 + energy * 0.35
     # 爆発力を3.5倍に増強
@@ -362,7 +365,8 @@ class ParticleSystem
           direction = normalize_vector(particle[:position])
           particle[:velocity] = direction.map { |d| d * explosion_force * 2.0 }
         end
-        particle[:color] = [bass * 2.0, mid * 0.3, high * 0.3]
+        base_color = [1.0, 0.2, 0.2]
+        mix = [bass * 2.0, mid * 0.3, high * 0.3]
 
       when 1  # 中音パーティクル: 螺旋運動
         if mid > 0.3 && rand < explosion_probability * 0.8
@@ -373,7 +377,8 @@ class ParticleSystem
             Math.sin(angle) * explosion_force * 1.5
           ]
         end
-        particle[:color] = [bass * 0.3, mid * 2.0, high * 0.3]
+        base_color = [0.2, 1.0, 0.2]
+        mix = [bass * 0.3, mid * 2.0, high * 0.3]
 
       when 2  # 高音パーティクル: 上向き噴出
         if high > 0.3 && rand < explosion_probability * 0.7
@@ -383,7 +388,16 @@ class ParticleSystem
             rand_range(-explosion_force, explosion_force) * 0.5
           ]
         end
-        particle[:color] = [bass * 0.3, mid * 0.3, high * 2.0]
+        base_color = [0.2, 0.2, 1.0]
+        mix = [bass * 0.3, mid * 0.3, high * 2.0]
+      end
+
+      # 音がある時は周波数色、無い時はベース色で最低明るさを保証
+      total = bass + mid + high
+      if total > 0.01
+        particle[:color] = mix.map { |c| [c * brightness, 0.0].max }
+      else
+        particle[:color] = base_color.map { |c| c * brightness }
       end
 
       # 位置更新
@@ -474,6 +488,8 @@ class BloomController
   def initialize
     @base_strength = 1.5
     @base_threshold = 0.85
+    @strength = @base_strength
+    @threshold = @base_threshold
   end
 
   def update(analysis)
@@ -726,17 +742,13 @@ end
         geometryMesh.rotation.z = Number(rotation[2]) || 0;
       }
 
-      // 発光強度を動的調整
+      // 発光強度を動的調整（最低でもベース色を保持）
       if (emissiveIntensity !== undefined && geometryMesh.material) {
         const intensity = Number(emissiveIntensity) || 0;
-        const r = Math.min(1.0, intensity * 0.3);
-        const g = Math.min(1.0, intensity * 1.0);
-        const b = Math.min(1.0, intensity * 0.5);
+        const r = Math.min(1.0, 0.1 + intensity * 0.3);
+        const g = Math.min(1.0, 0.4 + intensity * 1.0);
+        const b = Math.min(1.0, 0.1 + intensity * 0.5);
 
-        // THREE.Colorオブジェクトで直接色を設定
-        if (geometryMesh.material.emissive) {
-          geometryMesh.material.emissive.setRGB(r, g, b);
-        }
         if (geometryMesh.material.color) {
           geometryMesh.material.color.setRGB(r, g, b);
         }
