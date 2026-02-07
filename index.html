@@ -369,7 +369,7 @@ end
 
   <script type="text/ruby" id="ruby-particle-system">
 class ParticleSystem
-  PARTICLE_COUNT = 10000
+  PARTICLE_COUNT = 7500
 
   def initialize
     @particles = Array.new(PARTICLE_COUNT) do
@@ -470,9 +470,9 @@ class ParticleSystem
       positions.concat(p[:position])
       colors.concat(p[:color])
 
-      # サイズを動的計算（色の明度ベース）
+      # サイズを動的計算（色の明度ベース、1.1倍サイズアップ）
       brightness = (p[:color][0] + p[:color][1] + p[:color][2]) / 3.0
-      sizes << (0.02 + brightness * 0.15)
+      sizes << (0.02 + brightness * 0.15) * 1.1
 
       # 透明度を動的計算
       opacity = (0.6 + brightness * 0.4)
