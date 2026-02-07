@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:ruby.github.io)",
+      "Bash(wc:*)"
+    ]
+  }
+}

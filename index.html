@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Ruby WASM Sound Visualizer</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #000;
+      font-family: Arial, sans-serif;
+    }
+    canvas {
+      display: block;
+    }
+    #loading {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: white;
+      font-family: monospace;
+      font-size: 20px;
+      text-align: center;
+      z-index: 100;
+    }
+    #status {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      color: #0f0;
+      font-family: monospace;
+      font-size: 12px;
+      z-index: 50;
+    }
+  </style>
+</head>
+<body>
+  <div id="loading">
+    <div>Loading Ruby WASM Sound Visualizer...</div>
+    <div id="loadingStatus" style="font-size: 12px; margin-top: 20px;"></div>
+  </div>
+  <div id="status">
+    <div>Ruby WASM Sound Visualizer</div>
+    <div id="fpsCounter" style="margin-top: 5px;">FPS: 0</div>
+  </div>
+
+  <!-- Ruby WASM (must load before async module scripts) -->
+  <script src="https://cdn.jsdelivr.net/npm/@ruby/4.0-wasm-wasi@2.8.1/dist/browser.script.iife.js"></script>
+
+  <!-- Import Maps で Three.js 依存関係を解決 -->
+  <script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+  </script>
+
+  <!-- Three.js とポストプロセッシングをグローバルに登録 -->
+  <script type="module">
+    import * as THREE from 'three';
+    import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+    import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+    import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+    import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+    // Ruby から使えるようにグローバルに登録
+    window.THREE = THREE;
+    window.EffectComposer = EffectComposer;
+    window.RenderPass = RenderPass;
+    window.UnrealBloomPass = UnrealBloomPass;
+    window.OutputPass = OutputPass;
+    window.THREE_READY = true;
+
+    console.log('[Three.js] r' + THREE.REVISION + ' loaded with postprocessing');
+  </script>
+
+  <!-- Embedded Ruby Code Blocks -->
+  <script type="text/ruby" id="ruby-math-helper">
+module MathHelper
+  def self.clamp(value, min, max)
+    [[value, min].max, max].min
+  end
+
+  def self.lerp(a, b, t)
+    a + (b - a) * t
+  end
+
+  def self.map_range(value, in_min, in_max, out_min, out_max)
+    if in_max == in_min
+      return out_min
+    end
+    (value - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
+  end
+
+  def self.normalize(value, min, max)
+    if max == min
+      return 0.0
+    end
+    (value - min) / (max - min)
+  end
+end
+  </script>
+
+  <script type="text/ruby" id="ruby-js-bridge">
+require 'js'
+
+module JSBridge
+  def self.update_particles(data)
+    begin
+      positions = data[:positions]
+      colors = data[:colors]
+
+      if positions.is_a?(Array) && colors.is_a?(Array)
+        JS.global.updateParticles(positions, colors)
+      end
+    rescue => e
+      JS.global[:console].error("JSBridge error updating particles: #{e.message}")
+    end
+  end
+
+  def self.update_geometry(data)
+    begin
+      scale = data[:scale].to_f
+      rotation = data[:rotation]
+
+      if rotation.is_a?(Array)
+        JS.global.updateGeometry(scale, rotation)
+      end
+    rescue => e
+      JS.global[:console].error("JSBridge error updating geometry: #{e.message}")
+    end
+  end
+
+  def self.log(message)
+    begin
+      JS.global[:console].log("[Ruby] #{message}")
+    rescue => e
+      # Silent fail if console not available
+    end
+  end
+
+  def self.error(message)
+    begin
+      JS.global[:console].error("[Ruby] #{message}")
+    rescue => e
+      # Silent fail if console not available
+    end
+  end
+end
+  </script>
+
+  <script type="text/ruby" id="ruby-frequency-mapper">
+class FrequencyMapper
+  BASS_RANGE = (0..250)
+  MID_RANGE = (250..2000)
+  HIGH_RANGE = (2000..20000)
+
+  SAMPLE_RATE = 48000
+  FFT_SIZE = 2048
+
+  def initialize
+    @bin_size = (SAMPLE_RATE / 2.0) / (FFT_SIZE / 2.0)
+  end
+
+  def split_bands(frequency_data)
+    bass = extract_range(frequency_data, BASS_RANGE)
+    mid = extract_range(frequency_data, MID_RANGE)
+    high = extract_range(frequency_data, HIGH_RANGE)
+
+    {
+      bass: bass,
+      mid: mid,
+      high: high
+    }
+  end
+
+  private
+
+  def extract_range(data, freq_range, bin_size = nil)
+    bin_size ||= @bin_size
+    start_bin = (freq_range.begin / bin_size).floor
+    end_bin = [(freq_range.end / bin_size).ceil, data.length - 1].min
+
+    if start_bin < data.length && end_bin >= start_bin
+      data[start_bin..end_bin].to_a
+    else
+      []
+    end
+  end
+end
+  </script>
+
+  <script type="text/ruby" id="ruby-analyzer">
+class AudioAnalyzer
+  SAMPLE_RATE = 48000
+  FFT_SIZE = 2048
+
+  def initialize
+    @frequency_mapper = FrequencyMapper.new
+    @smoothed_bass = 0.0
+    @smoothed_mid = 0.0
+    @smoothed_high = 0.0
+    @smoothing_factor = 0.85
+  end
+
+  def analyze(frequency_data)
+    freq_array = frequency_data.is_a?(Array) ? frequency_data : frequency_data.to_a
+
+    return empty_analysis if freq_array.empty?
+
+    bands = @frequency_mapper.split_bands(freq_array)
+
+    bass_energy = calculate_energy(bands[:bass])
+    mid_energy = calculate_energy(bands[:mid])
+    high_energy = calculate_energy(bands[:high])
+    overall_energy = calculate_energy(freq_array)
+
+    @smoothed_bass = lerp(@smoothed_bass, bass_energy, 1.0 - @smoothing_factor)
+    @smoothed_mid = lerp(@smoothed_mid, mid_energy, 1.0 - @smoothing_factor)
+    @smoothed_high = lerp(@smoothed_high, high_energy, 1.0 - @smoothing_factor)
+
+    {
+      bass: @smoothed_bass,
+      mid: @smoothed_mid,
+      high: @smoothed_high,
+      overall_energy: overall_energy,
+      dominant_frequency: find_dominant_frequency(freq_array),
+      bands: {
+        bass: bands[:bass],
+        mid: bands[:mid],
+        high: bands[:high]
+      }
+    }
+  end
+
+  private
+
+  def calculate_energy(data)
+    return 0.0 if data.empty?
+
+    sum = 0.0
+    data.each do |val|
+      normalized = val.to_f / 255.0
+      sum += normalized * normalized
+    end
+
+    Math.sqrt(sum / data.length)
+  end
+
+  def find_dominant_frequency(data)
+    return 0 if data.nil? || data.length == 0
+
+    max_index = 0
+    max_value = 0
+
+    data.length.times do |idx|
+      val = data[idx].to_i
+      if val > max_value
+        max_value = val
+        max_index = idx
+      end
+    end
+
+    max_index * (SAMPLE_RATE / 2.0) / (FFT_SIZE / 2.0)
+  end
+
+  def lerp(a, b, t)
+    a + (b - a) * t
+  end
+
+  def empty_analysis
+    {
+      bass: 0.0,
+      mid: 0.0,
+      high: 0.0,
+      overall_energy: 0.0,
+      dominant_frequency: 0,
+      bands: {
+        bass: [],
+        mid: [],
+        high: []
+      }
+    }
+  end
+end
+  </script>
+
+  <script type="text/ruby" id="ruby-color-palette">
+class ColorPalette
+  BASS_COLOR = [1.0, 0.0, 0.0]
+  MID_COLOR = [0.0, 1.0, 0.0]
+  HIGH_COLOR = [0.0, 0.0, 1.0]
+
+  def self.frequency_to_color(analysis)
+    bass_weight = analysis[:bass]
+    mid_weight = analysis[:mid]
+    high_weight = analysis[:high]
+
+    total = bass_weight + mid_weight + high_weight
+    return [1.0, 1.0, 1.0] if total < 0.01
+
+    r = (BASS_COLOR[0] * bass_weight + MID_COLOR[0] * mid_weight + HIGH_COLOR[0] * high_weight) / total
+    g = (BASS_COLOR[1] * bass_weight + MID_COLOR[1] * mid_weight + HIGH_COLOR[1] * high_weight) / total
+    b = (BASS_COLOR[2] * bass_weight + MID_COLOR[2] * mid_weight + HIGH_COLOR[2] * high_weight) / total
+
+    [r, g, b]
+  end
+
+  def self.energy_to_brightness(energy)
+    0.3 + (energy ** 0.5) * 1.7
+  end
+end
+  </script>
+
+  <script type="text/ruby" id="ruby-particle-system">
+class ParticleSystem
+  PARTICLE_COUNT = 10000
+
+  def initialize
+    @particles = Array.new(PARTICLE_COUNT) do
+      {
+        position: [rand_range(-5, 5), rand_range(-5, 5), rand_range(-5, 5)],
+        velocity: [0, 0, 0],
+        color: [1, 1, 1]
+      }
+    end
+  end
+
+  def update(analysis)
+    energy = analysis[:overall_energy]
+    color = ColorPalette.frequency_to_color(analysis)
+    brightness = ColorPalette.energy_to_brightness(energy)
+
+    @particles.each do |particle|
+      explosion_force = energy * 0.1
+
+      if energy > 0.5 && rand < 0.05
+        particle[:velocity] = [
+          rand_range(-explosion_force, explosion_force),
+          rand_range(-explosion_force, explosion_force),
+          rand_range(-explosion_force, explosion_force)
+        ]
+      end
+
+      particle[:position][0] += particle[:velocity][0]
+      particle[:position][1] += particle[:velocity][1]
+      particle[:position][2] += particle[:velocity][2]
+
+      particle[:velocity][0] *= 0.95
+      particle[:velocity][1] *= 0.95
+      particle[:velocity][2] *= 0.95
+
+      3.times do |i|
+        if particle[:position][i].abs > 10
+          particle[:position][i] = rand_range(-5, 5)
+          particle[:velocity][i] = 0
+        end
+      end
+
+      particle[:color] = color.map { |c| c * brightness }
+    end
+  end
+
+  def get_data
+    positions = []
+    colors = []
+
+    @particles.each do |p|
+      positions.concat(p[:position])
+      colors.concat(p[:color])
+    end
+
+    { positions: positions, colors: colors }
+  end
+
+  private
+
+  def rand_range(min, max)
+    min + rand * (max - min)
+  end
+end
+  </script>
+
+  <script type="text/ruby" id="ruby-geometry-morpher">
+class GeometryMorpher
+  def initialize
+    @rotation = [0, 0, 0]
+    @base_scale = 1.0
+    @scale = 1.0
+  end
+
+  def update(analysis)
+    energy = analysis[:overall_energy]
+    bass = analysis[:bass]
+    mid = analysis[:mid]
+    high = analysis[:high]
+
+    @scale = @base_scale + energy * 0.5
+
+    @rotation[0] += bass * 0.05
+    @rotation[1] += mid * 0.03
+    @rotation[2] += high * 0.02
+  end
+
+  def get_data
+    {
+      scale: @scale,
+      rotation: @rotation
+    }
+  end
+end
+  </script>
+
+  <script type="text/ruby" id="ruby-effect-manager">
+class EffectManager
+  attr_reader :particle_data, :geometry_data
+
+  def initialize
+    @particle_system = ParticleSystem.new
+    @geometry_morpher = GeometryMorpher.new
+  end
+
+  def update(analysis)
+    @particle_system.update(analysis)
+    @geometry_morpher.update(analysis)
+
+    @particle_data = @particle_system.get_data
+    @geometry_data = @geometry_morpher.get_data
+  end
+end
+  </script>
+
+  <script type="text/ruby" id="ruby-main">
+require 'js'
+
+$initialized = false
+$audio_analyzer = nil
+$effect_manager = nil
+$frame_count = 0
+
+begin
+  JSBridge.log "Ruby VM started, initializing..."
+
+  $audio_analyzer = AudioAnalyzer.new
+  $effect_manager = EffectManager.new
+
+  JS.global[:rubyUpdateVisuals] = lambda do |freq_array|
+    begin
+      unless $initialized
+        JSBridge.log "First update received, initializing effect system..."
+        $initialized = true
+      end
+
+      analysis = $audio_analyzer.analyze(freq_array)
+      $effect_manager.update(analysis)
+
+      JSBridge.update_particles($effect_manager.particle_data)
+      JSBridge.update_geometry($effect_manager.geometry_data)
+
+      $frame_count += 1
+      if $frame_count % 60 == 0
+        bass = (analysis[:bass] * 100).round(1)
+        mid = (analysis[:mid] * 100).round(1)
+        high = (analysis[:high] * 100).round(1)
+        overall = (analysis[:overall_energy] * 100).round(1)
+        JSBridge.log "Audio: Bass=#{bass}% Mid=#{mid}% High=#{high}% Overall=#{overall}%"
+      end
+    rescue => e
+      JSBridge.error "Error in rubyUpdateVisuals: #{e.class} #{e.message}"
+      JSBridge.error e.backtrace[0..4].join(", ")
+    end
+  end
+
+  JSBridge.log "Ruby initialization complete!"
+
+rescue => e
+  JSBridge.error "Fatal error during Ruby initialization: #{e.message}"
+end
+  </script>
+
+  <script>
+    // Global state for JavaScript bridge
+    let audioContext, analyser, dataArray;
+    let scene, camera, renderer, composer;
+    let particleSystem, geometryMesh;
+    let lastFrameTime = Date.now();
+    let frameCount = 0;
+
+    // Ruby VM is set by browser.script.iife.js as window.rubyVM
+    const getRubyVM = () => window.rubyVM;
+
+    // Web Audio API Setup
+    async function initAudio() {
+      console.log('[JS] Initializing Web Audio API...');
+      try {
+        audioContext = new AudioContext();
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 2048;
+        analyser.smoothingTimeConstant = 0.85;
+        const bufferLength = analyser.frequencyBinCount;
+        dataArray = new Uint8Array(bufferLength);
+
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const source = audioContext.createMediaStreamSource(stream);
+        source.connect(analyser);
+        console.log('[JS] Web Audio API initialized successfully');
+      } catch (error) {
+        console.error('[JS] Audio init error:', error);
+        throw error;
+      }
+    }
+
+    // Three.js Setup
+    function initThree() {
+      // Three.js モジュールが読み込まれるまで待機
+      if (!window.THREE_READY) {
+        console.log('[JS] Waiting for Three.js to load...');
+        setTimeout(initThree, 100);
+        return;
+      }
+
+      console.log('[JS] Initializing Three.js...');
+
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+      camera.position.z = 5;
+
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setClearColor(0x000000);
+      document.body.appendChild(renderer.domElement);
+
+      // Post-processing setup
+      composer = new EffectComposer(renderer);
+
+      const renderPass = new RenderPass(scene, camera);
+      composer.addPass(renderPass);
+
+      const bloomPass = new UnrealBloomPass(
+        new THREE.Vector2(window.innerWidth, window.innerHeight),
+        1.5,
+        0.4,
+        0.85
+      );
+      composer.addPass(bloomPass);
+
+      // OutputPass を追加（最終出力用）
+      const outputPass = new OutputPass();
+      composer.addPass(outputPass);
+
+      // Particle system
+      const particleCount = 10000;
+      const geometry = new THREE.BufferGeometry();
+      const positions = new Float32Array(particleCount * 3);
+      const colors = new Float32Array(particleCount * 3);
+
+      for (let i = 0; i < particleCount; i++) {
+        positions[i * 3] = (Math.random() - 0.5) * 10;
+        positions[i * 3 + 1] = (Math.random() - 0.5) * 10;
+        positions[i * 3 + 2] = (Math.random() - 0.5) * 10;
+        colors[i * 3] = 1.0;
+        colors[i * 3 + 1] = 1.0;
+        colors[i * 3 + 2] = 1.0;
+      }
+
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+      const material = new THREE.PointsMaterial({
+        size: 0.05,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.8,
+        blending: THREE.AdditiveBlending
+      });
+
+      particleSystem = new THREE.Points(geometry, material);
+      scene.add(particleSystem);
+
+      // Morphing geometry (torus)
+      const torusGeometry = new THREE.TorusGeometry(1, 0.4, 32, 64);
+      const torusMaterial = new THREE.MeshBasicMaterial({
+        color: 0x00ff00,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.6,
+        emissive: 0x00ff00
+      });
+      geometryMesh = new THREE.Mesh(torusGeometry, torusMaterial);
+      scene.add(geometryMesh);
+
+      console.log('[JS] Three.js initialized successfully');
+    }
+
+    // Update functions called from Ruby
+    window.updateParticles = function(positions, colors) {
+      if (!particleSystem) {
+        console.warn('[JS] particleSystem is not initialized');
+        return;
+      }
+
+      const posAttr = particleSystem.geometry.attributes.position;
+      const colAttr = particleSystem.geometry.attributes.color;
+
+      if (!posAttr || !colAttr) {
+        console.warn('[JS] Attributes not found');
+        return;
+      }
+
+      // Convert to numbers if needed
+      const posArray = typeof positions === 'number' ? [positions] : Array.from(positions || []);
+      const colArray = typeof colors === 'number' ? [colors] : Array.from(colors || []);
+
+      if (posArray.length > 0 && colArray.length > 0) {
+        for (let i = 0; i < posArray.length && i < posAttr.array.length; i++) {
+          posAttr.array[i] = Number(posArray[i]) || 0;
+        }
+        for (let i = 0; i < colArray.length && i < colAttr.array.length; i++) {
+          colAttr.array[i] = Number(colArray[i]) || 0;
+        }
+
+        posAttr.needsUpdate = true;
+        colAttr.needsUpdate = true;
+      }
+    };
+
+    window.updateGeometry = function(scale, rotation) {
+      if (!geometryMesh) {
+        console.warn('[JS] geometryMesh is not initialized');
+        return;
+      }
+
+      const scaleNum = Number(scale) || 1.0;
+      geometryMesh.scale.set(scaleNum, scaleNum, scaleNum);
+
+      if (rotation && Array.isArray(rotation) && rotation.length >= 3) {
+        geometryMesh.rotation.x = Number(rotation[0]) || 0;
+        geometryMesh.rotation.y = Number(rotation[1]) || 0;
+        geometryMesh.rotation.z = Number(rotation[2]) || 0;
+      }
+    };
+
+    // Animation loop
+    function animate() {
+      requestAnimationFrame(animate);
+
+      if (analyser) {
+        analyser.getByteFrequencyData(dataArray);
+
+        if (window.rubyUpdateVisuals) {
+          try {
+            const freqArray = Array.from(dataArray);
+            // Call Ruby update with frequency data
+            window.rubyUpdateVisuals(freqArray);
+          } catch (error) {
+            console.error('[JS] Error calling Ruby update:', error);
+          }
+        } else {
+          console.warn('[JS] rubyUpdateVisuals not available');
+        }
+      } else {
+        console.warn('[JS] analyser not available');
+      }
+
+      frameCount++;
+      const now = Date.now();
+      if (now - lastFrameTime >= 1000) {
+        document.getElementById('fpsCounter').textContent = 'FPS: ' + frameCount;
+        frameCount = 0;
+        lastFrameTime = now;
+      }
+
+      if (composer) {
+        composer.render();
+      }
+    }
+
+    // Load Ruby code from embedded script tags
+    async function loadRubyCode() {
+      const rubyBlocks = document.querySelectorAll('script[type="text/ruby"]');
+      for (const block of rubyBlocks) {
+        const code = block.textContent;
+        try {
+          if (window.rubyVM) {
+            window.rubyVM.eval(code);
+            console.log(`[JS] Loaded Ruby code block: ${block.id}`);
+          }
+        } catch (error) {
+          console.error(`Failed to load Ruby code block ${block.id}:`, error);
+          throw error;
+        }
+      }
+    }
+
+    function updateLoadingStatus(message) {
+      const el = document.getElementById('loadingStatus');
+      if (el) {
+        el.textContent = message;
+      }
+      console.log('[JS] ' + message);
+    }
+
+    // Initialize everything
+    async function init() {
+      try {
+        updateLoadingStatus('Initializing Web Audio API...');
+        await initAudio();
+
+        updateLoadingStatus('Initializing Three.js...');
+        initThree();
+
+        // Ruby WASM は browser.script.iife.js によって自動初期化済み
+        // window.rubyVM と window.rubyUpdateVisuals は既に利用可能
+
+        updateLoadingStatus('Ready!');
+        document.getElementById('loading').style.display = 'none';
+        console.log('[JS] Initialization complete!');
+
+        // Start animation loop
+        animate();
+      } catch (error) {
+        console.error('[JS] Initialization error:', error);
+        updateLoadingStatus('Error: ' + error.message);
+      }
+    }
+
+    // Handle window resize
+    window.addEventListener('resize', function() {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+      renderer.setSize(width, height);
+      composer.setSize(width, height);
+    });
+
+    // Start initialization when page loads
+    window.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>
