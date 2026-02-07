@@ -171,15 +171,14 @@ Ruby と JavaScript 間のデータ受け渡し：
 
 **Ruby → JavaScript**:
 ```ruby
-JS.global[:updateParticles].call(positions_array, colors_array)
-JS.global[:updateGeometry].call(scale, rotation_array)
+# method_missing 経由で呼ぶ（.call() は使わない。後述の「既知の問題」参照）
+JS.global.updateParticles(positions_array, colors_array)
+JS.global.updateGeometry(scale, rotation_array)
 ```
 
 **JavaScript → Ruby**:
-```javascript
-JS.global[:rubyUpdateVisuals] = function(freq_array) {
-  // Ruby側で実行
-}
+```ruby
+JS.global[:rubyUpdateVisuals] = lambda { |freq_array| ... }
 ```
 
 ## 実行方法
@@ -345,6 +344,38 @@ three_scene = JS.global[:THREE][:Scene].new
 JS.global[:rubyCallback] = lambda { |data| ... }
 ```
 
+### 既知の問題: JS::Object#call のバグ（js gem 2.8.1）
+
+**`JS::Object#call` でJS関数を呼ぶと TypeError になる。`method_missing` 経由なら動く。**
+
+```ruby
+# NG: JS::Object#call → 内部の Reflect.apply で関数参照が undefined に化ける
+js_func = JS.global[:updateParticles]
+js_func.typeof   # => "function"（参照自体は有効）
+js_func.call(a, b)  # => TypeError: Function.prototype.apply was called on undefined
+
+# OK: method_missing → invoke_js_method 経由で正しく動く
+JS.global.updateParticles(a, b)  # 成功！
+```
+
+**原因**: `#call` は内部保持した関数参照を `Reflect.apply` に渡すが、その参照が `undefined` に化ける。
+`method_missing` は `globalThis` から関数を都度解決して `invoke_js_method` で呼ぶため問題なし。
+
+### JS::Object の注意点
+
+`JS::Object` は **`BasicObject` を継承**している：
+
+- `.class`, `.nil?`, `.is_a?` 等の Ruby 組み込みメソッドは **存在しない**
+- 全て `method_missing` 経由で **JS プロパティアクセスに変換**される
+- デバッグには `.typeof`（JS::Object 固有メソッド）を使う
+- 文字列補間内で `.class` を呼ぶと `obj.class` というJSプロパティアクセスになり `NoMethodError` で落ちる
+
+```ruby
+js_obj = JS.global[:someFunc]
+js_obj.typeof   # => "function" （OK: JS::Object 固有メソッド）
+js_obj.class    # => NoMethodError （NG: BasicObject に .class はない → method_missing → JS の obj.class を探す → 存在しない）
+```
+
 ### パフォーマンスのボトルネック
 
 1. **パーティクル更新**: 10,000 個 × フレーム数のループが最大の負荷
@@ -356,6 +387,62 @@ JS.global[:rubyCallback] = lambda { |data| ... }
 - **単一ファイル**: CDN への依存を最小化、デプロイが簡単
 - **YAGNI 原則**: 不要な機能は追加しない（今後の拡張時に追加予定）
 - **マイク必須**: ビジュアルはマイク入力に完全に依存
+
+## デバッグの手引き
+
+### ブラウザでの確認方法
+
+1. ローカルサーバーを起動: `bundle exec ruby -run -ehttpd . -p8000`
+2. ブラウザで `http://localhost:8000/index.html` を開く
+3. DevTools コンソール（F12）でエラーを確認
+4. Ruby WASM の初期化には **20〜30秒**かかるため、待ってから確認すること
+
+### Ruby WASM コードのデバッグ出力
+
+```ruby
+# OK: console.log/error は method_missing 経由で安全に呼べる
+JS.global[:console].log("[DEBUG] value=#{some_value}")
+
+# OK: typeof は JS::Object 固有メソッド
+JS.global[:console].log("[DEBUG] typeof=#{js_obj.typeof}")
+
+# NG: .class, .nil?, .inspect 等は使えない（BasicObject 継承のため）
+JS.global[:console].log("class=#{js_obj.class}")  # NoMethodError で落ちる
+```
+
+### JS側でのエラー監視（プログラム的）
+
+DevTools を開けない状況では、JS 側で `console.error` をフックして監視できる：
+
+```javascript
+window._errorCount = 0;
+window._errorMessages = [];
+const origError = console.error;
+console.error = function(...args) {
+  window._errorCount++;
+  if (window._errorMessages.length < 5) {
+    window._errorMessages.push(args.map(a => String(a).substring(0, 200)).join(' '));
+  }
+  origError.apply(console, args);
+};
+// 後で確認: JSON.stringify({ errorCount: window._errorCount, errors: window._errorMessages })
+```
+
+### 問題の洗い出し方
+
+1. **まず事実を掴む**: 憶測で修正しない。`console.log` でデバッグ出力を入れて、実際の値を確認する
+2. **エラーメッセージを正確に読む**: ruby.wasm のスタックトレースは `eval:行番号` で `<script type="text/ruby">` ブロック内の行を指す
+3. **一つずつ変数を確認**: 複数の値を一度に出力しようとすると、途中で例外が出て全体が失敗する（例: `.typeof` は OK だが `.class` で落ちる）
+4. **仮説を立てて検証**: 例えば「`.call()` が駄目なら `method_missing` はどうか？」のように、代替手段を一つずつ試す
+5. **Chrome で確認**: ページリロード後 Ruby WASM の初期化に時間がかかるため、**25〜30秒待ってから**コンソールを確認する
+
+### 実装のコツ
+
+- **Ruby → JS 関数呼び出し**: 必ず `JS.global.funcName(args)` 形式を使う（`method_missing` 経由）。`.call()` は使わない
+- **JS → Ruby コールバック**: `JS.global[:name] = lambda { |args| ... }` で登録。JS 側から `window.name(args)` で呼べる
+- **JS Array の受け取り**: Ruby lambda の引数として渡された JS Array は `.to_a` で Ruby Array に変換できる
+- **Ruby Array の受け渡し**: Ruby Array をそのまま JS 関数に渡せる。JS 側で `Array.from()` で変換可能
+- **URL のキャッシュ回避**: ブラウザ確認時は `?nocache=N` をクエリパラメータに付けてリロードすると確実
 
 ## ライセンス
 
