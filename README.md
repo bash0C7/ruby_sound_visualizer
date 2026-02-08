@@ -1,155 +1,155 @@
 # Ruby WASM Sound Visualizer
 
-🎵✨ Rubyで書かれたブラウザベースの音響ビジュアライザー（VJソフト）
+🎵✨ A browser-based audio visualizer (VJ software) written in Ruby
 
-マイク入力をリアルタイムで解析し、Three.jsで派手な3D視覚エフェクトを生成します。
+Analyzes microphone input in real-time and generates stunning 3D visual effects using Three.js.
 
 ![Features](https://img.shields.io/badge/Particles-10k-blue) ![Effects](https://img.shields.io/badge/Effects-Bloom%2FParticles%2FGeometry-green) ![Language](https://img.shields.io/badge/Language-Ruby%2FJavaScript-red)
 
-## クイックスタート
+## Quick Start
 
-### 1. セットアップ
+### 1. Setup
 
 ```bash
-# 依存関係をインストール
+# Install dependencies
 bundle install
 ```
 
-### 2. サーバー起動
+### 2. Start Server
 
 ```bash
-# Ruby WEBrick サーバーを起動
+# Start Ruby WEBrick server
 bundle exec ruby -run -ehttpd . -p8000
 ```
 
-### 3. ブラウザで開く
+### 3. Open in Browser
 
 ```
 http://localhost:8000/index.html
 ```
 
-### 4. マイク許可
+### 4. Allow Microphone Access
 
-ブラウザがマイク使用の許可を求めてきたら「許可」をクリック
+When the browser prompts for microphone permission, click "Allow"
 
-### 5. 音楽を再生
+### 5. Play Music
 
-スピーカーやマイクの近くで音楽を再生すると、自動的にビジュアルが反応します！
+Play music near your speakers or microphone, and the visualizer will automatically react!
 
-## 機能
+## Features
 
-### 視覚エフェクト
+### Visual Effects
 
-- **パーティクルシステム**: 10,000個のパーティクルが音に反応して爆発
-- **周波数別色分け**: 低音(赤) / 中音(緑) / 高音(青)の色が動的に変化
-- **幾何学変形**: トーラス（ドーナツ形）が音に合わせて拡大縮小・回転
-- **発光エフェクト**: Bloom エフェクトで画面全体が輝く
+- **Particle System**: 10,000 particles exploding in response to sound
+- **Frequency-Based Colors**: Bass (red) / Mid (green) / High (blue) colors change dynamically
+- **Geometry Morphing**: Torus (donut shape) scales and rotates with the music
+- **Glow Effects**: Bloom effect makes the entire screen glow
 
-### 技術
+### Technology
 
-- **Ruby 3.4.7** (@ruby/4.0-wasm-wasi) - ロジックはすべてRubyで実装
-- **Three.js** - 3D描画とポストエフェクト
-- **Web Audio API** - マイク入力と周波数解析
-- **単一HTMLファイル** - デプロイが簡単
+- **Ruby 3.4.7** (@ruby/4.0-wasm-wasi) - All logic implemented in Ruby
+- **Three.js** - 3D rendering and post-processing
+- **Web Audio API** - Microphone input and frequency analysis
+- **Single HTML File** - Easy deployment
 
-## キー操作
+## Keyboard Controls
 
-動作中にキーボードでリアルタイムにパラメーターを変更できます。
+You can adjust parameters in real-time using keyboard shortcuts.
 
-| キー | 機能 |
+| Key | Function |
 |------|------|
-| `0` | カラーモード: グレースケール |
-| `1` | カラーモード: 赤系 (240-120度) |
-| `2` | カラーモード: 緑系 (0-240度) |
-| `3` | カラーモード: 青系 (120-360度) |
-| `4` / `5` | 色相シフト -5度 / +5度 |
-| `6` / `7` | 最大輝度 -5 / +5 (0-255) |
-| `8` / `9` | 最大明度 -5 / +5 (0-255) |
-| `-` / `+` | 感度 -0.05 / +0.05 |
+| `0` | Color Mode: Grayscale |
+| `1` | Color Mode: Red spectrum (240-120°) |
+| `2` | Color Mode: Green spectrum (0-240°) |
+| `3` | Color Mode: Blue spectrum (120-360°) |
+| `4` / `5` | Hue shift -5° / +5° |
+| `6` / `7` | Max brightness -5 / +5 (0-255) |
+| `8` / `9` | Max lightness -5 / +5 (0-255) |
+| `-` / `+` | Sensitivity -0.05 / +0.05 |
 
-現在の設定値とキーガイドは画面左下に常時表示されます。
+Current settings and key guide are always displayed in the bottom-left corner of the screen.
 
-## 起動時パラメーター
+## URL Parameters
 
-URLクエリパラメーターで初期値を指定できます。
+You can specify initial values using URL query parameters.
 
 ```
 http://localhost:8000/index.html?sensitivity=1.5&maxBrightness=200&maxLightness=180
 ```
 
-| パラメーター | 説明 | デフォルト | 範囲 |
+| Parameter | Description | Default | Range |
 |-------------|------|-----------|------|
-| `sensitivity` | 音響感度（倍率） | `1.0` | 0.1〜 |
-| `maxBrightness` | 最大輝度（パーティクルの色出力上限） | `255` | 0-255 |
-| `maxLightness` | 最大明度（HSV の V 値上限） | `255` | 0-255 |
+| `sensitivity` | Audio sensitivity (multiplier) | `1.0` | 0.1~ |
+| `maxBrightness` | Max brightness (particle color output limit) | `255` | 0-255 |
+| `maxLightness` | Max lightness (HSV V value limit) | `255` | 0-255 |
 
-## ファイル構成
+## File Structure
 
 ```
 ruby_sound_visualizer/
-├── README.md           # このファイル
-├── CLAUDE.md           # 詳細ドキュメント
-├── Gemfile             # Ruby依存関係管理
-├── .ruby-version       # Ruby バージョン指定 (3.4.7)
-└── index.html          # メインアプリケーション（全コード含む）
+├── README.md           # This file
+├── CLAUDE.md           # Detailed documentation
+├── Gemfile             # Ruby dependency management
+├── .ruby-version       # Ruby version specification (3.4.7)
+└── index.html          # Main application (contains all code)
 ```
 
-## トラブルシューティング
+## Troubleshooting
 
-### マイクが動作しない
+### Microphone Not Working
 
-- HTTPS または localhost で実行してください
-- ブラウザのマイク許可設定を確認してください
+- Run on HTTPS or localhost
+- Check browser microphone permission settings
 
-### パフォーマンスが低い
+### Low Performance
 
-- ブラウザタブを少なくしてください
-- ハードウェアアクセラレーションを有効にしてください
-- DevTools コンソールを閉じてください
+- Close unnecessary browser tabs
+- Enable hardware acceleration
+- Close DevTools console
 
-### その他の問題
+### Other Issues
 
-詳細は [CLAUDE.md](CLAUDE.md) の「トラブルシューティング」セクションをご覧ください
+See the "Troubleshooting" section in [CLAUDE.md](CLAUDE.md) for details
 
-## 開発
+## Development
 
-### ローカル開発
+### Local Development
 
 ```bash
-# 依存関係をインストール
+# Install dependencies
 bundle install
 
-# WEBrick サーバーを起動
+# Start WEBrick server
 bundle exec ruby -run -ehttpd . -p8000
 
-# ブラウザで開く
+# Open in browser
 open http://localhost:8000/index.html
 ```
 
-### コード修正
+### Code Modification
 
-`index.html` 内の以下のセクションでコードを編集できます：
+You can edit code in the following sections of `index.html`:
 
-- Ruby コード: `<script type="text/ruby">` ブロック内
-- JavaScript コード: `<script>` ブロック内
+- Ruby code: Inside `<script type="text/ruby">` blocks
+- JavaScript code: Inside `<script>` blocks
 
-修正後はブラウザをリロードすると変更が反映されます
+Reload the browser after making changes to see the updates
 
-## 今後の拡張
+## Future Enhancements
 
-- God Rays（薄明光線）エフェクト
-- プリセットシステム
-- MIDI コントローラー対応
-- WebVR 対応
-- 録画機能
+- God Rays (crepuscular rays) effect
+- Preset system
+- MIDI controller support
+- WebVR support
+- Recording functionality
 
-詳細は [CLAUDE.md](CLAUDE.md) の「今後の拡張ポイント」をご覧ください
+See "Future Enhancement Points" in [CLAUDE.md](CLAUDE.md) for details
 
-## ライセンス
+## License
 
 MIT License
 
-## リンク
+## Links
 
 - [Ruby WASM Documentation](https://ruby.github.io/ruby.wasm/)
 - [Three.js](https://threejs.org/)
