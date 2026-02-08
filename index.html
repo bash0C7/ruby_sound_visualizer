@@ -115,11 +115,11 @@ module JSBridge
     begin
       positions = data[:positions]
       colors = data[:colors]
-      sizes = data[:sizes] || []
-      opacities = data[:opacities] || []
+      avg_size = data[:avg_size] || 0.05
+      avg_opacity = data[:avg_opacity] || 0.8
 
       if positions.is_a?(Array) && colors.is_a?(Array)
-        JS.global.updateParticles(positions, colors, sizes, opacities)
+        JS.global.updateParticles(positions, colors, avg_size, avg_opacity)
       end
     rescue => e
       JS.global[:console].error("JSBridge error updating particles: #{e.message}")
@@ -714,8 +714,8 @@ class ParticleSystem
   def get_data
     positions = []
     colors = []
-    sizes = []
-    opacities = []
+    total_size = 0.0
+    total_opacity = 0.0
 
     @particles.each do |p|
       positions.concat(p[:position])
@@ -723,14 +723,25 @@ class ParticleSystem
 
       # サイズを動的計算（パーティクル数減に合わせて2.5倍サイズアップ）
       brightness = (p[:color][0] + p[:color][1] + p[:color][2]) / 3.0
-      sizes << (0.05 + brightness * 0.25) * 2.5
+      size = (0.05 + brightness * 0.25) * 2.5
+      total_size += size
 
       # 透明度を動的計算
       opacity = (0.6 + brightness * 0.4)
-      opacities << [opacity, 1.0].min
+      opacity = [opacity, 1.0].min
+      total_opacity += opacity
     end
 
-    { positions: positions, colors: colors, sizes: sizes, opacities: opacities }
+    # 平均値を Ruby で計算（JavaScript 側の負荷を減らす）
+    avg_size = @particles.length > 0 ? total_size / @particles.length : 0.05
+    avg_opacity = @particles.length > 0 ? total_opacity / @particles.length : 0.8
+
+    {
+      positions: positions,
+      colors: colors,
+      avg_size: avg_size,
+      avg_opacity: avg_opacity
+    }
   end
 
   private
@@ -1278,7 +1289,7 @@ end
     }
 
     // Update functions called from Ruby
-    window.updateParticles = function(positions, colors, sizes, opacities) {
+    window.updateParticles = function(positions, colors, avgSize, avgOpacity) {
       if (!particleSystem) {
         console.warn('[JS] particleSystem is not initialized');
         return;
@@ -1295,8 +1306,6 @@ end
       // Convert to numbers if needed
       const posArray = typeof positions === 'number' ? [positions] : Array.from(positions || []);
       const colArray = typeof colors === 'number' ? [colors] : Array.from(colors || []);
-      const sizeArray = typeof sizes === 'number' ? [sizes] : Array.from(sizes || []);
-      const opacityArray = typeof opacities === 'number' ? [opacities] : Array.from(opacities || []);
 
       if (posArray.length > 0 && colArray.length > 0) {
         for (let i = 0; i < posArray.length && i < posAttr.array.length; i++) {
@@ -1309,20 +1318,10 @@ end
         posAttr.needsUpdate = true;
         colAttr.needsUpdate = true;
 
-        // サイズの動的更新（平均値）
-        if (sizeArray.length > 0) {
-          const avgSize = sizeArray.reduce((a, b) => a + b, 0) / sizeArray.length;
-          if (particleSystem.material) {
-            particleSystem.material.size = avgSize;
-          }
-        }
-
-        // 透明度の動的更新（平均値）
-        if (opacityArray.length > 0) {
-          const avgOpacity = opacityArray.reduce((a, b) => a + b, 0) / opacityArray.length;
-          if (particleSystem.material) {
-            particleSystem.material.opacity = Math.max(0.3, Math.min(1.0, avgOpacity));
-          }
+        // サイズと透明度の動的更新（Ruby で計算済みの平均値を使用）
+        if (particleSystem.material) {
+          particleSystem.material.size = Number(avgSize) || 0.05;
+          particleSystem.material.opacity = Math.max(0.3, Math.min(1.0, Number(avgOpacity) || 0.8));
         }
       }
     };
