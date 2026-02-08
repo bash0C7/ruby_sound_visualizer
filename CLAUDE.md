@@ -2,15 +2,70 @@
 
 ブラウザで動作する、Rubyで書かれた音響ビジュアライザー（VJソフトウェア）
 
+## Language Policy
+
+- **Documentation, git comments, code comments**: ALL in English
+- **User communication, information provision**: ALL in Japanese Kansai dialect (関西弁)
+
 ## git操作
 
-- subagentを使うこと
-- pushは厳格に禁止（人間が行う）
+- **subagent を使うこと**: git 操作は Task tool を使って subagent に委譲する
+- **push は厳格に禁止**: リモートへの push は人間が行う。Claude は commit までで止める
+- **Commit message format**: English only, follow conventional commits style
 
 ## 実装の注意
 
-- 既存の処理を壊さないように、慎重にかつテストファーストで一手ずつ確認しながら開発を進めること。いままでもデグレードが頻発している問題をClaude Codeが起こしていた。
-- 生産性高くruby.wasmコードを主体にする
+- **t-wada Style TDD (Test-Driven Development)**:
+  1. **Red**: Write a failing test first (before implementation)
+  2. **Green**: Write minimal code to make the test pass
+  3. **Refactor**: Improve code while keeping tests green
+  4. Repeat the red-green-refactoring cycle
+  5. Never write production code without a failing test first
+- **既存の処理を壊さないこと**: 慎重にテストファーストで一手ずつ確認しながら開発を進める
+- **デグレード防止**: 過去にデグレードが頻発している。変更前にテストケースを確認すること
+- **ruby.wasm コードを主体にする**: ロジックは可能な限り Ruby で実装
+
+## ブラウザテスト・デバッグ
+
+- **Chrome MCP ツール必須**: ブラウザでの動作確認には Chrome MCP ツール（`mcp__claude-in-chrome__*`）を**常に使用**すること
+- **テスト手順**:
+  1. `tabs_context_mcp(createIfEmpty: true)` でタブコンテキスト取得
+  2. 必要に応じて `tabs_create_mcp()` で新規タブ作成
+  3. `navigate` で `http://localhost:8000/index.html?nocache=<ランダム数>` に移動
+  4. `computer(action: "wait", duration: 30)` で Ruby WASM 初期化待機（**25〜30秒必須**）
+  5. `computer(action: "screenshot")` で視覚的確認
+  6. `read_console_messages(pattern: "Error|TypeError|Ruby", onlyErrors: true)` でエラー確認
+  7. 必要に応じて `javascript_tool` で動的デバッグ
+- **重要**: ブラウザ確認を依頼されたら、必ず Chrome MCP ツールを即座に使用すること。「手動で確認してください」と言わないこと
+- 詳細な手順は `/debug-browser` スキルを参照
+
+## 調査プロトコル (Investigation Protocol)
+
+**CRITICAL: 憶測で修正せず、必ずデバッグ出力で事実を確認してから修正すること**
+
+1. **まず事実を掴む**: `console.log` でデバッグ出力を入れて、実際の値を確認する
+2. **エラーメッセージを正確に読む**: ruby.wasm のスタックトレースは `eval:行番号` で `<script type="text/ruby">` ブロック内の行を指す
+3. **一つずつ変数を確認**: 複数の値を一度に出力しようとすると、途中で例外が出て全体が失敗する（例: `.typeof` は OK だが `.class` で落ちる）
+4. **仮説を立てて検証**: 「`.call()` が駄目なら `method_missing` はどうか？」のように、代替手段を一つずつ試す。ブルートフォースで総当たりしない
+5. **Chrome で確認**: ページリロード後 Ruby WASM の初期化に時間がかかるため、**25〜30秒待ってから**コンソールを確認する
+6. **投機的な修正禁止**: 根拠なく「多分これで直る」という修正をしない。必ずロジカルな根拠を持つこと
+
+**調査ワークフロー（複雑な問題の場合）**:
+1. 現象の正確な記録（何が起きているか）
+2. 期待される動作の確認（何が起きるべきか）
+3. 差分の特定（何が違うのか）
+4. 仮説の立案（最大3つ、根拠を明記）
+5. 仮説の検証（一つずつ、デバッグ出力で確認）
+6. 修正の実施（最小限の変更）
+7. 動作確認（Chrome MCP ツールで検証）
+
+## アプローチ制約 (Approach Constraints)
+
+- **ファイル修正スコープ厳守**: ユーザーが指定したファイルのみを修正。関連ファイルを勝手に変更しない
+- **ビルド/デプロイ禁止**: 明示的に指示されない限り、ビルドやデプロイを実行しない
+- **最小限の変更**: 広範なリファクタリングではなく、ターゲットを絞った変更を行う
+- **推測ベースの修正禁止**: 何が問題か分からない場合は、推測で修正するのではなく、調査を提案すること
+- **index.html と Gemfile は慎重に**: これらのファイルは単一ファイル構成の核心。変更時は必ずユーザーの明示的な承認を得ること
 
 ## 概要
 
@@ -79,7 +134,11 @@ ruby_sound_visualizer/
 │       ├── GeometryMorpher
 │       ├── EffectManager
 │       └── Main (初期化・メインループ)
-└── CLAUDE.md                  # このファイル
+├── CLAUDE.md                  # このファイル
+└── .claude/
+    └── skills/
+        ├── debug-browser/     # ブラウザデバッグ詳細手順
+        └── troubleshoot/      # トラブルシューティング
 ```
 
 ## 実装の詳細
@@ -118,37 +177,12 @@ ruby_sound_visualizer/
 - **色変化**: 周波数帯域の比率から色を計算、エネルギーで明度を変更
 - **境界処理**: 一定範囲外に出たパーティクルは中央にリセット
 
-**更新フロー**:
-```ruby
-analysis = analyze(frequency_data)
-particles.each do |p|
-  # 爆発判定
-  if energy > 0.5 && rand < 0.05
-    p.velocity = random_direction * energy
-  end
-
-  # 位置更新
-  p.position += p.velocity
-
-  # 摩擦
-  p.velocity *= 0.95
-
-  # 色更新
-  p.color = frequency_to_color(analysis) * energy_brightness
-end
-```
-
 ### 幾何学変形 (Ruby)
 
 トーラス（ドーナツ形）をリアルタイム変形：
 
-- **スケール変化**: 全体エネルギーで拡大縮小
-  - `scale = 1.0 + energy * 0.5`
-
-- **回転制御**: 各周波数帯域が異なる軸を回転
-  - X軸: Bass 回転速度
-  - Y軸: Mid 回転速度
-  - Z軸: High 回転速度
+- **スケール変化**: 全体エネルギーで拡大縮小（`scale = 1.0 + energy * 0.5`）
+- **回転制御**: 各周波数帯域が異なる軸を回転（X軸: Bass, Y軸: Mid, Z軸: High）
 
 ### 色彩システム (Ruby)
 
@@ -164,10 +198,8 @@ HIGH_COLOR = [0.0, 0.0, 1.0]   # 青
 color = BASS_COLOR * bass_weight +
         MID_COLOR * mid_weight +
         HIGH_COLOR * high_weight
-```
 
-エネルギーで明度を制御：
-```ruby
+# エネルギーで明度を制御
 brightness = 0.3 + sqrt(energy) * 1.7
 ```
 
@@ -211,18 +243,6 @@ bundle exec ruby -run -ehttpd . -p8000
 
 ブラウザで `http://localhost:8000/index.html` を開く
 
-### その他のサーバーオプション
-
-**Pythonの場合**:
-```bash
-python3 -m http.server 8000
-```
-
-**Node.js の場合**:
-```bash
-npx http-server
-```
-
 ### 初回実行時
 
 1. ページを開く
@@ -241,8 +261,6 @@ npx http-server
 
 ## パフォーマンス最適化
 
-### パーティクル数の調整
-
 ブラウザのパフォーマンスが低い場合、index.html 内の以下の値を変更：
 
 ```javascript
@@ -253,56 +271,19 @@ const particleCount = 10000;  // 5000 や 3000 に減らす
 PARTICLE_COUNT = 10000  # 5000 や 3000 に減らす
 ```
 
-### ブラウザ設定
-
+その他の最適化:
 - ハードウェアアクセラレーションを有効化（Chrome/Firefox 設定）
 - 他のタブを閉じる（GPU メモリ節約）
 - DevTools コンソールを閉じる（描画負荷軽減）
 
 ## トラブルシューティング
 
-### Ruby WASM が読み込めない
+基本的なトラブルシューティングは `/troubleshoot` スキルを参照。
 
-**症状**: 「Error: Failed to fetch ruby.wasm」
-
-**原因**: CORS エラー または ネットワークエラー
-
-**解決法**:
-- ローカルサーバー（http://localhost:8000）で実行
-- インターネット接続を確認
-- ブラウザコンソール（F12）でエラー詳細を確認
-
-### マイクが動作しない
-
-**症状**: 「Permission denied」または マイク許可ダイアログが出ない
-
-**原因**: HTTPS でない、またはセキュリティ設定
-
-**解決法**:
-- HTTPS または localhost で実行（非 HTTPS では マイク使用不可）
-- ブラウザのマイク許可設定を確認：
-  - Chrome: 左上のロックアイコン → サイト設定 → マイク → 許可
-  - Firefox: メニュー → 設定 → プライバシーとセキュリティ → マイク → 許可
-
-### パフォーマンスが悪い
-
-**症状**: FPS が低い（20 以下）、描画が遅い
-
-**原因**: GPU 不足、または パーティクル数が多すぎる
-
-**解決法**:
-1. パーティクル数を 5000 に減らす
-2. ブラウザのタブを少なくする
-3. ハードウェアアクセラレーションを有効化
-
-### Ruby エラーが出ている
-
-**症状**: コンソールに「[Ruby] Error:...」というメッセージ
-
-**確認**:
-- ブラウザの DevTools コンソール（F12）を開く
-- エラーメッセージを確認
-- ローカルサーバーで実行しているか確認
+よくある問題:
+- **Ruby WASM が読み込めない**: ローカルサーバーで実行、CORS エラー確認
+- **マイクが動作しない**: HTTPS または localhost で実行、ブラウザのマイク許可確認
+- **パフォーマンスが悪い**: パーティクル数を減らす、ハードウェアアクセラレーション有効化
 
 ## 今後の拡張ポイント
 
@@ -312,7 +293,6 @@ PARTICLE_COUNT = 10000  # 5000 や 3000 に減らす
 - **Chromatic Aberration（色収差）**: 迫力ある色分離エフェクト
 - **Camera Shake**: 強い低音で カメラを揺動
 - **Trail Effect**: パーティクルの軌跡表示
-- **Post-processing**: グリッチエフェクト、ノイズ、モーションブラー
 
 ### 機能拡張
 
@@ -320,14 +300,12 @@ PARTICLE_COUNT = 10000  # 5000 や 3000 に減らす
 - **録画機能**: Canvas Stream API でビデオ出力
 - **MIDI 対応**: 外部 MIDI コントローラーでパラメータ制御
 - **VR モード**: WebXR API でVRヘッドセット対応
-- **周波数ビジュアライザー**: スペクトラム表示
 
 ### パフォーマンス改善
 
 - **WebWorker**: 音響分析を別スレッドで実行
 - **GPU 計算**: GLSL シェーダーでのパーティクル計算
 - **LOD（Level of Detail）**: 距離に応じたパーティクル数動的調整
-- **テクスチャ活用**: パーティクル描画を2D テクスチャで高速化
 
 ## 開発ノート
 
@@ -395,27 +373,6 @@ search_str = JS.global[:location][:search].to_s       # => Ruby String
 search_str.match(/sensitivity=([0-9.]+)/)             # => 正しく Ruby の正規表現マッチが動く
 ```
 
-### パフォーマンスのボトルネック
-
-1. **パーティクル更新**: 10,000 個 × フレーム数のループが最大の負荷
-2. **周波数解析**: FFT 計算（JavaScript で実施）
-3. **BufferAttribute 更新**: needsUpdate フラグの管理が重要
-
-### 設計上の制約
-
-- **単一ファイル**: CDN への依存を最小化、デプロイが簡単
-- **YAGNI 原則**: 不要な機能は追加しない（今後の拡張時に追加予定）
-- **マイク必須**: ビジュアルはマイク入力に完全に依存
-
-## デバッグの手引き
-
-### ブラウザでの確認方法
-
-1. ローカルサーバーを起動: `bundle exec ruby -run -ehttpd . -p8000`
-2. ブラウザで `http://localhost:8000/index.html` を開く
-3. DevTools コンソール（F12）でエラーを確認
-4. Ruby WASM の初期化には **20〜30秒**かかるため、待ってから確認すること
-
 ### Ruby WASM コードのデバッグ出力
 
 ```ruby
@@ -429,32 +386,6 @@ JS.global[:console].log("[DEBUG] typeof=#{js_obj.typeof}")
 JS.global[:console].log("class=#{js_obj.class}")  # NoMethodError で落ちる
 ```
 
-### JS側でのエラー監視（プログラム的）
-
-DevTools を開けない状況では、JS 側で `console.error` をフックして監視できる：
-
-```javascript
-window._errorCount = 0;
-window._errorMessages = [];
-const origError = console.error;
-console.error = function(...args) {
-  window._errorCount++;
-  if (window._errorMessages.length < 5) {
-    window._errorMessages.push(args.map(a => String(a).substring(0, 200)).join(' '));
-  }
-  origError.apply(console, args);
-};
-// 後で確認: JSON.stringify({ errorCount: window._errorCount, errors: window._errorMessages })
-```
-
-### 問題の洗い出し方
-
-1. **まず事実を掴む**: 憶測で修正しない。`console.log` でデバッグ出力を入れて、実際の値を確認する
-2. **エラーメッセージを正確に読む**: ruby.wasm のスタックトレースは `eval:行番号` で `<script type="text/ruby">` ブロック内の行を指す
-3. **一つずつ変数を確認**: 複数の値を一度に出力しようとすると、途中で例外が出て全体が失敗する（例: `.typeof` は OK だが `.class` で落ちる）
-4. **仮説を立てて検証**: 例えば「`.call()` が駄目なら `method_missing` はどうか？」のように、代替手段を一つずつ試す
-5. **Chrome で確認**: ページリロード後 Ruby WASM の初期化に時間がかかるため、**25〜30秒待ってから**コンソールを確認する
-
 ### 実装のコツ
 
 - **Ruby → JS 関数呼び出し**: 必ず `JS.global.funcName(args)` 形式を使う（`method_missing` 経由）。`.call()` は使わない
@@ -462,7 +393,7 @@ console.error = function(...args) {
 - **JS Array の受け取り**: Ruby lambda の引数として渡された JS Array は `.to_a` で Ruby Array に変換できる
 - **Ruby Array の受け渡し**: Ruby Array をそのまま JS 関数に渡せる。JS 側で `Array.from()` で変換可能
 - **JS の値を Ruby で操作**: `JS.global[:prop]` の戻り値は `JS::Object`。Ruby の `.match`, `.include?`, `!=` 等を使う前に **必ず `.to_s` で Ruby String に変換**すること
-- **URL のキャッシュ回避**: ブラウザ確認時は `?nocache=N` をクエリパラメータに付けてリロードすると確実
+- **URL のキャッシュ回避**: ブラウザ確認時は `?nocache=<ランダム数>` をクエリパラメータに付けてリロードすると確実
 - **AudioContext の suspended 対策**: Chrome のオートプレイポリシーにより `new AudioContext()` は `suspended` 状態で作成される。`audioContext.resume()` を明示的に呼ぶこと。フォールバックとしてユーザーのクリックイベントでも resume する
 
 ## ライセンス

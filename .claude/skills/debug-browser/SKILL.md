@@ -1,0 +1,236 @@
+---
+name: debug-browser
+description: Detailed browser debugging procedure for ruby.wasm app using Chrome MCP tools
+disable-model-invocation: false
+---
+
+# Browser Debugging Workflow for Ruby WASM Sound Visualizer
+
+## Step-by-Step Chrome MCP Tool Usage
+
+### 1. Get Tab Context
+
+```
+mcp__claude-in-chrome__tabs_context_mcp(createIfEmpty: true)
+```
+
+- Returns available tab IDs in the current group
+- Creates new MCP tab group if none exists
+
+### 2. Create New Tab (if needed)
+
+```
+mcp__claude-in-chrome__tabs_create_mcp()
+```
+
+- Creates a fresh tab in the MCP group
+- Returns the new tab ID
+
+### 3. Navigate to Application
+
+```
+mcp__claude-in-chrome__navigate(
+  url: "http://localhost:8000/index.html?nocache=<random>",
+  tabId: XXX
+)
+```
+
+- Use `?nocache=<random-number>` to bypass browser cache
+- Wait for page load completion
+
+### 4. Wait for Ruby WASM Initialization (CRITICAL)
+
+```
+mcp__claude-in-chrome__computer(
+  action: "wait",
+  duration: 30,
+  tabId: XXX
+)
+```
+
+- Ruby WASM initialization takes **25-30 seconds**
+- DO NOT proceed before this wait completes
+
+### 5. Visual Verification
+
+```
+mcp__claude-in-chrome__computer(
+  action: "screenshot",
+  tabId: XXX
+)
+```
+
+- Check if particles are visible
+- Verify torus geometry is rendered
+- Look for visual artifacts or errors
+
+### 6. Check Console Errors
+
+```
+mcp__claude-in-chrome__read_console_messages(
+  tabId: XXX,
+  pattern: "Error|TypeError|Ruby|undefined",
+  onlyErrors: true
+)
+```
+
+- Always provide `pattern` to filter relevant messages
+- Focus on Ruby-related errors first
+
+### 7. Add Debug Output to Code
+
+When you need to inspect variables:
+
+1. Edit index.html to add `console.log` statements
+2. Reload the page (repeat steps 3-5)
+3. Read console messages again
+
+**IMPORTANT**: Output one variable at a time to avoid exceptions that fail the entire logging block.
+
+Example:
+```ruby
+# Good: one value per log
+JS.global[:console].log("[DEBUG] typeof=#{js_obj.typeof}")
+JS.global[:console].log("[DEBUG] value=#{some_value}")
+
+# Bad: multiple values can fail if one throws
+JS.global[:console].log("[DEBUG] typeof=#{js_obj.typeof} value=#{some_value}")
+```
+
+### 8. Dynamic Debugging with JavaScript
+
+```
+mcp__claude-in-chrome__javascript_tool(
+  tabId: XXX,
+  text: "console.log('[DEBUG]', window.audioContext.state)"
+)
+```
+
+- Inspect runtime state without editing files
+- Access browser APIs and global objects
+
+## Common Error Patterns
+
+### TypeError: Function.prototype.apply was called on undefined
+
+**Root Cause**: Bug in `JS::Object#call()` method (js gem 2.8.1)
+
+**Solution**: Use `method_missing` pattern instead
+```ruby
+# Wrong
+js_func = JS.global[:updateParticles]
+js_func.call(a, b)  # ← TypeError
+
+# Correct
+JS.global.updateParticles(a, b)  # ← Works via method_missing
+```
+
+### NoMethodError: undefined method `class' for #<JS::Object>
+
+**Root Cause**: `JS::Object` inherits from `BasicObject`, doesn't have `.class`
+
+**Solution**: Use `.typeof` or convert to Ruby types
+```ruby
+# Wrong
+js_obj.class  # ← NoMethodError
+
+# Correct
+js_obj.typeof  # ← "function"
+js_obj.to_s    # ← Convert to Ruby String
+```
+
+### AudioContext remains suspended
+
+**Root Cause**: Chrome's autoplay policy
+
+**Solution**: Explicitly call `audioContext.resume()`
+```ruby
+# Add after AudioContext creation
+JS.global[:audioContext].resume
+```
+
+**Fallback**: Add click event handler to resume
+```javascript
+document.addEventListener('click', () => {
+  if (audioContext.state === 'suspended') {
+    audioContext.resume();
+  }
+}, { once: true });
+```
+
+## Programmatic Error Monitoring Script
+
+When DevTools cannot be opened, inject error monitoring:
+
+```javascript
+mcp__claude-in-chrome__javascript_tool(
+  tabId: XXX,
+  text: `
+    window._errorCount = 0;
+    window._errorMessages = [];
+    const origError = console.error;
+    console.error = function(...args) {
+      window._errorCount++;
+      if (window._errorMessages.length < 5) {
+        window._errorMessages.push(
+          args.map(a => String(a).substring(0, 200)).join(' ')
+        );
+      }
+      origError.apply(console, args);
+    };
+    'Error monitoring installed';
+  `
+)
+```
+
+Later, check results:
+```javascript
+mcp__claude-in-chrome__javascript_tool(
+  tabId: XXX,
+  text: `JSON.stringify({
+    errorCount: window._errorCount,
+    errors: window._errorMessages
+  })`
+)
+```
+
+## Three.js / WebGL Debugging
+
+### Verify WebGL Context
+
+```javascript
+mcp__claude-in-chrome__javascript_tool(
+  tabId: XXX,
+  text: `
+    const canvas = document.querySelector('canvas');
+    const gl = canvas?.getContext('webgl2') || canvas?.getContext('webgl');
+    JSON.stringify({
+      hasCanvas: !!canvas,
+      hasContext: !!gl,
+      renderer: gl?.getParameter(gl.VERSION) || 'N/A'
+    });
+  `
+)
+```
+
+### Check Scene Object Counts
+
+```javascript
+mcp__claude-in-chrome__javascript_tool(
+  tabId: XXX,
+  text: `JSON.stringify({
+    sceneChildren: scene?.children.length || 0,
+    particles: particleSystem?.children.length || 0,
+    geometry: torusMesh?.geometry.type || 'N/A'
+  })`
+)
+```
+
+## Best Practices
+
+1. **Always use Chrome MCP tools** - Never ask user to manually check browser
+2. **Wait 25-30 seconds** after navigation for Ruby WASM initialization
+3. **Use pattern parameter** in `read_console_messages` to filter noise
+4. **Screenshot first** for visual confirmation before diving into logs
+5. **One debug variable per log** to avoid cascading exceptions
+6. **Cache-bust URLs** with `?nocache=<random>` for reliable testing
