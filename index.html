@@ -165,6 +165,18 @@ module JSBridge
     end
   end
 
+  def self.update_particle_rotation(geometry_rotation)
+    begin
+      if geometry_rotation.is_a?(Array) && geometry_rotation.length >= 3
+        # パーティクルをトーラスの半分の速さで回転（星空が流れる効果）
+        particle_rotation = geometry_rotation.map { |r| r * 0.5 }
+        JS.global.updateParticleRotation(particle_rotation)
+      end
+    rescue => e
+      JS.global[:console].error("JSBridge error updating particle rotation: #{e.message}")
+    end
+  end
+
   def self.log(message)
     begin
       JS.global[:console].log("[Ruby] #{message}")
@@ -980,31 +992,10 @@ begin
       JSBridge.update_geometry($effect_manager.geometry_data)
       JSBridge.update_bloom($effect_manager.bloom_data)
       JSBridge.update_camera($effect_manager.camera_data)
+      JSBridge.update_particle_rotation($effect_manager.geometry_data[:rotation])
 
       $frame_count += 1
 
-      # JavaScript側にデバッグ情報を渡す（表示用）
-      JS.global[:currentSensitivity] = $sensitivity
-      JS.global[:currentMaxBrightness] = $max_brightness
-      JS.global[:currentMaxLightness] = $max_lightness
-
-      # HSB デバッグ情報をセット
-      hsv = ColorPalette.get_last_hsv
-      hue_mode = ColorPalette.get_hue_mode
-      mode_str = hue_mode.nil? ? "0:Gray" : "#{hue_mode}:Hue"
-      hue_offset = ColorPalette.get_hue_offset
-      JS.global[:debugMode] = hue_offset == 0.0 ? mode_str : "#{mode_str}+#{hue_offset.round(0)}deg"
-      JS.global[:debugBass] = (analysis[:bass] * 100).round(1)
-      JS.global[:debugMid] = (analysis[:mid] * 100).round(1)
-      JS.global[:debugHigh] = (analysis[:high] * 100).round(1)
-      JS.global[:debugOverall] = (analysis[:overall_energy] * 100).round(1)
-      JS.global[:debugH] = (hsv[0] * 360).round(1)
-      JS.global[:debugS] = (hsv[1] * 100).round(1)
-      JS.global[:debugB] = (hsv[2] * 100).round(1)
-      # ボリュームレベル (dB)
-      energy = analysis[:overall_energy]
-      volume_db = energy > 0.001 ? (20.0 * Math.log10(energy)).round(1) : -60.0
-      JS.global[:debugVolume] = volume_db
       # BPM 推定（ビート間隔から計算）
       beat = analysis[:beat] || {}
       if beat[:bass]
@@ -1029,13 +1020,41 @@ begin
           end
         end
       end
-      JS.global[:debugBPM] = $estimated_bpm
+
       # 現在のフレームのビート状態
       beat_now = []
       beat_now << "B" if beat[:bass]
       beat_now << "M" if beat[:mid]
       beat_now << "H" if beat[:high]
-      JS.global[:debugBeatNow] = beat_now.empty? ? "" : beat_now.join("+")
+
+      # デバッグ情報文字列を Ruby でフォーマット（JavaScript 側の負荷を減らす）
+      energy = analysis[:overall_energy]
+      volume_db = energy > 0.001 ? (20.0 * Math.log10(energy)).round(1) : -60.0
+      hsv = ColorPalette.get_last_hsv
+      hue_mode_val = ColorPalette.get_hue_mode
+      mode_str_base = hue_mode_val.nil? ? "0:Gray" : "#{hue_mode_val}:Hue"
+      hue_offset_val = ColorPalette.get_hue_offset
+      mode_str = hue_offset_val == 0.0 ? mode_str_base : "#{mode_str_base}+#{hue_offset_val.round(0)}deg"
+      bass_str = (analysis[:bass] * 100).round(1).to_s
+      mid_str = (analysis[:mid] * 100).round(1).to_s
+      high_str = (analysis[:high] * 100).round(1).to_s
+      overall_str = (analysis[:overall_energy] * 100).round(1).to_s
+      h_str = (hsv[0] * 360).round(1).to_s
+      s_str = (hsv[1] * 100).round(1).to_s
+      b_str = (hsv[2] * 100).round(1).to_s
+      bpm_str = $estimated_bpm > 0 ? "#{$estimated_bpm} BPM" : "---"
+      beat_indicator = beat_now.empty? ? "" : " [#{beat_now.join("+")}]"
+
+      debug_text = "Mode: #{mode_str}  |  Bass: #{bass_str}%  Mid: #{mid_str}%  High: #{high_str}%  Overall: #{overall_str}%  Vol: #{volume_db.round(1)}dB\n" +
+                   "H: #{h_str}  S: #{s_str}%  B: #{b_str}%  |  #{bpm_str}#{beat_indicator}"
+      JS.global[:debugInfoText] = debug_text
+
+      # パラメーター情報文字列も Ruby でフォーマット
+      param_text = "Sensitivity: #{$sensitivity.round(2)}x  |  MaxBrightness: #{$max_brightness}  |  MaxLightness: #{$max_lightness}"
+      JS.global[:paramInfoText] = param_text
+
+      # キーガイド（固定文字列だが統一のため Ruby で定義）
+      JS.global[:keyGuideText] = "0-3: Color Mode  |  4/5: Hue Shift  |  6/7: Brightness ±5  |  8/9: Lightness ±5  |  +/-: Sensitivity"
 
       if $frame_count % 60 == 0
         bass = (analysis[:bass] * 100).round(1)
@@ -1370,6 +1389,19 @@ end
       camera.position.z = Number(pos[2]) + Number(shk[2]);
     };
 
+    window.updateParticleRotation = function(rotation) {
+      if (!particleSystem) {
+        console.warn('[JS] particleSystem is not initialized');
+        return;
+      }
+
+      if (rotation && Array.isArray(rotation) && rotation.length >= 3) {
+        particleSystem.rotation.x = Number(rotation[0]) || 0;
+        particleSystem.rotation.y = Number(rotation[1]) || 0;
+        particleSystem.rotation.z = Number(rotation[2]) || 0;
+      }
+    };
+
     // Animation loop
     function animate() {
       requestAnimationFrame(animate);
@@ -1395,48 +1427,29 @@ end
       frameCount++;
       const now = Date.now();
       if (now - lastFrameTime >= 1000) {
-        const sensitivity = window.currentSensitivity !== undefined ? Number(window.currentSensitivity).toFixed(2) : '1.00';
         document.getElementById('fpsCounter').textContent = 'FPS: ' + frameCount;
         window.currentFPS = frameCount;  // Ruby に FPS を渡す
 
-        // デバッグ情報表示
-        const mode = window.debugMode || '-';
-        const bass = window.debugBass !== undefined ? Number(window.debugBass).toFixed(1) : '-';
-        const mid = window.debugMid !== undefined ? Number(window.debugMid).toFixed(1) : '-';
-        const high = window.debugHigh !== undefined ? Number(window.debugHigh).toFixed(1) : '-';
-        const overall = window.debugOverall !== undefined ? Number(window.debugOverall).toFixed(1) : '-';
-        const h = window.debugH !== undefined ? Number(window.debugH).toFixed(1) : '-';
-        const s = window.debugS !== undefined ? Number(window.debugS).toFixed(1) : '-';
-        const b = window.debugB !== undefined ? Number(window.debugB).toFixed(1) : '-';
-        const vol = window.debugVolume !== undefined ? Number(window.debugVolume).toFixed(1) : '-';
-        const bpm = window.debugBPM !== undefined ? Number(window.debugBPM) : 0;
-        const beatNow = window.debugBeatNow || '';
-        const bpmStr = bpm > 0 ? bpm + ' BPM' : '---';
-        const beatIndicator = beatNow ? ' [' + beatNow + ']' : '';
-        document.getElementById('debugInfo').textContent =
-          'Mode: ' + mode + '  |  Bass: ' + bass + '%  Mid: ' + mid + '%  High: ' + high + '%  Overall: ' + overall + '%  Vol: ' + vol + 'dB\n' +
-          'H: ' + h + '  S: ' + s + '%  B: ' + b + '%  |  ' + bpmStr + beatIndicator;
+        // デバッグ情報表示（Ruby でフォーマット済み）
+        if (window.debugInfoText) {
+          document.getElementById('debugInfo').textContent = window.debugInfoText;
+        }
 
-        // パラメーター情報表示
-        const maxBr = window.currentMaxBrightness !== undefined ? Number(window.currentMaxBrightness) : 255;
-        const maxLt = window.currentMaxLightness !== undefined ? Number(window.currentMaxLightness) : 255;
-        document.getElementById('paramInfo').textContent =
-          'Sensitivity: ' + sensitivity + 'x  |  MaxBrightness: ' + maxBr + '  |  MaxLightness: ' + maxLt;
+        // パラメーター情報表示（Ruby でフォーマット済み）
+        if (window.paramInfoText) {
+          document.getElementById('paramInfo').textContent = window.paramInfoText;
+        }
 
-        // キーガイド表示
-        document.getElementById('keyGuide').textContent =
-          '0-3: Color Mode  |  4/5: Hue Shift  |  6/7: Brightness ±5  |  8/9: Lightness ±5  |  +/-: Sensitivity';
+        // キーガイド表示（Ruby でフォーマット済み）
+        if (window.keyGuideText) {
+          document.getElementById('keyGuide').textContent = window.keyGuideText;
+        }
 
         frameCount = 0;
         lastFrameTime = now;
       }
 
-      // パーティクルをトーラスの半分の速さで回転（星空が流れる効果）
-      if (particleSystem && geometryMesh) {
-        particleSystem.rotation.x = geometryMesh.rotation.x * 0.5;
-        particleSystem.rotation.y = geometryMesh.rotation.y * 0.5;
-        particleSystem.rotation.z = geometryMesh.rotation.z * 0.5;
-      }
+      // パーティクル回転は Ruby 側で計算済み（updateParticleRotation）
 
       if (composer) {
         composer.render();
