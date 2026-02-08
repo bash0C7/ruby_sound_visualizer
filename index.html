@@ -44,6 +44,8 @@
     <div>Ruby WASM Sound Visualizer</div>
     <div id="fpsCounter" style="margin-top: 5px;">FPS: 0</div>
     <div id="debugInfo" style="margin-top: 5px; white-space: pre-wrap;"></div>
+    <div id="paramInfo" style="margin-top: 5px;"></div>
+    <div id="keyGuide" style="margin-top: 5px; color: #888; font-size: 11px; white-space: pre-wrap;"></div>
   </div>
 
   <!-- Ruby WASM (must load before async module scripts) -->
@@ -438,14 +440,24 @@ end
   <script type="text/ruby" id="ruby-color-palette">
 class ColorPalette
   @@hue_mode = nil  # nil = grayscale, 1,2,3 = 色相モード
+  @@hue_offset = 0.0  # 手動オフセット（度数、0-360循環）
   @@last_hsv = [0, 0, 0.3]  # デバッグ用: 最後に計算した H, S, V
 
   def self.set_hue_mode(mode)
     @@hue_mode = mode
+    @@hue_offset = 0.0  # プリセット選択時はオフセットリセット
   end
 
   def self.get_hue_mode
     @@hue_mode
+  end
+
+  def self.get_hue_offset
+    @@hue_offset
+  end
+
+  def self.shift_hue_offset(delta)
+    @@hue_offset = (@@hue_offset + delta) % 360.0
   end
 
   def self.get_last_hsv
@@ -464,8 +476,14 @@ class ColorPalette
       return [0.3, 0.3, 0.3]
     end
 
-    # 全モード統一：明度（0.4-0.65）
-    value = 0.4 + total * 0.25
+    # 全モード統一：明度（ソフトクリッピングで大音量での飽和を防ぐ）
+    value = 0.4 + Math.tanh(total * 0.5) * 0.3
+
+    # 最大明度キャップ適用
+    if defined?($max_lightness) && $max_lightness < 255
+      max_v = $max_lightness / 255.0
+      value = [value, max_v].min
+    end
 
     # Grayscale mode
     if @@hue_mode.nil?
@@ -473,32 +491,32 @@ class ColorPalette
       return hsv_to_rgb(0, 0, value)
     end
 
-    # 統一ロジック: bass vs high の比率で色相シフト（全モード共通）
-    # bass が強い → 0.0（範囲の開始点）、high が強い → 1.0（範囲の終了点）
-    bass_high_total = bass + high
-    if bass_high_total > 0.01
-      hue_shift = high / bass_high_total
+    # 色相シフト: bass→低, mid→中, high→高 の重み付き
+    # bass=0.0, mid=0.5, high=1.0 寄りにマッピング
+    if total > 0.01
+      hue_shift = (mid * 0.5 + high * 1.0) / total
     else
       hue_shift = 0.5
     end
 
-    # モードに応じて色相範囲を均等3分割
+    # モードに応じて色相範囲（各240度幅） + 手動オフセット
+    offset = @@hue_offset / 360.0
     case @@hue_mode
     when 1
-      # 0-120度 (0.0-0.333)
-      hue = hue_shift * 0.333
+      # 赤中心: 240-120度 (マゼンタ←赤→黄→緑)
+      hue = (0.667 + offset + hue_shift * 0.667) % 1.0
     when 2
-      # 120-240度 (0.333-0.666)
-      hue = 0.333 + hue_shift * 0.333
+      # 緑中心: 0-240度 (赤→黄→緑→シアン→青)
+      hue = (offset + hue_shift * 0.667) % 1.0
     when 3
-      # 240-360度 (0.666-1.0)
-      hue = 0.666 + hue_shift * 0.334
+      # 青中心: 120-360度 (緑→シアン→青→紫→マゼンタ)
+      hue = (0.333 + offset + hue_shift * 0.667) % 1.0
     else
       hue = 0
     end
 
-    # 彩度: 全周波数合計で統一制御
-    saturation = 0.65 + total * 0.1
+    # 彩度: ソフトクリッピング
+    saturation = 0.65 + Math.tanh(total * 0.5) * 0.15
 
     @@last_hsv = [hue, saturation, value]
     hsv_to_rgb(hue, saturation, value)
@@ -514,26 +532,32 @@ class ColorPalette
     total = bass + mid + high
     return [0.3, 0.3, 0.3] if total < 0.01
 
-    value = 0.4 + total * 0.25
+    value = 0.4 + Math.tanh(total * 0.5) * 0.3
+
+    # 最大明度キャップ適用
+    if defined?($max_lightness) && $max_lightness < 255
+      max_v = $max_lightness / 255.0
+      value = [value, max_v].min
+    end
 
     if @@hue_mode.nil?
       return hsv_to_rgb(0, 0, value)
     end
 
-    # 距離で色相範囲内をグラデーション
-    # 中心(0.0) → 範囲の開始点、外縁(1.0) → 範囲の終了点
+    # 距離で色相範囲内をグラデーション（各240度幅） + 手動オフセット
+    offset = @@hue_offset / 360.0
     case @@hue_mode
     when 1
-      hue = distance * 0.333
+      hue = (0.667 + offset + distance * 0.667) % 1.0
     when 2
-      hue = 0.333 + distance * 0.333
+      hue = (offset + distance * 0.667) % 1.0
     when 3
-      hue = 0.666 + distance * 0.334
+      hue = (0.333 + offset + distance * 0.667) % 1.0
     else
       hue = 0
     end
 
-    saturation = 0.65 + total * 0.1
+    saturation = 0.65 + Math.tanh(total * 0.5) * 0.15
 
     hsv_to_rgb(hue, saturation, value)
   end
@@ -591,10 +615,11 @@ class ParticleSystem
     # ColorPalette から統一色を取得
     base_color = ColorPalette.frequency_to_color(analysis)
 
-    # 最低明るさを保証（音が無くても見える）
-    brightness = 0.3 + (energy ** 0.5) * 1.7
-    # impulse で明度ブースト（連続的に減衰）
-    brightness += 0.5 * imp_overall
+    # 最低明るさを保証 + ソフトクリッピングで大音量飽和防止
+    brightness = 0.3 + Math.tanh(energy * 1.5) * 1.2
+    # impulse で明度ブースト（抑制付き）
+    brightness += 0.3 * imp_overall
+    brightness = [brightness, 1.5].min
 
     # 動的爆発確率（20-70%、エネルギーに応じて変化）
     explosion_probability = 0.20 + energy * 0.50
@@ -650,7 +675,9 @@ class ParticleSystem
       dist = Math.sqrt(pos[0]**2 + pos[1]**2 + pos[2]**2)
       normalized_dist = [dist / 10.0, 1.0].min  # 0.0(中心)〜1.0(外縁)
       dist_color = ColorPalette.frequency_to_color_at_distance(analysis, normalized_dist)
-      particle[:color] = dist_color.map { |c| [c * brightness, 0.0].max }
+      # 最大輝度キャップ適用
+      max_c = (defined?($max_brightness) && $max_brightness < 255) ? $max_brightness / 255.0 : 1.0
+      particle[:color] = dist_color.map { |c| [[c * brightness, 0.0].max, max_c].min }
 
       # 位置更新
       particle[:position][0] += particle[:velocity][0]
@@ -747,9 +774,10 @@ class GeometryMorpher
     @rotation[1] += 0.4 * imp_mid
     @rotation[2] += 0.3 * imp_high
 
-    # 発光強度を計算
-    @emissive_intensity = energy * 2.0
-    @emissive_intensity += 1.5 * imp_overall
+    # 発光強度（ソフトクリッピングでホワイトアウト防止）
+    @emissive_intensity = Math.tanh(energy * 1.5) * 1.5
+    @emissive_intensity += Math.tanh(imp_overall) * 0.8
+    @emissive_intensity = [@emissive_intensity, 2.0].min
   end
 
   def get_data
@@ -811,16 +839,16 @@ class BloomController
     impulse = analysis[:impulse] || {}
     imp_overall = impulse[:overall] || 0.0
 
-    # エネルギーに応じてBloom強度を動的調整（1.5-6.0）
-    @strength = @base_strength + energy * 4.5
-    # impulse で強烈フラッシュ（連続的に減衰）
-    @strength += 3.5 * imp_overall
+    # エネルギーに応じてBloom強度（ソフトクリッピングで飽和防止）
+    @strength = @base_strength + Math.tanh(energy * 2.0) * 2.5
+    # impulse フラッシュ（抑制付き）
+    @strength += Math.tanh(imp_overall) * 1.5
+    @strength = [@strength, 4.5].min
 
-    # エネルギーが高いほどthresholdを下げる（より多く発光）
-    @threshold = 0.3 - energy * 0.2
-    # impulse で threshold を下げる（連続的に減衰）
-    @threshold -= @threshold * imp_overall
-    @threshold = [@threshold, 0.0].max
+    # エネルギーが高いほどthresholdを下げる（下限付き）
+    @threshold = 0.3 - Math.tanh(energy) * 0.18
+    @threshold -= 0.05 * imp_overall
+    @threshold = [@threshold, 0.12].max
   end
 
   def get_data
@@ -898,10 +926,12 @@ $audio_analyzer = nil
 $effect_manager = nil
 $frame_count = 0
 $sensitivity = 1.0
+$max_brightness = 255
+$max_lightness = 255
 $beat_times = []  # ビート検出時のフレーム番号を記録
 $estimated_bpm = 0
 
-# URL パラメーターから sensitivity を読取
+# URL パラメーターから設定値を読取
 # 注意: JS.global[:location][:search] は JS::Object を返す。
 # JS::Object は BasicObject 継承のため、.match 等の Ruby メソッドが
 # method_missing 経由で JS 側に転送されてしまう。
@@ -914,10 +944,20 @@ begin
       $sensitivity = match[1].to_f
       $sensitivity = [$sensitivity, 0.1].max  # 最小 0.1
     end
+    match_br = search_str.match(/maxBrightness=([0-9]+)/)
+    if match_br
+      $max_brightness = [[match_br[1].to_i, 0].max, 255].min
+    end
+    match_lt = search_str.match(/maxLightness=([0-9]+)/)
+    if match_lt
+      $max_lightness = [[match_lt[1].to_i, 0].max, 255].min
+    end
   end
 rescue => e
   # URLパラメーター読取失敗時はデフォルト値を使用
   $sensitivity = 1.0
+  $max_brightness = 255
+  $max_lightness = 255
 end
 
 begin
@@ -945,12 +985,15 @@ begin
 
       # JavaScript側にデバッグ情報を渡す（表示用）
       JS.global[:currentSensitivity] = $sensitivity
+      JS.global[:currentMaxBrightness] = $max_brightness
+      JS.global[:currentMaxLightness] = $max_lightness
 
       # HSB デバッグ情報をセット
       hsv = ColorPalette.get_last_hsv
       hue_mode = ColorPalette.get_hue_mode
       mode_str = hue_mode.nil? ? "0:Gray" : "#{hue_mode}:Hue"
-      JS.global[:debugMode] = mode_str
+      hue_offset = ColorPalette.get_hue_offset
+      JS.global[:debugMode] = hue_offset == 0.0 ? mode_str : "#{mode_str}+#{hue_offset.round(0)}deg"
       JS.global[:debugBass] = (analysis[:bass] * 100).round(1)
       JS.global[:debugMid] = (analysis[:mid] * 100).round(1)
       JS.global[:debugHigh] = (analysis[:high] * 100).round(1)
@@ -1018,17 +1061,14 @@ begin
         ColorPalette.set_hue_mode(nil)
         JSBridge.log "Color Mode: Grayscale"
       when 1
-        # 色相範囲1: 0-120度（赤〜黄）
         ColorPalette.set_hue_mode(1)
-        JSBridge.log "Color Mode: Hue Range 1 (0-120)"
+        JSBridge.log "Color Mode: 1:Red (240-120deg)"
       when 2
-        # 色相範囲2: 120-240度（緑〜シアン）
         ColorPalette.set_hue_mode(2)
-        JSBridge.log "Color Mode: Hue Range 2 (120-240)"
+        JSBridge.log "Color Mode: 2:Green (0-240deg)"
       when 3
-        # 色相範囲3: 240-360度（青〜マゼンタ）
         ColorPalette.set_hue_mode(3)
-        JSBridge.log "Color Mode: Hue Range 3 (240-360)"
+        JSBridge.log "Color Mode: 3:Blue (120-360deg)"
       end
     rescue => e
       JSBridge.error "Error in rubySetColorMode: #{e.message}"
@@ -1046,7 +1086,41 @@ begin
     end
   end
 
-  JSBridge.log "Keyboard controls ready (0-3: color, +/-: sensitivity)"
+  # 色相位置マニュアルシフト（4: -5度, 5: +5度）
+  JS.global[:rubyShiftHue] = lambda do |delta|
+    begin
+      d = delta.to_f
+      ColorPalette.shift_hue_offset(d)
+      offset = ColorPalette.get_hue_offset
+      JSBridge.log "Hue Offset: #{offset.round(1)} deg"
+    rescue => e
+      JSBridge.error "Error in rubyShiftHue: #{e.message}"
+    end
+  end
+
+  # 最大輝度 増減コールバック（6: -5, 7: +5）
+  JS.global[:rubyAdjustMaxBrightness] = lambda do |delta|
+    begin
+      d = delta.to_i
+      $max_brightness = [[$max_brightness + d, 0].max, 255].min
+      JSBridge.log "MaxBrightness: #{$max_brightness}"
+    rescue => e
+      JSBridge.error "Error in rubyAdjustMaxBrightness: #{e.message}"
+    end
+  end
+
+  # 最大明度 増減コールバック（8: -5, 9: +5）
+  JS.global[:rubyAdjustMaxLightness] = lambda do |delta|
+    begin
+      d = delta.to_i
+      $max_lightness = [[$max_lightness + d, 0].max, 255].min
+      JSBridge.log "MaxLightness: #{$max_lightness}"
+    rescue => e
+      JSBridge.error "Error in rubyAdjustMaxLightness: #{e.message}"
+    end
+  end
+
+  JSBridge.log "Keyboard controls ready (0-3: color, 4/5: hue shift, 6/7: brightness, 8/9: lightness, +/-: sensitivity)"
   JSBridge.log "Ruby initialization complete!"
 
 rescue => e
@@ -1321,8 +1395,8 @@ end
       frameCount++;
       const now = Date.now();
       if (now - lastFrameTime >= 1000) {
-        const sensitivity = window.currentSensitivity !== undefined ? window.currentSensitivity.toFixed(2) : '1.00';
-        document.getElementById('fpsCounter').textContent = 'FPS: ' + frameCount + '  |  Sensitivity: ' + sensitivity + 'x';
+        const sensitivity = window.currentSensitivity !== undefined ? Number(window.currentSensitivity).toFixed(2) : '1.00';
+        document.getElementById('fpsCounter').textContent = 'FPS: ' + frameCount;
         window.currentFPS = frameCount;  // Ruby に FPS を渡す
 
         // デバッグ情報表示
@@ -1342,6 +1416,16 @@ end
         document.getElementById('debugInfo').textContent =
           'Mode: ' + mode + '  |  Bass: ' + bass + '%  Mid: ' + mid + '%  High: ' + high + '%  Overall: ' + overall + '%  Vol: ' + vol + 'dB\n' +
           'H: ' + h + '  S: ' + s + '%  B: ' + b + '%  |  ' + bpmStr + beatIndicator;
+
+        // パラメーター情報表示
+        const maxBr = window.currentMaxBrightness !== undefined ? Number(window.currentMaxBrightness) : 255;
+        const maxLt = window.currentMaxLightness !== undefined ? Number(window.currentMaxLightness) : 255;
+        document.getElementById('paramInfo').textContent =
+          'Sensitivity: ' + sensitivity + 'x  |  MaxBrightness: ' + maxBr + '  |  MaxLightness: ' + maxLt;
+
+        // キーガイド表示
+        document.getElementById('keyGuide').textContent =
+          '0-3: Color Mode  |  4/5: Hue Shift  |  6/7: Brightness ±5  |  8/9: Lightness ±5  |  +/-: Sensitivity';
 
         frameCount = 0;
         lastFrameTime = now;
@@ -1433,6 +1517,36 @@ end
         } else {
           console.warn('[JS] rubySetColorMode not available yet');
         }
+      } else if (key === '4' || key === '5') {
+        // 4: 色相-5度, 5: 色相+5度（マニュアルシフト）
+        if (window.rubyShiftHue) {
+          try {
+            const delta = (key === '4') ? -5 : 5;
+            window.rubyShiftHue(delta);
+          } catch (error) {
+            console.error('[JS] Error calling rubyShiftHue:', error);
+          }
+        }
+      } else if (key === '6' || key === '7') {
+        // 6: 最大輝度-5, 7: 最大輝度+5
+        if (window.rubyAdjustMaxBrightness) {
+          try {
+            const delta = (key === '6') ? -5 : 5;
+            window.rubyAdjustMaxBrightness(delta);
+          } catch (error) {
+            console.error('[JS] Error calling rubyAdjustMaxBrightness:', error);
+          }
+        }
+      } else if (key === '8' || key === '9') {
+        // 8: 最大明度-5, 9: 最大明度+5
+        if (window.rubyAdjustMaxLightness) {
+          try {
+            const delta = (key === '8') ? -5 : 5;
+            window.rubyAdjustMaxLightness(delta);
+          } catch (error) {
+            console.error('[JS] Error calling rubyAdjustMaxLightness:', error);
+          }
+        }
       } else if (key === '-' || key === '+' || key === '=') {
         // +/- で sensitivity を 0.05 ずつ増減（= は Shift なしの + キー対応）
         if (window.rubyAdjustSensitivity) {
@@ -1446,7 +1560,7 @@ end
       }
     });
 
-    console.log('[JS] Keyboard listener registered (0-3: color modes, +/-: sensitivity)');
+    console.log('[JS] Keyboard listener registered (0-3: color, 4/5: hue, 6/7: brightness, 8/9: lightness, +/-: sensitivity)');
 
     // Handle window resize
     window.addEventListener('resize', function() {
