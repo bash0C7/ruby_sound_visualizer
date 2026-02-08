@@ -43,6 +43,7 @@
   <div id="status">
     <div>Ruby WASM Sound Visualizer</div>
     <div id="fpsCounter" style="margin-top: 5px;">FPS: 0</div>
+    <div id="debugInfo" style="margin-top: 5px; white-space: pre-wrap;"></div>
   </div>
 
   <!-- Ruby WASM (must load before async module scripts) -->
@@ -128,9 +129,10 @@ module JSBridge
       scale = data[:scale].to_f
       rotation = data[:rotation]
       emissive = data[:emissive_intensity].to_f
+      color = data[:color] || [0.3, 0.3, 0.3]  # デフォルト値で安全
 
       if rotation.is_a?(Array)
-        JS.global.updateGeometry(scale, rotation, emissive)
+        JS.global.updateGeometry(scale, rotation, emissive, color)
       end
     rescue => e
       JS.global[:console].error("JSBridge error updating geometry: #{e.message}")
@@ -224,13 +226,28 @@ end
 class AudioAnalyzer
   SAMPLE_RATE = 48000
   FFT_SIZE = 2048
+  HISTORY_SIZE = 43  # 約2秒分（~21fps想定）
 
   def initialize
     @frequency_mapper = FrequencyMapper.new
     @smoothed_bass = 0.0
     @smoothed_mid = 0.0
     @smoothed_high = 0.0
-    @smoothing_factor = 0.85
+    @smoothing_factor = 0.55  # 高速反応でビート感を出す
+
+    # ビート検出用: エネルギー履歴（リングバッファ）
+    @energy_history = Array.new(HISTORY_SIZE, 0.0)
+    @bass_history = Array.new(HISTORY_SIZE, 0.0)
+    @mid_history = Array.new(HISTORY_SIZE, 0.0)
+    @high_history = Array.new(HISTORY_SIZE, 0.0)
+    @history_index = 0
+
+    # ビート状態
+    @beat_overall = false
+    @beat_bass = false
+    @beat_mid = false
+    @beat_high = false
+    @beat_cooldown = 0  # 連続検出防止
   end
 
   def analyze(frequency_data)
@@ -249,12 +266,28 @@ class AudioAnalyzer
     @smoothed_mid = lerp(@smoothed_mid, mid_energy, 1.0 - @smoothing_factor)
     @smoothed_high = lerp(@smoothed_high, high_energy, 1.0 - @smoothing_factor)
 
+    # ビート検出
+    detect_beats(overall_energy, bass_energy, mid_energy, high_energy)
+
+    # 履歴に記録
+    @energy_history[@history_index] = overall_energy
+    @bass_history[@history_index] = bass_energy
+    @mid_history[@history_index] = mid_energy
+    @high_history[@history_index] = high_energy
+    @history_index = (@history_index + 1) % HISTORY_SIZE
+
     {
       bass: @smoothed_bass,
       mid: @smoothed_mid,
       high: @smoothed_high,
       overall_energy: overall_energy,
       dominant_frequency: find_dominant_frequency(freq_array),
+      beat: {
+        overall: @beat_overall,
+        bass: @beat_bass,
+        mid: @beat_mid,
+        high: @beat_high
+      },
       bands: {
         bass: bands[:bass],
         mid: bands[:mid],
@@ -264,6 +297,42 @@ class AudioAnalyzer
   end
 
   private
+
+  def detect_beats(overall, bass, mid, high)
+    # クールダウン中はビートを検出しない
+    if @beat_cooldown > 0
+      @beat_cooldown -= 1
+      @beat_overall = false
+      @beat_bass = false
+      @beat_mid = false
+      @beat_high = false
+      return
+    end
+
+    # 前フレームとのエネルギー差分でビート検出（スペクトルフラックス方式）
+    prev_idx = (@history_index - 1 + HISTORY_SIZE) % HISTORY_SIZE
+
+    bass_diff = bass - @bass_history[prev_idx]
+    mid_diff = mid - @mid_history[prev_idx]
+    high_diff = high - @high_history[prev_idx]
+
+    # bass の急激な上昇をビートとして検出（最も確実）
+    @beat_bass = bass_diff > 0.04 && bass > 0.12
+    @beat_mid = mid_diff > 0.06 && mid > 0.15
+    @beat_high = high_diff > 0.06 && high > 0.15
+    @beat_overall = @beat_bass || (@beat_mid && @beat_high)
+
+    # ビート検出時はクールダウン（連続検出防止: 約2フレーム）
+    if @beat_overall || @beat_bass || @beat_mid || @beat_high
+      @beat_cooldown = 2
+    end
+  end
+
+  def average(history)
+    sum = 0.0
+    history.each { |v| sum += v }
+    sum / history.length
+  end
 
   def calculate_energy(data)
     return 0.0 if data.empty?
@@ -305,6 +374,12 @@ class AudioAnalyzer
       high: 0.0,
       overall_energy: 0.0,
       dominant_frequency: 0,
+      beat: {
+        overall: false,
+        bass: false,
+        mid: false,
+        high: false
+      },
       bands: {
         bass: [],
         mid: [],
@@ -317,10 +392,20 @@ end
 
   <script type="text/ruby" id="ruby-color-palette">
 class ColorPalette
-  # HSV色空間での色定義（より鮮やか）
-  BASS_HUE = 0.0    # 赤（0度）
-  MID_HUE = 0.33    # 緑（120度）
-  HIGH_HUE = 0.66   # 青（240度）
+  @@hue_mode = nil  # nil = grayscale, 1,2,3 = 色相モード
+  @@last_hsv = [0, 0, 0.3]  # デバッグ用: 最後に計算した H, S, V
+
+  def self.set_hue_mode(mode)
+    @@hue_mode = mode
+  end
+
+  def self.get_hue_mode
+    @@hue_mode
+  end
+
+  def self.get_last_hsv
+    @@last_hsv
+  end
 
   def self.frequency_to_color(analysis)
     bass = analysis[:bass]
@@ -328,16 +413,82 @@ class ColorPalette
     high = analysis[:high]
 
     total = bass + mid + high
-    return [1.0, 1.0, 1.0] if total < 0.01
 
-    # 主要周波数のHueを計算（0.0-1.0）
-    hue = (BASS_HUE * bass + MID_HUE * mid + HIGH_HUE * high) / total
+    if total < 0.01
+      @@last_hsv = [0, 0, 0.3]
+      return [0.3, 0.3, 0.3]
+    end
 
-    # 彩度: エネルギーが高いほど鮮やか（0.7-1.0）
-    saturation = 0.7 + total * 0.3
+    # 全モード統一：明度（0.4-0.65）
+    value = 0.4 + total * 0.25
 
-    # 明度（0.5-1.0）
-    value = 0.5 + total * 0.5
+    # Grayscale mode
+    if @@hue_mode.nil?
+      @@last_hsv = [0, 0, value]
+      return hsv_to_rgb(0, 0, value)
+    end
+
+    # 統一ロジック: bass vs high の比率で色相シフト（全モード共通）
+    # bass が強い → 0.0（範囲の開始点）、high が強い → 1.0（範囲の終了点）
+    bass_high_total = bass + high
+    if bass_high_total > 0.01
+      hue_shift = high / bass_high_total
+    else
+      hue_shift = 0.5
+    end
+
+    # モードに応じて色相範囲を均等3分割
+    case @@hue_mode
+    when 1
+      # 0-120度 (0.0-0.333)
+      hue = hue_shift * 0.333
+    when 2
+      # 120-240度 (0.333-0.666)
+      hue = 0.333 + hue_shift * 0.333
+    when 3
+      # 240-360度 (0.666-1.0)
+      hue = 0.666 + hue_shift * 0.334
+    else
+      hue = 0
+    end
+
+    # 彩度: 全周波数合計で統一制御
+    saturation = 0.65 + total * 0.1
+
+    @@last_hsv = [hue, saturation, value]
+    hsv_to_rgb(hue, saturation, value)
+  end
+
+  # 距離ベースの色計算（円状グラデーション用）
+  # distance: 0.0（中心）〜 1.0（外縁）
+  def self.frequency_to_color_at_distance(analysis, distance)
+    bass = analysis[:bass]
+    mid = analysis[:mid]
+    high = analysis[:high]
+
+    total = bass + mid + high
+    return [0.3, 0.3, 0.3] if total < 0.01
+
+    value = 0.4 + total * 0.25
+
+    if @@hue_mode.nil?
+      return hsv_to_rgb(0, 0, value)
+    end
+
+    # 距離で色相範囲内をグラデーション
+    # 中心(0.0) → 範囲の開始点、外縁(1.0) → 範囲の終了点
+    case @@hue_mode
+    when 1
+      hue = distance * 0.333
+    when 2
+      hue = 0.333 + distance * 0.333
+    when 3
+      hue = 0.666 + distance * 0.334
+    else
+      hue = 0
+    end
+
+    saturation = 0.65 + total * 0.1
 
     hsv_to_rgb(hue, saturation, value)
   end
@@ -369,14 +520,14 @@ end
 
   <script type="text/ruby" id="ruby-particle-system">
 class ParticleSystem
-  PARTICLE_COUNT = 7500
+  PARTICLE_COUNT = 3000
 
   def initialize
     @particles = Array.new(PARTICLE_COUNT) do
       {
         position: [rand_range(-5, 5), rand_range(-5, 5), rand_range(-5, 5)],
         velocity: [0, 0, 0],
-        color: [1, 1, 1]
+        color: [0.3, 0.3, 0.3]  # dim gray (グレースケール起動)
       }
     end
   end
@@ -386,14 +537,28 @@ class ParticleSystem
     bass = analysis[:bass]
     mid = analysis[:mid]
     high = analysis[:high]
+    impulse = analysis[:impulse] || {}
+    imp_overall = impulse[:overall] || 0.0
+    imp_bass = impulse[:bass] || 0.0
+    imp_mid = impulse[:mid] || 0.0
+    imp_high = impulse[:high] || 0.0
+
+    # ColorPalette から統一色を取得
+    base_color = ColorPalette.frequency_to_color(analysis)
 
     # 最低明るさを保証（音が無くても見える）
     brightness = 0.3 + (energy ** 0.5) * 1.7
+    # impulse で明度ブースト（連続的に減衰）
+    brightness += 0.5 * imp_overall
 
-    # 動的爆発確率（15-50%、エネルギーに応じて変化）
-    explosion_probability = 0.15 + energy * 0.35
-    # 爆発力を3.5倍に増強
-    explosion_force = energy * 0.35
+    # 動的爆発確率（20-70%、エネルギーに応じて変化）
+    explosion_probability = 0.20 + energy * 0.50
+    # 爆発力を強化（パーティクル数減で個別の動きを大きく）
+    explosion_force = energy * 0.55
+
+    # impulse で爆発確率と爆発力をブースト（連続的に減衰）
+    explosion_probability = [explosion_probability + 0.3 * imp_overall, 0.9].min
+    explosion_force += 0.35 * imp_overall
 
     @particles.each_with_index do |particle, idx|
       # パーティクルを3タイプに分類（0=bass, 1=mid, 2=high）
@@ -401,54 +566,56 @@ class ParticleSystem
 
       case freq_type
       when 0  # 低音パーティクル: 放射状爆発
-        if bass > 0.4 && rand < explosion_probability
+        trigger = bass > 0.4 || imp_bass > 0.3
+        if trigger && rand < explosion_probability
           direction = normalize_vector(particle[:position])
-          particle[:velocity] = direction.map { |d| d * explosion_force * 2.0 }
+          # impulse で力を連続補間（2.0 基準 + impulse で最大 1.0 追加）
+          force = explosion_force * (2.0 + imp_bass * 1.0)
+          particle[:velocity] = direction.map { |d| d * force }
         end
-        base_color = [1.0, 0.2, 0.2]
-        mix = [bass * 2.0, mid * 0.3, high * 0.3]
 
       when 1  # 中音パーティクル: 螺旋運動
-        if mid > 0.3 && rand < explosion_probability * 0.8
+        trigger = mid > 0.3 || imp_mid > 0.3
+        if trigger && rand < explosion_probability * 0.8
           angle = rand * Math::PI * 2
+          # impulse で力を連続補間（1.5 基準 + impulse で最大 1.0 追加）
+          force = explosion_force * (1.5 + imp_mid * 1.0)
           particle[:velocity] = [
-            Math.cos(angle) * explosion_force * 1.5,
-            explosion_force * 1.5,
-            Math.sin(angle) * explosion_force * 1.5
+            Math.cos(angle) * force,
+            force,
+            Math.sin(angle) * force
           ]
         end
-        base_color = [0.2, 1.0, 0.2]
-        mix = [bass * 0.3, mid * 2.0, high * 0.3]
 
       when 2  # 高音パーティクル: 上向き噴出
-        if high > 0.3 && rand < explosion_probability * 0.7
+        trigger = high > 0.3 || imp_high > 0.3
+        if trigger && rand < explosion_probability * 0.7
+          # impulse で力を連続補間（2.5 基準 + impulse で最大 1.0 追加）
+          force = explosion_force * (2.5 + imp_high * 1.0)
           particle[:velocity] = [
             rand_range(-explosion_force, explosion_force) * 0.5,
-            explosion_force * 2.5,
+            force,
             rand_range(-explosion_force, explosion_force) * 0.5
           ]
         end
-        base_color = [0.2, 0.2, 1.0]
-        mix = [bass * 0.3, mid * 0.3, high * 2.0]
       end
 
-      # 音がある時は周波数色、無い時はベース色で最低明るさを保証
-      total = bass + mid + high
-      if total > 0.01
-        particle[:color] = mix.map { |c| [c * brightness, 0.0].max }
-      else
-        particle[:color] = base_color.map { |c| c * brightness }
-      end
+      # 色の適用（中心からの距離で円状グラデーション）
+      pos = particle[:position]
+      dist = Math.sqrt(pos[0]**2 + pos[1]**2 + pos[2]**2)
+      normalized_dist = [dist / 10.0, 1.0].min  # 0.0(中心)〜1.0(外縁)
+      dist_color = ColorPalette.frequency_to_color_at_distance(analysis, normalized_dist)
+      particle[:color] = dist_color.map { |c| [c * brightness, 0.0].max }
 
       # 位置更新
       particle[:position][0] += particle[:velocity][0]
       particle[:position][1] += particle[:velocity][1]
       particle[:position][2] += particle[:velocity][2]
 
-      # 摩擦（やや強化）
-      particle[:velocity][0] *= 0.93
-      particle[:velocity][1] *= 0.93
-      particle[:velocity][2] *= 0.93
+      # 摩擦（高速フェードアウトでビート感を出す）
+      particle[:velocity][0] *= 0.86
+      particle[:velocity][1] *= 0.86
+      particle[:velocity][2] *= 0.86
 
       # 境界処理
       3.times do |i|
@@ -470,9 +637,9 @@ class ParticleSystem
       positions.concat(p[:position])
       colors.concat(p[:color])
 
-      # サイズを動的計算（色の明度ベース、1.1倍サイズアップ）
+      # サイズを動的計算（パーティクル数減に合わせて2.5倍サイズアップ）
       brightness = (p[:color][0] + p[:color][1] + p[:color][2]) / 3.0
-      sizes << (0.02 + brightness * 0.15) * 1.1
+      sizes << (0.05 + brightness * 0.25) * 2.5
 
       # 透明度を動的計算
       opacity = (0.6 + brightness * 0.4)
@@ -503,6 +670,7 @@ class GeometryMorpher
     @base_scale = 1.0
     @scale = 1.0
     @emissive_intensity = 0.0
+    @color = [0.3, 0.3, 0.3]  # 初期値 dim gray
   end
 
   def update(analysis)
@@ -510,24 +678,37 @@ class GeometryMorpher
     bass = analysis[:bass]
     mid = analysis[:mid]
     high = analysis[:high]
+    beat = analysis[:beat] || {}
+
+    # ColorPalette から色を取得
+    @color = ColorPalette.frequency_to_color(analysis)
 
     # スケールを大幅に強化（最大3.5倍）
     @scale = @base_scale + energy * 2.5
+    # ビートでスケールを一瞬ブーストさせる
+    @scale += 0.8 if beat[:overall]
 
-    # 回転速度を3倍に強化
+    # 回転速度（通常）
     @rotation[0] += bass * 0.15
     @rotation[1] += mid * 0.1
     @rotation[2] += high * 0.08
 
+    # ビートで回転を急加速（帯域別）
+    @rotation[0] += 0.5 if beat[:bass]
+    @rotation[1] += 0.4 if beat[:mid]
+    @rotation[2] += 0.3 if beat[:high]
+
     # 発光強度を計算
     @emissive_intensity = energy * 2.0
+    @emissive_intensity += 1.5 if beat[:overall]
   end
 
   def get_data
     {
       scale: @scale,
       rotation: @rotation,
-      emissive_intensity: @emissive_intensity
+      emissive_intensity: @emissive_intensity,
+      color: @color  # 新規追加
     }
   end
 end
@@ -543,10 +724,11 @@ class CameraController
 
   def update(analysis)
     bass = analysis[:bass]
+    beat = analysis[:beat] || {}
 
-    # 低音でカメラシェイク（bass > 0.6で発動）
-    if bass > 0.6
-      shake_intensity = bass * 0.3
+    # 低音でカメラシェイク（bass > 0.6 またはビートで発動）
+    if bass > 0.6 || beat[:bass]
+      shake_intensity = beat[:bass] ? bass * 0.6 : bass * 0.3
       @shake_offset = [
         (rand - 0.5) * shake_intensity,
         (rand - 0.5) * shake_intensity,
@@ -575,12 +757,16 @@ class BloomController
 
   def update(analysis)
     energy = analysis[:overall_energy]
+    beat = analysis[:beat] || {}
 
-    # エネルギーに応じてBloom強度を動的調整（1.5-4.5）
-    @strength = @base_strength + energy * 3.0
+    # エネルギーに応じてBloom強度を動的調整（1.5-6.0）
+    @strength = @base_strength + energy * 4.5
+    # ビートで強烈フラッシュ
+    @strength += 3.5 if beat[:overall]
 
     # エネルギーが高いほどthresholdを下げる（より多く発光）
     @threshold = 0.3 - energy * 0.2
+    @threshold = 0.0 if beat[:overall]
     @threshold = [@threshold, 0.0].max
   end
 
@@ -592,6 +778,8 @@ end
 
   <script type="text/ruby" id="ruby-effect-manager">
 class EffectManager
+  IMPULSE_DECAY = 0.82  # 毎フレーム18%減衰（素早く変わるが連続的）
+
   attr_reader :particle_data, :geometry_data, :bloom_data, :camera_data
 
   def initialize
@@ -599,16 +787,35 @@ class EffectManager
     @geometry_morpher = GeometryMorpher.new
     @bloom_controller = BloomController.new
     @camera_controller = CameraController.new
+    # 衝撃波（impulse）: 0.0〜1.0 の連続値
+    @impulse_overall = 0.0
+    @impulse_bass = 0.0
+    @impulse_mid = 0.0
+    @impulse_high = 0.0
   end
 
   def update(analysis, sensitivity = 1.0)
-    # 感度スケーリング: エネルギー値を感度で掛ける
+    beat = analysis[:beat] || {}
+
+    # ビート検出時に impulse を 1.0 にセット
+    @impulse_bass = 1.0 if beat[:bass]
+    @impulse_mid = 1.0 if beat[:mid]
+    @impulse_high = 1.0 if beat[:high]
+    @impulse_overall = 1.0 if beat[:overall]
+
+    # 感度スケーリング + impulse を渡す
     scaled_analysis = {
       bass: [analysis[:bass] * sensitivity, 1.0].min,
       mid: [analysis[:mid] * sensitivity, 1.0].min,
       high: [analysis[:high] * sensitivity, 1.0].min,
       overall_energy: [analysis[:overall_energy] * sensitivity, 1.0].min,
-      dominant_frequency: analysis[:dominant_frequency]
+      dominant_frequency: analysis[:dominant_frequency],
+      impulse: {
+        overall: @impulse_overall,
+        bass: @impulse_bass,
+        mid: @impulse_mid,
+        high: @impulse_high
+      }
     }
 
     @particle_system.update(scaled_analysis)
@@ -620,6 +827,12 @@ class EffectManager
     @geometry_data = @geometry_morpher.get_data
     @bloom_data = @bloom_controller.get_data
     @camera_data = @camera_controller.get_data
+
+    # impulse を減衰（毎フレーム）
+    @impulse_bass *= IMPULSE_DECAY
+    @impulse_mid *= IMPULSE_DECAY
+    @impulse_high *= IMPULSE_DECAY
+    @impulse_overall *= IMPULSE_DECAY
   end
 end
   </script>
@@ -632,6 +845,8 @@ $audio_analyzer = nil
 $effect_manager = nil
 $frame_count = 0
 $sensitivity = 1.0
+$beat_times = []  # ビート検出時のフレーム番号を記録
+$estimated_bpm = 0
 
 # URL パラメーターから sensitivity を読取
 # 注意: JS.global[:location][:search] は JS::Object を返す。
@@ -675,8 +890,56 @@ begin
 
       $frame_count += 1
 
-      # JavaScript側に sensitivity を常に渡す（表示用）
+      # JavaScript側にデバッグ情報を渡す（表示用）
       JS.global[:currentSensitivity] = $sensitivity
+
+      # HSB デバッグ情報をセット
+      hsv = ColorPalette.get_last_hsv
+      hue_mode = ColorPalette.get_hue_mode
+      mode_str = hue_mode.nil? ? "0:Gray" : "#{hue_mode}:Hue"
+      JS.global[:debugMode] = mode_str
+      JS.global[:debugBass] = (analysis[:bass] * 100).round(1)
+      JS.global[:debugMid] = (analysis[:mid] * 100).round(1)
+      JS.global[:debugHigh] = (analysis[:high] * 100).round(1)
+      JS.global[:debugOverall] = (analysis[:overall_energy] * 100).round(1)
+      JS.global[:debugH] = (hsv[0] * 360).round(1)
+      JS.global[:debugS] = (hsv[1] * 100).round(1)
+      JS.global[:debugB] = (hsv[2] * 100).round(1)
+      # ボリュームレベル (dB)
+      energy = analysis[:overall_energy]
+      volume_db = energy > 0.001 ? (20.0 * Math.log10(energy)).round(1) : -60.0
+      JS.global[:debugVolume] = volume_db
+      # BPM 推定（ビート間隔から計算）
+      beat = analysis[:beat] || {}
+      if beat[:bass]
+        $beat_times << $frame_count
+        # 直近16回分のみ保持
+        $beat_times = $beat_times.last(16) if $beat_times.length > 16
+
+        if $beat_times.length >= 3
+          # ビート間隔の平均からBPMを推定
+          intervals = []
+          ($beat_times.length - 1).times do |i|
+            intervals << $beat_times[i + 1] - $beat_times[i]
+          end
+          avg_interval = intervals.sum.to_f / intervals.length
+          if avg_interval > 0
+            fps_val = JS.global[:currentFPS]
+            fps = fps_val.typeof == "number" ? fps_val.to_f : 30.0
+            fps = 30.0 if fps < 10
+            $estimated_bpm = (60.0 / (avg_interval / fps)).round(0)
+            # BPM を妥当な範囲にクリップ
+            $estimated_bpm = 0 if $estimated_bpm < 40 || $estimated_bpm > 240
+          end
+        end
+      end
+      JS.global[:debugBPM] = $estimated_bpm
+      # 現在のフレームのビート状態
+      beat_now = []
+      beat_now << "B" if beat[:bass]
+      beat_now << "M" if beat[:mid]
+      beat_now << "H" if beat[:high]
+      JS.global[:debugBeatNow] = beat_now.empty? ? "" : beat_now.join("+")
 
       if $frame_count % 60 == 0
         bass = (analysis[:bass] * 100).round(1)
@@ -692,6 +955,45 @@ begin
     end
   end
 
+  # Register keyboard callback for color mode changes
+  JS.global[:rubySetColorMode] = lambda do |key_number|
+    begin
+      key = key_number.to_i
+
+      case key
+      when 0
+        ColorPalette.set_hue_mode(nil)
+        JSBridge.log "Color Mode: Grayscale"
+      when 1
+        # 色相範囲1: 0-120度（赤〜黄）
+        ColorPalette.set_hue_mode(1)
+        JSBridge.log "Color Mode: Hue Range 1 (0-120)"
+      when 2
+        # 色相範囲2: 120-240度（緑〜シアン）
+        ColorPalette.set_hue_mode(2)
+        JSBridge.log "Color Mode: Hue Range 2 (120-240)"
+      when 3
+        # 色相範囲3: 240-360度（青〜マゼンタ）
+        ColorPalette.set_hue_mode(3)
+        JSBridge.log "Color Mode: Hue Range 3 (240-360)"
+      end
+    rescue => e
+      JSBridge.error "Error in rubySetColorMode: #{e.message}"
+    end
+  end
+
+  # Sensitivity 増減コールバック
+  JS.global[:rubyAdjustSensitivity] = lambda do |delta|
+    begin
+      d = delta.to_f
+      $sensitivity = [($sensitivity + d).round(2), 0.05].max
+      JSBridge.log "Sensitivity: #{$sensitivity}x"
+    rescue => e
+      JSBridge.error "Error in rubyAdjustSensitivity: #{e.message}"
+    end
+  end
+
+  JSBridge.log "Keyboard controls ready (0-3: color, +/-: sensitivity)"
   JSBridge.log "Ruby initialization complete!"
 
 rescue => e
@@ -726,7 +1028,7 @@ end
 
         analyser = audioContext.createAnalyser();
         analyser.fftSize = 2048;
-        analyser.smoothingTimeConstant = 0.85;
+        analyser.smoothingTimeConstant = 0.5;  // ビート検出のため低めに設定
         const bufferLength = analyser.frequencyBinCount;
         dataArray = new Uint8Array(bufferLength);
 
@@ -786,7 +1088,7 @@ end
       composer.addPass(outputPass);
 
       // Particle system
-      const particleCount = 10000;
+      const particleCount = 3000;
       const geometry = new THREE.BufferGeometry();
       const positions = new Float32Array(particleCount * 3);
       const colors = new Float32Array(particleCount * 3);
@@ -795,9 +1097,9 @@ end
         positions[i * 3] = (Math.random() - 0.5) * 10;
         positions[i * 3 + 1] = (Math.random() - 0.5) * 10;
         positions[i * 3 + 2] = (Math.random() - 0.5) * 10;
-        colors[i * 3] = 1.0;
-        colors[i * 3 + 1] = 1.0;
-        colors[i * 3 + 2] = 1.0;
+        colors[i * 3] = 0.3;      // dim gray (グレースケール起動)
+        colors[i * 3 + 1] = 0.3;
+        colors[i * 3 + 2] = 0.3;
       }
 
       geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
@@ -815,13 +1117,13 @@ end
       scene.add(particleSystem);
 
       // Morphing geometry (torus) - ポリゴン削減で FPS 改善（32,64 → 24,32）
-      const torusGeometry = new THREE.TorusGeometry(1, 0.4, 24, 32);
+      const torusGeometry = new THREE.TorusGeometry(1, 0.4, 12, 16);
       const torusMaterial = new THREE.MeshBasicMaterial({
-        color: 0x00ff00,
+        color: 0x4d4d4d,  // dim gray (グレースケール起動)
         wireframe: true,
         transparent: true,
         opacity: 0.6,
-        emissive: 0x00ff00
+        emissive: 0x4d4d4d  // dim gray
       });
       geometryMesh = new THREE.Mesh(torusGeometry, torusMaterial);
       scene.add(geometryMesh);
@@ -879,7 +1181,7 @@ end
       }
     };
 
-    window.updateGeometry = function(scale, rotation, emissiveIntensity) {
+    window.updateGeometry = function(scale, rotation, emissiveIntensity, color) {
       if (!geometryMesh) {
         console.warn('[JS] geometryMesh is not initialized');
         return;
@@ -894,21 +1196,25 @@ end
         geometryMesh.rotation.z = Number(rotation[2]) || 0;
       }
 
-      // 発光強度を動的調整（最低でもベース色を保持）
-      if (emissiveIntensity !== undefined && geometryMesh.material) {
-        const intensity = Number(emissiveIntensity) || 0;
-        const r = Math.min(1.0, 0.1 + intensity * 0.3);
-        const g = Math.min(1.0, 0.4 + intensity * 1.0);
-        const b = Math.min(1.0, 0.1 + intensity * 0.5);
+      // Ruby から渡された色を使用（新規追加）
+      if (color && Array.isArray(color) && color.length >= 3 && geometryMesh.material) {
+        const r = Number(color[0]) || 0;
+        const g = Number(color[1]) || 0;
+        const b = Number(color[2]) || 0;
 
-        // color を更新（基本色）
+        // Base color
         if (geometryMesh.material.color) {
           geometryMesh.material.color.setRGB(r, g, b);
         }
 
-        // emissive を更新（発光色、存在する場合のみ）
+        // Emissive (色相を保持しつつ intensity で明度制御)
         if (geometryMesh.material.emissive) {
-          geometryMesh.material.emissive.setRGB(r * 0.5, g * 0.5, b * 0.5);
+          const intensity = Number(emissiveIntensity) || 0;
+          geometryMesh.material.emissive.setRGB(
+            r * intensity * 0.5,
+            g * intensity * 0.5,
+            b * intensity * 0.5
+          );
         }
       }
     };
@@ -964,8 +1270,35 @@ end
       if (now - lastFrameTime >= 1000) {
         const sensitivity = window.currentSensitivity !== undefined ? window.currentSensitivity.toFixed(2) : '1.00';
         document.getElementById('fpsCounter').textContent = 'FPS: ' + frameCount + '  |  Sensitivity: ' + sensitivity + 'x';
+        window.currentFPS = frameCount;  // Ruby に FPS を渡す
+
+        // デバッグ情報表示
+        const mode = window.debugMode || '-';
+        const bass = window.debugBass !== undefined ? Number(window.debugBass).toFixed(1) : '-';
+        const mid = window.debugMid !== undefined ? Number(window.debugMid).toFixed(1) : '-';
+        const high = window.debugHigh !== undefined ? Number(window.debugHigh).toFixed(1) : '-';
+        const overall = window.debugOverall !== undefined ? Number(window.debugOverall).toFixed(1) : '-';
+        const h = window.debugH !== undefined ? Number(window.debugH).toFixed(1) : '-';
+        const s = window.debugS !== undefined ? Number(window.debugS).toFixed(1) : '-';
+        const b = window.debugB !== undefined ? Number(window.debugB).toFixed(1) : '-';
+        const vol = window.debugVolume !== undefined ? Number(window.debugVolume).toFixed(1) : '-';
+        const bpm = window.debugBPM !== undefined ? Number(window.debugBPM) : 0;
+        const beatNow = window.debugBeatNow || '';
+        const bpmStr = bpm > 0 ? bpm + ' BPM' : '---';
+        const beatIndicator = beatNow ? ' [' + beatNow + ']' : '';
+        document.getElementById('debugInfo').textContent =
+          'Mode: ' + mode + '  |  Bass: ' + bass + '%  Mid: ' + mid + '%  High: ' + high + '%  Overall: ' + overall + '%  Vol: ' + vol + 'dB\n' +
+          'H: ' + h + '  S: ' + s + '%  B: ' + b + '%  |  ' + bpmStr + beatIndicator;
+
         frameCount = 0;
         lastFrameTime = now;
+      }
+
+      // パーティクルをトーラスの半分の速さで回転（星空が流れる効果）
+      if (particleSystem && geometryMesh) {
+        particleSystem.rotation.x = geometryMesh.rotation.x * 0.5;
+        particleSystem.rotation.y = geometryMesh.rotation.y * 0.5;
+        particleSystem.rotation.z = geometryMesh.rotation.z * 0.5;
       }
 
       if (composer) {
@@ -1031,6 +1364,36 @@ end
       }
       document.removeEventListener('click', resumeAudio);
     });
+
+    // Keyboard event listener for color mode control
+    window.addEventListener('keydown', function(event) {
+      const key = event.key;
+      if (key >= '0' && key <= '3') {
+        const keyNumber = parseInt(key, 10);
+
+        if (window.rubySetColorMode) {
+          try {
+            window.rubySetColorMode(keyNumber);
+          } catch (error) {
+            console.error('[JS] Error calling rubySetColorMode:', error);
+          }
+        } else {
+          console.warn('[JS] rubySetColorMode not available yet');
+        }
+      } else if (key === '-' || key === '+' || key === '=') {
+        // +/- で sensitivity を 0.05 ずつ増減（= は Shift なしの + キー対応）
+        if (window.rubyAdjustSensitivity) {
+          try {
+            const delta = (key === '-') ? -0.05 : 0.05;
+            window.rubyAdjustSensitivity(delta);
+          } catch (error) {
+            console.error('[JS] Error calling rubyAdjustSensitivity:', error);
+          }
+        }
+      }
+    });
+
+    console.log('[JS] Keyboard listener registered (0-3: color modes, +/-: sensitivity)');
 
     // Handle window resize
     window.addEventListener('resize', function() {
