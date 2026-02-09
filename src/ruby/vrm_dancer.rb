@@ -12,11 +12,14 @@ class VRMDancer
     @time = 0.0
     @beat_phase = 0.0
     @sway_phase = 0.0
-    @bounce_vel = 0.0
-    @bounce_pos = 0.0
+    @head_nod_phase = 0.0
+    @step_phase = 0.0
     @arm_raise = 0.0
-    @step_foot = 0
-    @last_beat_bass = false
+    @blink_timer = 0.0
+    @blink_value = 0.0
+
+    # Smoothing state for natural movement (store previous rotation targets)
+    @prev_rotations = Array.new(BONE_ORDER.length * 3, 0.0)
   end
 
   def update(analysis, delta_time = nil)
@@ -30,119 +33,138 @@ class VRMDancer
 
     @time += delta
 
-    bass = analysis[:bass] || 0.0
-    mid = analysis[:mid] || 0.0
-    high = analysis[:high] || 0.0
-    energy = analysis[:overall_energy] || 0.0
-    impulse = analysis[:impulse] || {}
-    imp_bass = impulse[:bass] || 0.0
-    imp_mid = impulse[:mid] || 0.0
-    imp_high = impulse[:high] || 0.0
-    beat = analysis[:beat] || {}
+    # VRM dances with constant rhythm (independent of audio)
+    # Use fixed periods for natural human movement
 
-    # Rhythmic phase accumulators (slower for smooth dance movement)
-    @beat_phase += delta * (1.5 + energy * 1.5)
-    @sway_phase += delta * 0.75
+    # Constant phase accumulators (independent of audio)
+    @beat_phase += delta * 0.8       # Main body rhythm (~7.5 sec cycle)
+    @sway_phase += delta * 0.5       # Gentle sway (~12 sec cycle)
+    @head_nod_phase += delta * 1.2   # Head movement (~5 sec cycle)
+    @step_phase += delta * Math::PI / 2.0  # Leg step phase (~4 sec full cycle)
 
-    # Trigger bounce on bass beat
-    if beat[:bass] && !@last_beat_bass
-      @bounce_vel = -(0.08 + bass * 0.12)
-      @step_foot = 1 - @step_foot
+    # Arm raise cycles smoothly (0 to 0.3 over 8 seconds)
+    arm_target = (Math.sin(@time * 0.8) + 1.0) * 0.15  # 0.0 to 0.3
+    @arm_raise = MathHelper.lerp(@arm_raise, arm_target, 2.0 * delta)
+
+    # Blink periodically (2-4 seconds interval)
+    @blink_timer += delta
+    if @blink_timer > 3.0 + Math.sin(@time * 0.5) * 1.0  # Random 2-4 sec interval
+      @blink_timer = 0.0
+      @blink_value = 1.0  # Trigger blink
     end
-    @last_beat_bass = beat[:bass] || false
 
-    # Bounce spring physics
-    @bounce_vel += -@bounce_pos * 25.0 * delta
-    @bounce_vel *= (1.0 - 5.0 * delta)
-    @bounce_pos += @bounce_vel
-
-    # Arm raise tracks energy
-    arm_target = energy > 0.4 ? (energy - 0.2) * 1.0 : 0.0
-    @arm_raise = MathHelper.lerp(@arm_raise, arm_target, 3.0 * delta)
+    # Blink decay (fast close, slower open)
+    if @blink_value > 0.0
+      @blink_value = [@blink_value - delta * 8.0, 0.0].max  # Decay in ~0.125 sec
+    end
 
     rotations = []
 
-    # hips
+    # hips (gentle sway and twist - natural human range)
     rotations.concat([
-      0,
-      Math.sin(@sway_phase) * mid * 0.15,
+      Math.sin(@beat_phase * 0.8) * 0.02,   # Forward/back tilt (±9° after 8x)
+      Math.sin(@sway_phase) * 0.08,         # Left/right twist (±37° after 8x)
       0
     ])
 
-    # spine
-    sway = Math.sin(@beat_phase) * mid * 0.12
+    # spine (twist with hips - natural human range)
+    sway = Math.sin(@beat_phase * 0.9) * 0.07  # Twist (±32° after 8x)
     rotations.concat([
-      Math.sin(@beat_phase * 2) * bass * 0.08,
-      Math.sin(@sway_phase * 1.3) * mid * 0.15,
+      Math.sin(@beat_phase * 1.2) * 0.04,       # Forward/back (±18° after 8x)
+      Math.sin(@sway_phase * 1.1) * 0.08,       # Left/right twist (±37° after 8x)
       sway
     ])
 
-    # chest (counter-rotate)
+    # chest (subtle counter-rotate for natural movement)
     rotations.concat([
       0,
-      -Math.sin(@sway_phase * 1.3) * mid * 0.08,
+      -Math.sin(@sway_phase * 1.1) * 0.04,      # Counter-rotate (±18° after 8x)
       -sway * 0.5
     ])
 
-    # head
+    # head (gentle nods and turns - natural human range)
+    head_nod = Math.sin(@head_nod_phase) * 0.03        # Nod (±14° after 8x)
+    head_turn = Math.sin(@sway_phase * 0.6) * 0.04     # Turn (±18° after 8x)
     rotations.concat([
-      Math.sin(@beat_phase * 2) * bass * 0.12 + imp_bass * 0.08,
-      Math.sin(@sway_phase * 0.7) * 0.1,
-      Math.sin(@beat_phase) * high * 0.06
+      head_nod + Math.sin(@beat_phase * 1.5) * 0.03,   # Combined nod
+      head_turn,                                         # Gentle turn
+      Math.sin(@beat_phase) * 0.02                      # Slight tilt (±9° after 8x)
     ])
 
-    # left upper arm (spread horizontally for dance pose)
-    arm_pump = Math.sin(@beat_phase * 2) * energy * 0.25
-    raise_l = @arm_raise + Math.sin(@beat_phase * 2 + 0.5) * energy * 0.2
+    # left upper arm (gentle swing - natural human range)
+    # Z rotation: -0.02 to 0.08 rad → -9° to 37° after 8x amplification
+    arm_wave = Math.sin(@beat_phase * 0.8) * 0.04  # Slow wave (±18° after 8x)
+    raise_l = @arm_raise  # Smoothed raise cycle
     rotations.concat([
-      arm_pump + imp_bass * 0.15,
-      0,
-      1.2 + raise_l  # ~69 degrees horizontal spread (was 0.3)
+      Math.sin(@beat_phase * 1.0) * 0.03,       # Forward/back swing (±14° after 8x)
+      Math.sin(@sway_phase * 0.9) * 0.02,       # Inward/outward (±9° after 8x)
+      -0.01 + arm_wave + raise_l                # From relaxed down to raised
     ])
 
-    # left lower arm (natural elbow bend: 0-143 degrees after 10x amplification)
-    elbow_l = 0.1 + Math.sin(@beat_phase * 2 + 0.3) * energy * 0.15
+    # left lower arm (natural elbow bend - human range: 0-145°)
+    # 0.02 to 0.08 rad → 9° to 37° after 8x amplification
+    elbow_l = 0.03 + Math.sin(@beat_phase * 1.2 + 0.3) * 0.03
     rotations.concat([0, 0, elbow_l])
 
     # left hand
     rotations.concat([0, 0, 0])
 
-    # right upper arm (mirror, spread horizontally)
-    raise_r = @arm_raise + Math.sin(@beat_phase * 2 - 0.5) * energy * 0.2
+    # right upper arm (mirror)
     rotations.concat([
-      arm_pump + imp_bass * 0.15,
-      0,
-      -(1.2 + raise_r)  # ~69 degrees horizontal spread (was 0.3)
+      Math.sin(@beat_phase * 1.0) * 0.03,
+      Math.sin(@sway_phase * 0.9 + Math::PI) * 0.02,
+      -(-0.01 + arm_wave + raise_l)  # Mirror
     ])
 
-    # right lower arm (natural elbow bend: 0-143 degrees after 10x amplification)
-    elbow_r = 0.1 + Math.sin(@beat_phase * 2 - 0.3) * energy * 0.15
+    # right lower arm (natural elbow bend)
+    elbow_r = 0.03 + Math.sin(@beat_phase * 1.2 - 0.3) * 0.03
     rotations.concat([0, 0, -elbow_r])
 
     # right hand
     rotations.concat([0, 0, 0])
 
-    # legs - alternating step
-    step = bass * 0.15 + imp_bass * 0.1
-    if @step_foot == 0
-      rotations.concat([-step, 0, 0])         # left upper leg (step)
-      rotations.concat([step * 0.6, 0, 0])    # left lower leg
-      rotations.concat([step * 0.2, 0, 0])    # right upper leg
-      rotations.concat([step * 0.3, 0, 0])    # right lower leg
-    else
-      rotations.concat([step * 0.2, 0, 0])    # left upper leg
-      rotations.concat([step * 0.3, 0, 0])    # left lower leg
-      rotations.concat([-step, 0, 0])          # right upper leg (step)
-      rotations.concat([step * 0.6, 0, 0])    # right lower leg
+    # legs - smooth alternating step using sin wave (natural human range)
+    # Hip extension/flexion: ±145°, Knee flexion: 0-145°
+    step_sin = Math.sin(@step_phase)  # -1 to 1, smooth transition
+    step_forward = step_sin * 0.04    # ±18° after 8x (smooth left/right)
+    step_open = Math.sin(@beat_phase * 0.7) * 0.02  # Open/close (±9° after 8x)
+
+    # Left leg: forward when step_sin > 0, back when step_sin < 0
+    # Right leg: opposite
+    rotations.concat([
+      -step_forward,           # Left upper leg (smooth forward/back)
+      -step_open,              # Left leg slightly inward (Y-axis)
+      0
+    ])
+    # Left knee bend: more when leg is back (step_sin < 0)
+    left_knee = 0.02 + [0.0, -step_sin * 0.02].max
+    rotations.concat([left_knee, 0, 0])
+
+    rotations.concat([
+      step_forward,            # Right upper leg (opposite of left)
+      step_open,               # Right leg slightly outward (Y-axis)
+      0
+    ])
+    # Right knee bend: more when leg is back (step_sin > 0)
+    right_knee = 0.02 + [0.0, step_sin * 0.02].max
+    rotations.concat([right_knee, 0, 0])
+
+    # Apply smoothing to rotations (natural human movement has inertia)
+    smoothing_factor = 8.0  # Higher = slower response, smoother movement
+    smoothed_rotations = []
+    rotations.each_with_index do |target, i|
+      smoothed = MathHelper.lerp(@prev_rotations[i], target, smoothing_factor * delta)
+      smoothed_rotations << smoothed
+      @prev_rotations[i] = smoothed
     end
 
-    # Amplify rotations for visibility (10x for better dance movement)
-    amplified_rotations = rotations.map { |r| r * 10.0 }
-    amplified_hips_y = @bounce_pos * 3.0
+    # Amplify rotations for visibility (8x for natural movement)
+    amplified_rotations = smoothed_rotations.map { |r| r * 8.0 }
 
     {
       rotations: amplified_rotations,
-      hips_position_y: amplified_hips_y
+      hips_position_y: 0.0,  # No vertical bounce
+      blink: @blink_value
     }
   end
 end

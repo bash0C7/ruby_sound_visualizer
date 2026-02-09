@@ -71,9 +71,10 @@ module JSBridge
     begin
       rotations = data[:rotations]
       hips_y = data[:hips_position_y] || 0.0
+      blink = data[:blink] || 0.0
 
       if rotations.is_a?(Array)
-        JS.global.updateVRM(rotations, hips_y)
+        JS.global.updateVRM(rotations, hips_y, blink)
       end
     rescue => e
       JS.global[:console].error("JSBridge error updating VRM: #{e.message}")

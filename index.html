@@ -143,6 +143,12 @@
     let currentVRM = null;
     let animLastTime = Date.now();
 
+    // Camera rotation control (spherical coordinates)
+    let cameraTheta = 0;      // Y-axis rotation (horizontal)
+    let cameraPhi = 0;        // X-axis rotation (vertical)
+    let cameraRadius = 5;     // Distance from target
+    let cameraTarget = null;  // Look-at target (initialized in initThree)
+
     // Selective Bloom (Layer 1 = bloom objects, Layer 0 = non-bloom objects)
     const BLOOM_LAYER = 1;
     let bloomLayer = null;      // Initialize after THREE.js loads
@@ -210,8 +216,9 @@
 
       scene = new THREE.Scene();
       camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-      // Unified camera position (will adjust when VRM loads)
-      camera.position.z = 5;
+      // Initialize camera target and position with spherical coordinates
+      cameraTarget = new THREE.Vector3(0, 0, 0);
+      updateCameraPosition();
       // Enable all layers for camera (Layer 0 for VRM, Layer 1 for particles/torus)
       camera.layers.enableAll();
 
@@ -287,6 +294,46 @@
       darkMaterial = new THREE.MeshBasicMaterial({ color: 'black' });
 
       console.log('[JS] Three.js initialized successfully');
+
+      // Setup keyboard controls for camera rotation
+      setupCameraControls();
+    }
+
+    // Update camera position using spherical coordinates
+    function updateCameraPosition() {
+      const x = cameraRadius * Math.cos(cameraPhi) * Math.sin(cameraTheta);
+      const y = cameraRadius * Math.sin(cameraPhi);
+      const z = cameraRadius * Math.cos(cameraPhi) * Math.cos(cameraTheta);
+      camera.position.set(cameraTarget.x + x, cameraTarget.y + y, cameraTarget.z + z);
+      camera.lookAt(cameraTarget);
+    }
+
+    // Setup keyboard controls for camera rotation
+    function setupCameraControls() {
+      document.addEventListener('keydown', (event) => {
+        const rotationStep = Math.PI / 18;  // 10 degrees
+
+        switch(event.key.toLowerCase()) {
+          case 'd':  // Rotate left
+            cameraTheta -= rotationStep;
+            updateCameraPosition();
+            break;
+          case 'f':  // Rotate right
+            cameraTheta += rotationStep;
+            updateCameraPosition();
+            break;
+          case 'e':  // Rotate up
+            cameraPhi = Math.min(cameraPhi + rotationStep, Math.PI / 2 - 0.01);  // Clamp to avoid gimbal lock
+            updateCameraPosition();
+            break;
+          case 'c':  // Rotate down
+            cameraPhi = Math.max(cameraPhi - rotationStep, -Math.PI / 2 + 0.01);  // Clamp to avoid gimbal lock
+            updateCameraPosition();
+            break;
+        }
+      });
+
+      console.log('[JS] Camera controls initialized (d/f: rotate left/right, e/c: rotate up/down)');
     }
 
     // VRM file upload promise (or skip)
@@ -374,12 +421,13 @@
     }
 
     // Update VRM bones from Ruby dance data
-    window.updateVRM = function(rotations, hipsY) {
+    window.updateVRM = function(rotations, hipsY, blink) {
       if (!currentVRM) return;
 
       const humanoid = currentVRM.humanoid;
       const rotArray = Array.from(rotations || []);
       const hipsPositionY = Number(hipsY) || 0;
+      const blinkValue = Number(blink) || 0;
 
       for (let i = 0; i < VRM_BONE_ORDER.length; i++) {
         const boneName = VRM_BONE_ORDER[i];
@@ -395,6 +443,14 @@
             bone.position.y = hipsPositionY;
           }
         }
+      }
+
+      // Update blink expression
+      const expressionManager = currentVRM.expressionManager;
+      if (expressionManager) {
+        expressionManager.setValue('blink', blinkValue);
+        expressionManager.setValue('blinkLeft', blinkValue);
+        expressionManager.setValue('blinkRight', blinkValue);
       }
     };
 
