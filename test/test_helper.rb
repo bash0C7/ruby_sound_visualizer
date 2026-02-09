@@ -1,6 +1,6 @@
 require 'minitest/autorun'
 
-# Prevent `require 'js'` inside Ruby blocks from failing.
+# Prevent `require 'js'` inside Ruby source files from failing.
 # Our mock JS module (below) replaces the real js gem.
 $LOADED_FEATURES << 'js.rb'
 
@@ -73,24 +73,19 @@ module JS
   end
 end
 
-# Extract and load Ruby code blocks from index.html.
-# Skips 'ruby-main' block which has side effects (global variable init,
+# Load Ruby source files directly (standard require_relative).
+# Skips main.rb which has side effects (global variable init,
 # lambda registrations on JS.global).
-def load_ruby_blocks_from_html(html_path, skip_ids: ['ruby-main'])
-  html = File.read(html_path, encoding: 'UTF-8')
+RUBY_SRC_DIR = File.expand_path('../src/ruby', __dir__)
 
-  # Extract all <script type="text/ruby" id="...">...</script> blocks
-  html.scan(/<script\s+type="text\/ruby"\s+id="([^"]+)">(.*?)<\/script>/m).each do |id, code|
-    next if skip_ids.include?(id)
-
-    begin
-      eval(code, TOPLEVEL_BINDING, "#{html_path}:#{id}")
-    rescue => e
-      warn "Warning: Failed to load Ruby block '#{id}': #{e.message}"
-    end
-  end
-end
-
-# Load all Ruby class definitions from index.html
-INDEX_HTML_PATH = File.expand_path('../index.html', __dir__)
-load_ruby_blocks_from_html(INDEX_HTML_PATH)
+require_relative '../src/ruby/math_helper'
+require_relative '../src/ruby/js_bridge'
+require_relative '../src/ruby/frequency_mapper'
+require_relative '../src/ruby/audio_analyzer'
+require_relative '../src/ruby/color_palette'
+require_relative '../src/ruby/particle_system'
+require_relative '../src/ruby/geometry_morpher'
+require_relative '../src/ruby/camera_controller'
+require_relative '../src/ruby/bloom_controller'
+require_relative '../src/ruby/effect_manager'
+require_relative '../src/ruby/vrm_dancer'
