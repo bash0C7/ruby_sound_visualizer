@@ -17,10 +17,10 @@ class BloomController
     @strength += Math.tanh(imp_overall) * 1.5
     @strength = [@strength, 4.5].min
 
-    # エネルギーが高いほどthresholdを下げる（下限付き）
-    @threshold = 0.3 - Math.tanh(energy) * 0.18
-    @threshold -= 0.05 * imp_overall
-    @threshold = [@threshold, 0.12].max
+    # エネルギーが高いほどthresholdを下げる（下限付き、VRM白飛び防止のため0.3に）
+    @threshold = 0.5 - Math.tanh(energy) * 0.15
+    @threshold -= 0.04 * imp_overall
+    @threshold = [@threshold, 0.3].max
   end
 
   def get_data

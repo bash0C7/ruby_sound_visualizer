@@ -4,7 +4,6 @@ $initialized = false
 $audio_analyzer = nil
 $effect_manager = nil
 $vrm_dancer = nil
-$vrm_mode = false
 $frame_count = 0
 $sensitivity = 1.0
 $max_brightness = 255
@@ -33,10 +32,6 @@ begin
     if match_lt
       $max_lightness = [[match_lt[1].to_i, 0].max, 255].min
     end
-    # VRM mode detection (match ?vrm or &vrm, not substring like "vrm123")
-    if search_str.match?(/[?&]vrm(?:=|&|$)/)
-      $vrm_mode = true
-    end
   end
 rescue => e
   # URLパラメーター読取失敗時はデフォルト値を使用
@@ -46,11 +41,11 @@ rescue => e
 end
 
 begin
-  JSBridge.log "Ruby VM started, initializing... (Sensitivity: #{$sensitivity}, VRM: #{$vrm_mode})"
+  JSBridge.log "Ruby VM started, initializing... (Sensitivity: #{$sensitivity})"
 
   $audio_analyzer = AudioAnalyzer.new
   $effect_manager = EffectManager.new
-  $vrm_dancer = VRMDancer.new if $vrm_mode
+  $vrm_dancer = VRMDancer.new  # Always initialize (VRM optional)
 
   JS.global[:rubyUpdateVisuals] = lambda do |freq_array|
     begin
@@ -65,41 +60,39 @@ begin
       JSBridge.update_particles($effect_manager.particle_data)
       JSBridge.update_geometry($effect_manager.geometry_data)
       JSBridge.update_bloom($effect_manager.bloom_data)
-      # Disable camera controller in VRM mode (manual keyboard control only)
-      JSBridge.update_camera($effect_manager.camera_data) unless $vrm_mode
+      # Camera controller always enabled (keyboard control can override)
+      JSBridge.update_camera($effect_manager.camera_data)
       JSBridge.update_particle_rotation($effect_manager.geometry_data[:rotation])
 
-      # VRM dance update
-      if $vrm_mode && $vrm_dancer
-        scaled_for_vrm = {
-          bass: [analysis[:bass] * $sensitivity, 1.0].min,
-          mid: [analysis[:mid] * $sensitivity, 1.0].min,
-          high: [analysis[:high] * $sensitivity, 1.0].min,
-          overall_energy: [analysis[:overall_energy] * $sensitivity, 1.0].min,
-          beat: analysis[:beat],
-          impulse: {
-            overall: $effect_manager.impulse_overall || 0.0,
-            bass: $effect_manager.impulse_bass || 0.0,
-            mid: $effect_manager.impulse_mid || 0.0,
-            high: $effect_manager.impulse_high || 0.0
-          }
+      # VRM dance update (always update, JavaScript will use if VRM is loaded)
+      scaled_for_vrm = {
+        bass: [analysis[:bass] * $sensitivity, 1.0].min,
+        mid: [analysis[:mid] * $sensitivity, 1.0].min,
+        high: [analysis[:high] * $sensitivity, 1.0].min,
+        overall_energy: [analysis[:overall_energy] * $sensitivity, 1.0].min,
+        beat: analysis[:beat],
+        impulse: {
+          overall: $effect_manager.impulse_overall || 0.0,
+          bass: $effect_manager.impulse_bass || 0.0,
+          mid: $effect_manager.impulse_mid || 0.0,
+          high: $effect_manager.impulse_high || 0.0
         }
-        vrm_data = $vrm_dancer.update(scaled_for_vrm)
-        JSBridge.update_vrm(vrm_data)
+      }
+      vrm_data = $vrm_dancer.update(scaled_for_vrm)
+      JSBridge.update_vrm(vrm_data)
 
-        # VRM debug info (60フレームごとに更新、コンパクト表示)
-        if $frame_count % 60 == 0
-          rotations = vrm_data[:rotations] || []
-          # 回転値の最大・最小を表示（動きの範囲を確認）
-          if rotations.length >= 9
-            hips_rot_max = rotations[0..2].map(&:abs).max.round(3)
-            spine_rot_max = rotations[3..5].map(&:abs).max.round(3)
-            chest_rot_max = rotations[6..8].map(&:abs).max.round(3)
-            hips_y = (vrm_data[:hips_position_y] || 0.0).round(3)
+      # VRM debug info (60フレームごとに更新、コンパクト表示)
+      if $frame_count % 60 == 0
+        rotations = vrm_data[:rotations] || []
+        # 回転値の最大・最小を表示（動きの範囲を確認）
+        if rotations.length >= 9
+          hips_rot_max = rotations[0..2].map(&:abs).max.round(3)
+          spine_rot_max = rotations[3..5].map(&:abs).max.round(3)
+          chest_rot_max = rotations[6..8].map(&:abs).max.round(3)
+          hips_y = (vrm_data[:hips_position_y] || 0.0).round(3)
 
-            vrm_debug = "VRM rot: h=#{hips_rot_max} s=#{spine_rot_max} c=#{chest_rot_max} hY=#{hips_y}"
-            JS.global[:vrmDebugText] = vrm_debug
-          end
+          vrm_debug = "VRM rot: h=#{hips_rot_max} s=#{spine_rot_max} c=#{chest_rot_max} hY=#{hips_y}"
+          JS.global[:vrmDebugText] = vrm_debug
         end
       end
 

@@ -66,6 +66,7 @@
     <div id="vrmUpload" style="display: none;">
       <label for="vrmFileInput" class="vrm-upload-btn">Upload VRM File</label>
       <input type="file" id="vrmFileInput" accept=".vrm" style="display: none;">
+      <button id="skipVrmBtn" class="vrm-upload-btn" style="margin-left: 10px;">Start without VRM</button>
       <div id="vrmFileName"></div>
     </div>
   </div>
@@ -134,13 +135,12 @@
     let audioContext, analyser, dataArray;
     let scene, camera, renderer, composer;
     let particleSystem, geometryMesh;
-    let bloomPass;
+    let renderPass, bloomPass;
     let lastFrameTime = Date.now();
     let frameCount = 0;
 
     // VRM state
     let currentVRM = null;
-    let vrmMode = false;
     let animLastTime = Date.now();
 
     // Selective Bloom (Layer 1 = bloom objects, Layer 0 = non-bloom objects)
@@ -210,8 +210,10 @@
 
       scene = new THREE.Scene();
       camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-      // VRM mode: closer camera for better model visibility (Z=1.5 is optimal)
-      camera.position.z = vrmMode ? 1.5 : 5;
+      // Unified camera position (will adjust when VRM loads)
+      camera.position.z = 5;
+      // Enable all layers for camera (Layer 0 for VRM, Layer 1 for particles/torus)
+      camera.layers.enableAll();
 
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
       renderer.setSize(window.innerWidth, window.innerHeight);
@@ -221,7 +223,7 @@
       // Post-processing setup
       composer = new EffectComposer(renderer);
 
-      const renderPass = new RenderPass(scene, camera);
+      renderPass = new RenderPass(scene, camera);
       composer.addPass(renderPass);
 
       bloomPass = new UnrealBloomPass(
@@ -263,7 +265,7 @@
       });
 
       particleSystem = new THREE.Points(geometry, material);
-      particleSystem.layers.set(BLOOM_LAYER);  // Enable bloom for particles
+      // particleSystem.layers.set(BLOOM_LAYER);  // DISABLED: Enable bloom for particles
       scene.add(particleSystem);
 
       // Morphing geometry (torus) - ポリゴン削減で FPS 改善（32,64 → 24,32）
@@ -276,7 +278,7 @@
         emissive: 0x4d4d4d  // dim gray
       });
       geometryMesh = new THREE.Mesh(torusGeometry, torusMaterial);
-      geometryMesh.layers.set(BLOOM_LAYER);  // Enable bloom for torus
+      // geometryMesh.layers.set(BLOOM_LAYER);  // DISABLED: Enable bloom for torus
       scene.add(geometryMesh);
 
       // Initialize Selective Bloom materials
@@ -287,16 +289,22 @@
       console.log('[JS] Three.js initialized successfully');
     }
 
-    // VRM file upload promise
+    // VRM file upload promise (or skip)
     function waitForVRMFile() {
       return new Promise((resolve) => {
         const input = document.getElementById('vrmFileInput');
+        const skipBtn = document.getElementById('skipVrmBtn');
+
         input.addEventListener('change', (event) => {
           const file = event.target.files[0];
           if (file) {
             document.getElementById('vrmFileName').textContent = file.name;
             resolve(file);
           }
+        });
+
+        skipBtn.addEventListener('click', () => {
+          resolve(null);  // No VRM file, start without it
         });
       });
     }
@@ -592,18 +600,29 @@
       }
 
       if (composer) {
-        // Selective Bloom: darken non-bloomed objects (VRM) before bloom pass
-        // TEMPORARILY DISABLED FOR DEBUGGING
+        // DISABLED: Selective Bloom (back to normal rendering)
         // if (vrmMode && currentVRM) {
-        //   scene.traverse(darkenNonBloomed);
+        //   // Selective Bloom for VRM mode:
+        //   // 1. Render all objects normally without bloom
+        //   renderer.autoClear = true;
+        //   renderer.render(scene, camera);
+        //
+        //   // 2. Render bloom layer only (particles/torus) with bloom effect (additive)
+        //   camera.layers.set(BLOOM_LAYER);   // Show only bloom layer
+        //   renderPass.clear = false;         // Don't clear previous render
+        //   composer.render();                // Apply bloom to particles/torus
+        //
+        //   // 3. Restore camera layers and clear flag
+        //   camera.layers.enableAll();
+        //   renderPass.clear = true;
+        // } else {
+        //   // Normal mode: render everything with bloom
+        //   renderPass.clear = true;
+        //   composer.render();
         // }
 
+        // Normal rendering for all modes
         composer.render();
-
-        // Restore original materials after bloom pass
-        // if (vrmMode && currentVRM) {
-        //   scene.traverse(restoreMaterial);
-        // }
       }
     }
 
@@ -635,51 +654,34 @@
     // Initialize everything
     async function init() {
       try {
-        // Check for VRM mode
-        const urlParams = new URLSearchParams(window.location.search);
-        vrmMode = urlParams.has('vrm');
+        // Always show VRM upload UI
+        document.getElementById('vrmUpload').style.display = 'block';
+        updateLoadingStatus('Upload a VRM file or start without it...');
 
-        if (vrmMode) {
-          // VRM mode: show upload UI, wait for file, then proceed
-          document.getElementById('loadingTitle').textContent =
-            'Ruby WASM Sound Visualizer - VRM Mode';
-          document.getElementById('vrmUpload').style.display = 'block';
-          updateLoadingStatus('Please upload a VRM file to begin...');
+        const vrmFile = await waitForVRMFile();
+        document.getElementById('vrmUpload').style.display = 'none';
 
-          const vrmFile = await waitForVRMFile();
-          document.getElementById('vrmUpload').style.display = 'none';
+        updateLoadingStatus('Initializing Web Audio API...');
+        await initAudio();
 
-          updateLoadingStatus('Initializing Web Audio API...');
-          await initAudio();
+        updateLoadingStatus('Initializing Three.js...');
+        initThree();
 
-          updateLoadingStatus('Initializing Three.js...');
-          initThree();
-
+        // Load VRM if file was provided
+        if (vrmFile) {
           updateLoadingStatus('Loading VRM model...');
           await loadVRMFile(vrmFile);
-
-          updateLoadingStatus('Ready!');
-          document.getElementById('loading').style.display = 'none';
-          console.log('[JS] VRM mode initialization complete!');
-
-          animate();
+          // Adjust camera for VRM viewing
+          camera.position.z = 1.5;
+          console.log('[JS] Initialization complete with VRM!');
         } else {
-          // Normal mode
-          updateLoadingStatus('Initializing Web Audio API...');
-          await initAudio();
-
-          updateLoadingStatus('Initializing Three.js...');
-          initThree();
-
-          // Ruby WASM は browser.script.iife.js によって自動初期化済み
-          // window.rubyVM と window.rubyUpdateVisuals は既に利用可能
-
-          updateLoadingStatus('Ready!');
-          document.getElementById('loading').style.display = 'none';
-          console.log('[JS] Initialization complete!');
-
-          animate();
+          console.log('[JS] Initialization complete without VRM!');
         }
+
+        updateLoadingStatus('Ready!');
+        document.getElementById('loading').style.display = 'none';
+
+        animate();
       } catch (error) {
         console.error('[JS] Initialization error:', error);
         updateLoadingStatus('Error: ' + error.message);
