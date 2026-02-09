@@ -932,7 +932,8 @@ end
 class EffectManager
   IMPULSE_DECAY = 0.82  # 毎フレーム18%減衰（素早く変わるが連続的）
 
-  attr_reader :particle_data, :geometry_data, :bloom_data, :camera_data
+  attr_reader :particle_data, :geometry_data, :bloom_data, :camera_data,
+              :impulse_overall, :impulse_bass, :impulse_mid, :impulse_high
 
   def initialize
     @particle_system = ParticleSystem.new
@@ -1011,9 +1012,13 @@ class VRMDancer
     @last_beat_bass = false
   end
 
-  def update(analysis)
-    dt = JS.global[:_animDeltaTime]
-    delta = dt.typeof == "number" ? dt.to_f : 0.033
+  def update(analysis, delta_time = nil)
+    if delta_time
+      delta = delta_time.to_f
+    else
+      dt = JS.global[:_animDeltaTime]
+      delta = dt.typeof == "number" ? dt.to_f : 0.033
+    end
     delta = [[delta, 0.001].max, 0.1].min
 
     @time += delta
@@ -1168,8 +1173,8 @@ begin
     if match_lt
       $max_lightness = [[match_lt[1].to_i, 0].max, 255].min
     end
-    # VRM mode detection
-    if search_str.include?("vrm")
+    # VRM mode detection (match ?vrm or &vrm, not substring like "vrm123")
+    if search_str.match?(/[?&]vrm(?:=|&|$)/)
       $vrm_mode = true
     end
   end
@@ -1212,10 +1217,10 @@ begin
           overall_energy: [analysis[:overall_energy] * $sensitivity, 1.0].min,
           beat: analysis[:beat],
           impulse: {
-            overall: $effect_manager.send(:instance_variable_get, :@impulse_overall) || 0.0,
-            bass: $effect_manager.send(:instance_variable_get, :@impulse_bass) || 0.0,
-            mid: $effect_manager.send(:instance_variable_get, :@impulse_mid) || 0.0,
-            high: $effect_manager.send(:instance_variable_get, :@impulse_high) || 0.0
+            overall: $effect_manager.impulse_overall || 0.0,
+            bass: $effect_manager.impulse_bass || 0.0,
+            mid: $effect_manager.impulse_mid || 0.0,
+            high: $effect_manager.impulse_high || 0.0
           }
         }
         vrm_data = $vrm_dancer.update(scaled_for_vrm)
@@ -1592,9 +1597,9 @@ end
           const rz = Number(rotArray[i * 3 + 2]) || 0;
           bone.rotation.set(rx, ry, rz);
 
-          // Hips position (bounce)
+          // Hips position (bounce) - use set, not accumulate
           if (boneName === 'hips') {
-            bone.position.y += hipsPositionY;
+            bone.position.y = hipsPositionY;
           }
         }
       }
