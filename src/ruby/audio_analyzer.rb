@@ -17,9 +17,9 @@ class AudioAnalyzer
   BEAT_MIN_HIGH = 0.20
 
   # Two-stage smoothing: beat detection vs visual
-  VISUAL_SMOOTHING_FACTOR = 0.88  # ビジュアル用（より滑らか、12% 新規データ）
+  VISUAL_SMOOTHING_FACTOR = 0.70  # ビジュアル用（滑らか、30% 新規データ）
   IMPULSE_DECAY = 0.65             # インパルスの減衰率（35% 減衰/フレーム）
-  EXPONENTIAL_THRESHOLD = 0.12     # この値以下を指数的に減衰（ノイズ処理）
+  EXPONENTIAL_THRESHOLD = 0.06     # この値以下を指数的に減衰（ノイズ処理）
 
   def initialize
     @frequency_mapper = FrequencyMapper.new

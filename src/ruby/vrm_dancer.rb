@@ -17,6 +17,9 @@ class VRMDancer
     @arm_raise = 0.0
     @blink_timer = 0.0
     @blink_value = 0.0
+    @mouth_phase = 0.0
+    @mouth_open_vertical = 0.0
+    @mouth_open_horizontal = 0.0
 
     # Smoothing state for natural movement (store previous rotation targets)
     @prev_rotations = Array.new(BONE_ORDER.length * 3, 0.0)
@@ -58,21 +61,28 @@ class VRMDancer
       @blink_value = [@blink_value - delta * 8.0, 0.0].max  # Decay in ~0.125 sec
     end
 
+    # Mouth motion (open/close cycle)
+    @mouth_phase += delta * 1.0  # Mouth cycle (~6 sec)
+    # Vertical mouth open (aa sound): 0.0 to 0.8
+    @mouth_open_vertical = (Math.sin(@mouth_phase) + 1.0) * 0.4  # 0.0 to 0.8
+    # Horizontal mouth open (ee sound): 0.0 to 0.6
+    @mouth_open_horizontal = (Math.sin(@mouth_phase + Math::PI / 2) + 1.0) * 0.3  # 0.0 to 0.6
+
     rotations = []
 
-    # hips (gentle sway and twist - natural human range)
+    # hips (sway, twist, and tilt - natural human range)
     rotations.concat([
-      Math.sin(@beat_phase * 0.8) * 0.02,   # Forward/back tilt (±9° after 8x)
-      Math.sin(@sway_phase) * 0.08,         # Left/right twist (±37° after 8x)
-      0
+      Math.sin(@beat_phase * 0.8) * 0.03,   # Forward/back tilt (±14° after 8x)
+      Math.sin(@sway_phase) * 0.12,         # Left/right twist (±55° after 8x)
+      Math.sin(@beat_phase * 0.6) * 0.04    # Left/right lean (±18° after 8x)
     ])
 
     # spine (twist with hips - natural human range)
-    sway = Math.sin(@beat_phase * 0.9) * 0.07  # Twist (±32° after 8x)
+    sway = Math.sin(@beat_phase * 0.9) * 0.10  # Twist (±46° after 8x)
     rotations.concat([
-      Math.sin(@beat_phase * 1.2) * 0.04,       # Forward/back (±18° after 8x)
-      Math.sin(@sway_phase * 1.1) * 0.08,       # Left/right twist (±37° after 8x)
-      sway
+      Math.sin(@beat_phase * 1.2) * 0.05,        # Forward/back (±23° after 8x)
+      Math.sin(@sway_phase * 1.1) * 0.12,        # Left/right twist (±55° after 8x)
+      sway + Math.sin(@sway_phase * 0.7) * 0.05  # Twist + lean (±32-55° after 8x)
     ])
 
     # chest (subtle counter-rotate for natural movement)
@@ -91,14 +101,14 @@ class VRMDancer
       Math.sin(@beat_phase) * 0.02                      # Slight tilt (±9° after 8x)
     ])
 
-    # left upper arm (gentle swing - natural human range)
-    # Z rotation: -0.02 to 0.08 rad → -9° to 37° after 8x amplification
-    arm_wave = Math.sin(@beat_phase * 0.8) * 0.04  # Slow wave (±18° after 8x)
-    raise_l = @arm_raise  # Smoothed raise cycle
+    # left upper arm (natural human range - 前方 + 小 swing、横に超大きく広げる)
+    # Z rotation: 腕を下げる（頭にめり込まないように）
+    arm_wave = Math.sin(@beat_phase * 0.8) * 0.02  # Slow wave (小さく) ±9° after 8x
+    raise_l = @arm_raise * 0.3  # Raise を抑える（頭にめり込まない）
     rotations.concat([
-      Math.sin(@beat_phase * 1.0) * 0.03,       # Forward/back swing (±14° after 8x)
-      Math.sin(@sway_phase * 0.9) * 0.02,       # Inward/outward (±9° after 8x)
-      -0.01 + arm_wave + raise_l                # From relaxed down to raised
+      0.17 + Math.sin(@beat_phase * 1.0) * 0.01,  # Forward + 小 swing (後ろ倒れず) 73°-82° after 8x
+      0.20 + Math.sin(@sway_phase * 0.9) * 0.05,  # Outward (クロスせず横に超広げる) 69°-115° after 8x
+      -0.05 + arm_wave + raise_l                  # 下げる（頭にめり込まない） -23° to 9° after 8x
     ])
 
     # left lower arm (natural elbow bend - human range: 0-145°)
@@ -111,9 +121,9 @@ class VRMDancer
 
     # right upper arm (mirror)
     rotations.concat([
-      Math.sin(@beat_phase * 1.0) * 0.03,
-      Math.sin(@sway_phase * 0.9 + Math::PI) * 0.02,
-      -(-0.01 + arm_wave + raise_l)  # Mirror
+      0.17 + Math.sin(@beat_phase * 1.0) * 0.01,  # Forward + 小 swing (後ろ倒れず) same as left
+      -0.20 + Math.sin(@sway_phase * 0.9 + Math::PI) * 0.05,  # Outward (クロスせず横に超広げる) mirrored
+      -(-0.05 + arm_wave + raise_l)  # Mirror Z rotation (下げる)
     ])
 
     # right lower arm (natural elbow bend)
@@ -164,7 +174,9 @@ class VRMDancer
     {
       rotations: amplified_rotations,
       hips_position_y: 0.0,  # No vertical bounce
-      blink: @blink_value
+      blink: @blink_value,
+      mouth_open_vertical: @mouth_open_vertical,
+      mouth_open_horizontal: @mouth_open_horizontal
     }
   end
 end
