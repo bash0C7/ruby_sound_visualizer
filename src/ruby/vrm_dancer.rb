@@ -40,9 +40,9 @@ class VRMDancer
     imp_high = impulse[:high] || 0.0
     beat = analysis[:beat] || {}
 
-    # Rhythmic phase accumulators
-    @beat_phase += delta * (3.0 + energy * 3.0)
-    @sway_phase += delta * 1.5
+    # Rhythmic phase accumulators (slower for smooth dance movement)
+    @beat_phase += delta * (1.5 + energy * 1.5)
+    @sway_phase += delta * 0.75
 
     # Trigger bounce on bass beat
     if beat[:bass] && !@last_beat_bass
@@ -91,32 +91,32 @@ class VRMDancer
       Math.sin(@beat_phase) * high * 0.06
     ])
 
-    # left upper arm
+    # left upper arm (spread horizontally for dance pose)
     arm_pump = Math.sin(@beat_phase * 2) * energy * 0.25
     raise_l = @arm_raise + Math.sin(@beat_phase * 2 + 0.5) * energy * 0.2
     rotations.concat([
       arm_pump + imp_bass * 0.15,
       0,
-      0.3 + raise_l
+      1.2 + raise_l  # ~69 degrees horizontal spread (was 0.3)
     ])
 
-    # left lower arm
-    elbow_l = 0.2 + Math.sin(@beat_phase * 2 + 0.3) * energy * 0.3
+    # left lower arm (natural elbow bend: 0-143 degrees after 10x amplification)
+    elbow_l = 0.1 + Math.sin(@beat_phase * 2 + 0.3) * energy * 0.15
     rotations.concat([0, 0, elbow_l])
 
     # left hand
     rotations.concat([0, 0, 0])
 
-    # right upper arm (mirror)
+    # right upper arm (mirror, spread horizontally)
     raise_r = @arm_raise + Math.sin(@beat_phase * 2 - 0.5) * energy * 0.2
     rotations.concat([
       arm_pump + imp_bass * 0.15,
       0,
-      -(0.3 + raise_r)
+      -(1.2 + raise_r)  # ~69 degrees horizontal spread (was 0.3)
     ])
 
-    # right lower arm
-    elbow_r = 0.2 + Math.sin(@beat_phase * 2 - 0.3) * energy * 0.3
+    # right lower arm (natural elbow bend: 0-143 degrees after 10x amplification)
+    elbow_r = 0.1 + Math.sin(@beat_phase * 2 - 0.3) * energy * 0.15
     rotations.concat([0, 0, -elbow_r])
 
     # right hand
@@ -136,9 +136,13 @@ class VRMDancer
       rotations.concat([step * 0.6, 0, 0])    # right lower leg
     end
 
+    # Amplify rotations for visibility (10x for better dance movement)
+    amplified_rotations = rotations.map { |r| r * 10.0 }
+    amplified_hips_y = @bounce_pos * 3.0
+
     {
-      rotations: rotations,
-      hips_position_y: @bounce_pos
+      rotations: amplified_rotations,
+      hips_position_y: amplified_hips_y
     }
   end
 end

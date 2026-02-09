@@ -65,7 +65,8 @@ begin
       JSBridge.update_particles($effect_manager.particle_data)
       JSBridge.update_geometry($effect_manager.geometry_data)
       JSBridge.update_bloom($effect_manager.bloom_data)
-      JSBridge.update_camera($effect_manager.camera_data)
+      # Disable camera controller in VRM mode (manual keyboard control only)
+      JSBridge.update_camera($effect_manager.camera_data) unless $vrm_mode
       JSBridge.update_particle_rotation($effect_manager.geometry_data[:rotation])
 
       # VRM dance update
@@ -85,6 +86,21 @@ begin
         }
         vrm_data = $vrm_dancer.update(scaled_for_vrm)
         JSBridge.update_vrm(vrm_data)
+
+        # VRM debug info (60フレームごとに更新、コンパクト表示)
+        if $frame_count % 60 == 0
+          rotations = vrm_data[:rotations] || []
+          # 回転値の最大・最小を表示（動きの範囲を確認）
+          if rotations.length >= 9
+            hips_rot_max = rotations[0..2].map(&:abs).max.round(3)
+            spine_rot_max = rotations[3..5].map(&:abs).max.round(3)
+            chest_rot_max = rotations[6..8].map(&:abs).max.round(3)
+            hips_y = (vrm_data[:hips_position_y] || 0.0).round(3)
+
+            vrm_debug = "VRM rot: h=#{hips_rot_max} s=#{spine_rot_max} c=#{chest_rot_max} hY=#{hips_y}"
+            JS.global[:vrmDebugText] = vrm_debug
+          end
+        end
       end
 
       $frame_count += 1
@@ -147,7 +163,7 @@ begin
       JS.global[:paramInfoText] = param_text
 
       # キーガイド（固定文字列だが統一のため Ruby で定義）
-      JS.global[:keyGuideText] = "0-3: Color Mode  |  4/5: Hue Shift  |  6/7: Brightness ±5  |  8/9: Lightness ±5  |  +/-: Sensitivity"
+      JS.global[:keyGuideText] = "0-3: Color Mode  |  4/5: Hue Shift  |  6/7: Brightness ±5  |  8/9: Lightness ±5  |  +/-: Sensitivity  |  a/s: Cam X  |  w/x: Cam Y  |  q/z: Cam Z"
 
       if $frame_count % 60 == 0
         bass = (analysis[:bass] * 100).round(1)
