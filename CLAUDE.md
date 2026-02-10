@@ -1,6 +1,27 @@
 # Ruby WASM Sound Visualizer
 
-ブラウザで動作する、Rubyで書かれた音響ビジュアライザー（VJソフトウェア）
+Browser-based audio visualizer (VJ software) written in Ruby and executed via ruby.wasm.
+
+## Table of Contents
+
+1. [Overview](#overview)
+2. [Language Policy](#language-policy)
+3. [Development Guidelines](#development-guidelines)
+   - [Git Operations](#git-operations)
+   - [Implementation Approach](#implementation-approach)
+   - [Investigation Protocol](#investigation-protocol)
+   - [Browser Testing & Debugging](#browser-testing--debugging)
+4. [Technical Specifications](#technical-specifications)
+   - [Technology Stack](#technology-stack)
+   - [Architecture](#architecture)
+   - [File Structure](#file-structure)
+5. [Project Skills](#project-skills)
+6. [Quick Start](#quick-start)
+7. [References](#references)
+
+## Overview
+
+Real-time audio visualizer that analyzes microphone input and generates vivid 3D visual effects using Three.js. Nearly all logic is implemented in Ruby and executed in the browser via @ruby/4.0-wasm-wasi.
 
 ## Language Policy
 
@@ -8,89 +29,97 @@
 - **User communication, information provision**: ALL in Japanese Kansai dialect (関西弁)
 - **README.md**: ABSOLUTE RULE - ALL in English, no bold emphasis (`**`), no emoji, fact-based language without hyperbole
 
-## git操作
+## Development Guidelines
 
-- **subagent を使うこと**: git 操作は Task tool を使って subagent に委譲する
-- **push は厳格に禁止**: リモートへの push は人間が行う。Claude は commit までで止める
+### Git Operations
+
+- **Use subagent**: Delegate git operations to Task tool subagent
+- **Push policy**: Push allowed from Claude Code on web only. Local sessions stop at commit (manual push by humans).
 - **Commit message format**: English only, follow conventional commits style
 
-## 実装の注意
+### Implementation Approach
 
-- **t-wada Style TDD**: Red → Green → Refactor サイクルで開発
-  - 必ず failing test から始める。production code より先に test を書く
-  - 既存の処理を壊さないよう慎重にテストファーストで進める
-- **ruby.wasm コードを主体にする**: ロジックは可能な限り Ruby で実装
+- **t-wada Style TDD**: Develop using Red → Green → Refactor cycle
+  - Always start with failing test. Write test before production code.
+  - Proceed carefully with test-first approach to avoid breaking existing functionality.
+- **Ruby-first implementation**: Implement logic in Ruby as much as possible
+- **Scope adherence**: Only modify files specified by user
+- **Build/deploy prohibition**: Do not execute unless explicitly instructed
+- **Minimal changes**: Targeted changes, not broad refactoring
+- **No speculation-based fixes**: Propose investigation instead
+- **Critical files**: index.html and Gemfile require explicit user approval before modification
 
-## ブラウザテスト・デバッグ
+### Investigation Protocol
 
-**Chrome MCP ツール必須**: ブラウザでの動作確認には Chrome MCP ツール（`mcp__claude-in-chrome__*`）を**常に使用**すること
+**CRITICAL: Never fix based on speculation. Always verify facts with debug output before fixing.**
 
-詳細な手順は `/debug-browser` スキルを参照。
+1. Record phenomenon accurately (what is happening)
+2. Confirm expected behavior (what should happen)
+3. Identify differences (what is different)
+4. Formulate hypotheses (max 3, with rationale)
+5. Verify with debug output (one at a time)
+6. Apply minimal fix
+7. Verify with Chrome MCP tools
 
-## 調査プロトコル
+See [.claude/INVESTIGATION-PROTOCOL.md](.claude/INVESTIGATION-PROTOCOL.md) for detailed workflow.
 
-**CRITICAL: 憶測で修正せず、必ずデバッグ出力で事実を確認してから修正すること**
+### Browser Testing & Debugging
 
-1. 現象を正確に記録する（何が起きているか）
-2. 期待される動作を確認する（何が起きるべきか）
-3. 差分を特定する（何が違うのか）
-4. 仮説を立てる（最大3つ、根拠を明記）
-5. デバッグ出力で検証する（一つずつ確認）
-6. 最小限の修正を実施する
-7. Chrome MCP ツールで検証する
+**Chrome MCP tools required**: ALWAYS use Chrome MCP tools (`mcp__claude-in-chrome__*`) for browser verification.
 
-詳細なワークフローは [.claude/INVESTIGATION-PROTOCOL.md](.claude/INVESTIGATION-PROTOCOL.md) を参照。
+Use `/debug-browser` skill for detailed procedures.
 
-## アプローチ制約
+## Technical Specifications
 
-- **ファイル修正スコープ厳守**: ユーザーが指定したファイルのみを修正
-- **ビルド/デプロイ禁止**: 明示的に指示されない限り実行しない
-- **最小限の変更**: 広範なリファクタリングではなく、ターゲットを絞った変更
-- **推測ベースの修正禁止**: 調査を提案する
-- **index.html と Gemfile は慎重に**: 変更時は必ずユーザーの明示的な承認を得る
-
-## 概要
-
-マイク入力をリアルタイムで解析し、Three.jsで派手な3D視覚エフェクトを生成します。
-ロジックのほぼ全てをRubyで実装し、@ruby/4.0-wasm-wasiによってブラウザで実行されます。
-
-## 技術スタック
+### Technology Stack
 
 - **Ruby 3.4.7** (via @ruby/4.0-wasm-wasi 2.8.1)
 - **Three.js** (0.160.0) - 3D rendering & post-processing
-- **Web Audio API** - マイク入力 & 周波数解析
+- **Web Audio API** - Microphone input & frequency analysis
 
-詳細なアーキテクチャは [.claude/ARCHITECTURE.md](.claude/ARCHITECTURE.md) を参照。
+### Architecture
 
-## ファイル構成
+See [.claude/ARCHITECTURE.md](.claude/ARCHITECTURE.md) for detailed architecture documentation.
 
-[index.html](./index.html) - 全コードを含む単一ファイル（Ruby + JavaScript + HTML）
+### File Structure
 
-[.claude/](./.claude/) - プロジェクト固有の設定・ドキュメント
-- [ARCHITECTURE.md](./.claude/ARCHITECTURE.md) - アーキテクチャ詳細
-- [INVESTIGATION-PROTOCOL.md](./.claude/INVESTIGATION-PROTOCOL.md) - 調査プロトコル
-- [RUBY-WASM.md](./.claude/RUBY-WASM.md) - Ruby WASM 固有の知見
-- [SETUP.md](./.claude/SETUP.md) - セットアップ・実行方法
-- [skills/](./.claude/skills/) - プロジェクト固有スキル
+```
+index.html              # Single file containing all code (Ruby + JavaScript + HTML)
+.claude/                # Project-specific configuration & documentation
+├── ARCHITECTURE.md     # Architecture details
+├── INVESTIGATION-PROTOCOL.md  # Investigation protocol
+├── RUBY-WASM.md        # Ruby WASM specific knowledge
+├── SETUP.md            # Setup & execution instructions
+├── tasks.md            # Project task list
+└── skills/             # Project-local skills
+    ├── debug-browser/  # Browser debugging procedures
+    └── troubleshoot/   # Basic troubleshooting
+```
 
-## セットアップ
+## Project Skills
 
-セットアップと実行方法は [.claude/SETUP.md](./.claude/SETUP.md) を参照。
+This project defines local skills in `.claude/skills/`. Use skills via Skill tool (e.g., `/debug-browser`).
+
+Available skills:
+- **debug-browser**: Detailed browser debugging procedure for ruby.wasm app using Chrome MCP tools
+- **troubleshoot**: Basic troubleshooting guide
+
+Skills are project-local and defined within this repository.
+
+## Quick Start
+
+See [.claude/SETUP.md](.claude/SETUP.md) for detailed setup instructions.
 
 ```bash
 bundle install
 bundle exec ruby -run -ehttpd . -p8000
 ```
 
-ブラウザで `http://localhost:8000/index.html` を開く（初回は30秒待機）
+Open `http://localhost:8000/index.html` in browser (wait 30 seconds on first load).
 
-## トラブルシューティング
-
-基本的なトラブルシューティングは `/troubleshoot` スキルを参照。
-
-## 参考資料
+## References
 
 - [ruby.wasm Official Documentation](https://ruby.github.io/ruby.wasm/)
 - [Three.js Documentation](https://threejs.org/docs/)
 - [Web Audio API - MDN](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API)
-- [ruby.wasm JavaScript Interop Guide](./.claude/RUBY-WASM.md) - プロジェクト固有の知見
+- [ruby.wasm JavaScript Interop Guide](./.claude/RUBY-WASM.md) - Project-specific knowledge
