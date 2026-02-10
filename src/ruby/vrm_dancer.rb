@@ -118,8 +118,8 @@ class VRMDancer
     y_outward_bonus = (max_raise - raise_l) * 0.4  # 下のとき横に広げる (0.04 to 0.0)
 
     rotations.concat([
-      0.40 + arm_swing_x + x_forward_bonus,       # 常に前方（0.38-0.48 rad = 173°-220° after 8x）
-      0.35 + arm_swing_y + y_outward_bonus,       # 横に広げる + 下のとき更に広げる
+      0.40 + arm_swing_x + x_forward_bonus - 2.0, # 前方に出す（-2.0 rad で spine より前方へ）
+      0.44 + arm_swing_y + y_outward_bonus + 1.5, # 横に広げる（+1.5 rad で外側へ）
       0.15 + arm_wave + raise_l * 2.0             # 周期的に上下
     ])
 
@@ -136,8 +136,8 @@ class VRMDancer
 
     # right upper arm (mirror) - ダンサブルな動き
     rotations.concat([
-      0.40 + arm_swing_x + x_forward_bonus,        # 常に前方 (same as left)
-      -0.35 + Math.cos(@sway_phase + Math::PI) * 0.15 - y_outward_bonus,  # 横に広げる (mirrored)
+      0.40 + arm_swing_x + x_forward_bonus - 2.0,  # 前方に出す（-2.0 rad で spine より前方へ）
+      -0.44 + Math.cos(@sway_phase + Math::PI) * 0.15 - y_outward_bonus - 1.5,  # 横に広げる（-1.5 rad で外側へ）
       0.15 + arm_wave + raise_l * 2.0              # 周期的に上下 (same as left)
     ])
 
