@@ -16,7 +16,7 @@
   - JavaScript-ruby.wasm 連携ガイド
   - ruby.wasm 技術ガイド
 
-- [ ] CLAUDE.md をリファクタリングする
+- [x] CLAUDE.md をリファクタリングする
   - 2026 年 2 月 Claude Code ベストプラクティスに準拠
   - Skills をプロジェクトローカルで定義
   - 構成を簡潔に整理し、冗長性を削減
