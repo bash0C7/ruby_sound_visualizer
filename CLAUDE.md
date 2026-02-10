@@ -34,7 +34,7 @@ Real-time audio visualizer that analyzes microphone input and generates vivid 3D
 ### Git Operations
 
 - **Use subagent**: Delegate git operations to Task tool subagent
-- **Push strictly prohibited**: Remote push is done by humans only. Claude stops at commit.
+- **Push policy**: Push allowed from Claude Code on web only. Local sessions stop at commit (manual push by humans).
 - **Commit message format**: English only, follow conventional commits style
 
 ### Implementation Approach
