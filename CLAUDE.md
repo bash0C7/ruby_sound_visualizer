@@ -91,6 +91,13 @@ index.html              # Single file containing all code (Ruby + JavaScript + H
 ├── RUBY-WASM.md        # Ruby WASM specific knowledge
 ├── SETUP.md            # Setup & execution instructions
 ├── tasks.md            # Project task list
+├── guides/             # Technical reference guides
+│   ├── 3d-basics.md          # Three.js 3D fundamentals
+│   ├── 3d-glossary.md        # 3D programming & shader glossary
+│   ├── shader-operations.md  # Post-processing & shader guide
+│   ├── vrm.md                # VRM model integration guide
+│   ├── js-ruby-wasm-interop.md  # JS-Ruby interop patterns
+│   └── ruby-wasm-technical.md   # ruby.wasm platform guide
 └── skills/             # Project-local skills
     ├── debug-browser/  # Browser debugging procedures
     └── troubleshoot/   # Basic troubleshooting
@@ -116,6 +123,17 @@ bundle exec ruby -run -ehttpd . -p8000
 ```
 
 Open `http://localhost:8000/index.html` in browser (wait 30 seconds on first load).
+
+## Technical Guides
+
+Reference guides for technologies used in this project (located in `.claude/guides/`):
+
+- [3D Basics](.claude/guides/3d-basics.md) - Three.js scene, camera, geometry, animation
+- [3D Glossary](.claude/guides/3d-glossary.md) - 3D programming, modeling & shader terminology
+- [Shader Operations](.claude/guides/shader-operations.md) - Post-processing, bloom, materials
+- [VRM Guide](.claude/guides/vrm.md) - VRM model loading, bones, expressions
+- [JS-Ruby Interop](.claude/guides/js-ruby-wasm-interop.md) - JavaScript & ruby.wasm integration
+- [ruby.wasm Technical](.claude/guides/ruby-wasm-technical.md) - ruby.wasm platform specifics
 
 ## References
 
