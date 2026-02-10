@@ -128,6 +128,7 @@
   <script type="text/ruby" src="src/ruby/bloom_controller.rb"></script>
   <script type="text/ruby" src="src/ruby/effect_manager.rb"></script>
   <script type="text/ruby" src="src/ruby/vrm_dancer.rb"></script>
+  <script type="text/ruby" src="src/ruby/vrm_material_controller.rb"></script>
   <script type="text/ruby" src="src/ruby/main.rb"></script>
 
   <script>
@@ -142,6 +143,12 @@
     // VRM state
     let currentVRM = null;
     let animLastTime = Date.now();
+
+    // Camera rotation control (spherical coordinates)
+    let cameraTheta = 0;      // Y-axis rotation (horizontal)
+    let cameraPhi = 0;        // X-axis rotation (vertical)
+    let cameraRadius = 5;     // Distance from target
+    let cameraTarget = null;  // Look-at target (initialized in initThree)
 
     // Selective Bloom (Layer 1 = bloom objects, Layer 0 = non-bloom objects)
     const BLOOM_LAYER = 1;
@@ -210,8 +217,9 @@
 
       scene = new THREE.Scene();
       camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-      // Unified camera position (will adjust when VRM loads)
-      camera.position.z = 5;
+      // Initialize camera target and position with spherical coordinates
+      cameraTarget = new THREE.Vector3(0, 0, 0);
+      updateCameraPosition();
       // Enable all layers for camera (Layer 0 for VRM, Layer 1 for particles/torus)
       camera.layers.enableAll();
 
@@ -228,9 +236,9 @@
 
       bloomPass = new UnrealBloomPass(
         new THREE.Vector2(window.innerWidth, window.innerHeight),
-        1.5,
-        0.4,
-        0.85
+        1.5,   // Bloom strength
+        0.4,   // Bloom radius
+        0.0    // Threshold 0.0 = 全体を輝かせる
       );
       composer.addPass(bloomPass);
 
@@ -270,12 +278,15 @@
 
       // Morphing geometry (torus) - ポリゴン削減で FPS 改善（32,64 → 24,32）
       const torusGeometry = new THREE.TorusGeometry(1, 0.4, 12, 16);
-      const torusMaterial = new THREE.MeshBasicMaterial({
+      const torusMaterial = new THREE.MeshStandardMaterial({
         color: 0x4d4d4d,  // dim gray (グレースケール起動)
         wireframe: true,
         transparent: true,
         opacity: 0.6,
-        emissive: 0x4d4d4d  // dim gray
+        emissive: 0xffffff,  // white for uniform glow
+        emissiveIntensity: 0.3,  // initial intensity
+        metalness: 0.0,
+        roughness: 1.0
       });
       geometryMesh = new THREE.Mesh(torusGeometry, torusMaterial);
       // geometryMesh.layers.set(BLOOM_LAYER);  // DISABLED: Enable bloom for torus
@@ -287,6 +298,46 @@
       darkMaterial = new THREE.MeshBasicMaterial({ color: 'black' });
 
       console.log('[JS] Three.js initialized successfully');
+
+      // Setup keyboard controls for camera rotation
+      setupCameraControls();
+    }
+
+    // Update camera position using spherical coordinates
+    function updateCameraPosition() {
+      const x = cameraRadius * Math.cos(cameraPhi) * Math.sin(cameraTheta);
+      const y = cameraRadius * Math.sin(cameraPhi);
+      const z = cameraRadius * Math.cos(cameraPhi) * Math.cos(cameraTheta);
+      camera.position.set(cameraTarget.x + x, cameraTarget.y + y, cameraTarget.z + z);
+      camera.lookAt(cameraTarget);
+    }
+
+    // Setup keyboard controls for camera rotation
+    function setupCameraControls() {
+      document.addEventListener('keydown', (event) => {
+        const rotationStep = Math.PI / 18;  // 10 degrees
+
+        switch(event.key.toLowerCase()) {
+          case 'd':  // Rotate left
+            cameraTheta -= rotationStep;
+            updateCameraPosition();
+            break;
+          case 'f':  // Rotate right
+            cameraTheta += rotationStep;
+            updateCameraPosition();
+            break;
+          case 'e':  // Rotate up
+            cameraPhi = Math.min(cameraPhi + rotationStep, Math.PI / 2 - 0.01);  // Clamp to avoid gimbal lock
+            updateCameraPosition();
+            break;
+          case 'c':  // Rotate down
+            cameraPhi = Math.max(cameraPhi - rotationStep, -Math.PI / 2 + 0.01);  // Clamp to avoid gimbal lock
+            updateCameraPosition();
+            break;
+        }
+      });
+
+      console.log('[JS] Camera controls initialized (d/f: rotate left/right, e/c: rotate up/down)');
     }
 
     // VRM file upload promise (or skip)
@@ -344,22 +395,11 @@
               geometryMesh.position.z = -2.0;
             }
 
-            // Reduce VRM bloom effect (20% of particles)
-            currentVRM.scene.traverse((node) => {
-              if (node.isMesh && node.material) {
-                if (Array.isArray(node.material)) {
-                  node.material.forEach((mat) => {
-                    if (mat.emissive) {
-                      mat.emissiveIntensity = (mat.emissiveIntensity || 1.0) * 0.2;
-                    }
-                  });
-                } else {
-                  if (node.material.emissive) {
-                    node.material.emissiveIntensity = (node.material.emissiveIntensity || 1.0) * 0.2;
-                  }
-                }
-              }
-            });
+            // Initialize VRM materials with emissive for bloom
+            // (Ruby will control the intensity dynamically)
+            // Use material's base color for emissive to make all parts glow naturally
+            // VRM材質はデフォルトのまま（ローダーの設定を尊重）
+            // updateVRMMaterial で emissiveIntensity のみ更新する
 
             console.log('[JS] VRM model loaded successfully');
             resolve();
@@ -374,12 +414,15 @@
     }
 
     // Update VRM bones from Ruby dance data
-    window.updateVRM = function(rotations, hipsY) {
+    window.updateVRM = function(rotations, hipsY, blink, mouthV, mouthH) {
       if (!currentVRM) return;
 
       const humanoid = currentVRM.humanoid;
       const rotArray = Array.from(rotations || []);
       const hipsPositionY = Number(hipsY) || 0;
+      const blinkValue = Number(blink) || 0;
+      const mouthOpenVertical = Number(mouthV) || 0;
+      const mouthOpenHorizontal = Number(mouthH) || 0;
 
       for (let i = 0; i < VRM_BONE_ORDER.length; i++) {
         const boneName = VRM_BONE_ORDER[i];
@@ -395,6 +438,54 @@
             bone.position.y = hipsPositionY;
           }
         }
+      }
+
+      // Update expressions
+      const expressionManager = currentVRM.expressionManager;
+      if (expressionManager) {
+        // Blink
+        expressionManager.setValue('blink', blinkValue);
+        expressionManager.setValue('blinkLeft', blinkValue);
+        expressionManager.setValue('blinkRight', blinkValue);
+
+        // Mouth (vertical = aa, horizontal = ee)
+        expressionManager.setValue('aa', mouthOpenVertical);
+        expressionManager.setValue('ee', mouthOpenHorizontal);
+      }
+    };
+
+    // Update VRM material emissive for bloom effect
+    // Only update intensity, preserve the base color set during initialization
+    window.updateVRMMaterial = function(intensity, color) {
+      if (!currentVRM) {
+        console.warn('[JS] updateVRMMaterial called but currentVRM is null');
+        return;
+      }
+
+      const emissiveIntensity = Number(intensity) || 1.0;
+
+      // Debug: log every 60 frames (assuming 60fps)
+      let materialCount = 0;
+      let updatedCount = 0;
+
+      currentVRM.scene.traverse((node) => {
+        if (node.isMesh && node.material) {
+          const materials = Array.isArray(node.material) ? node.material : [node.material];
+          materials.forEach((mat) => {
+            materialCount++;
+            if (mat.emissive && mat.emissiveIntensity !== undefined) {
+              // Only update intensity, keep the color (which was copied from mat.color)
+              mat.emissiveIntensity = emissiveIntensity;
+              mat.needsUpdate = true;
+              updatedCount++;
+            }
+          });
+        }
+      });
+
+      if (frameCount % 60 === 0) {
+        console.log('[DEBUG JS VRM] intensity=' + emissiveIntensity.toFixed(2) +
+                    ' materials=' + materialCount + ' updated=' + updatedCount);
       }
     };
 
@@ -462,14 +553,11 @@
           geometryMesh.material.color.setRGB(r, g, b);
         }
 
-        // Emissive (色相を保持しつつ intensity で明度制御)
-        if (geometryMesh.material.emissive) {
+        // Emissive intensity (using emissiveIntensity property like VRM)
+        if (emissiveIntensity !== undefined && geometryMesh.material.emissiveIntensity !== undefined) {
           const intensity = Number(emissiveIntensity) || 0;
-          geometryMesh.material.emissive.setRGB(
-            r * intensity * 0.5,
-            g * intensity * 0.5,
-            b * intensity * 0.5
-          );
+          geometryMesh.material.emissiveIntensity = intensity;
+          geometryMesh.material.needsUpdate = true;
         }
       }
     };
@@ -480,8 +568,14 @@
         return;
       }
 
-      bloomPass.strength = Number(strength) || 1.5;
-      bloomPass.threshold = Number(threshold) || 0.85;
+      bloomPass.strength = strength !== undefined ? Number(strength) : 1.5;
+      bloomPass.threshold = threshold !== undefined ? Number(threshold) : 0.0;
+
+      // Debug: log every 120 frames
+      if (frameCount % 120 === 0) {
+        console.log('[DEBUG BLOOM] strength=' + bloomPass.strength.toFixed(2) +
+                    ' threshold=' + bloomPass.threshold.toFixed(2));
+      }
     };
 
     window.updateCamera = function(position, shake) {

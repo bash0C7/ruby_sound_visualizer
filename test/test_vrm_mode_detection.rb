@@ -1,6 +1,6 @@
 require_relative 'test_helper'
 
-class TestVRMModeDetection < Minitest::Test
+class TestVRMModeDetection < Test::Unit::TestCase
   # Test the regex used for VRM mode detection in ruby-main.
   # The pattern should match ?vrm, &vrm, ?vrm=1, &vrm=1
   # but NOT substrings like ?maxBrightness=vrm123

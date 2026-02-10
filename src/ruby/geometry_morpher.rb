@@ -8,10 +8,12 @@ class GeometryMorpher
   end
 
   def update(analysis)
+    # Use visual-smoothed values (bass, mid, high) for base motion (smooth, no sudden jumps)
+    # Use impulse values for instantaneous reactions on beat detection (beat感)
     energy = analysis[:overall_energy]
-    bass = analysis[:bass]
-    mid = analysis[:mid]
-    high = analysis[:high]
+    bass = analysis[:bass]       # Smooth visual value (from AudioAnalyzer two-stage smoothing)
+    mid = analysis[:mid]         # Smooth visual value
+    high = analysis[:high]       # Smooth visual value
     impulse = analysis[:impulse] || {}
     imp_overall = impulse[:overall] || 0.0
     imp_bass = impulse[:bass] || 0.0
@@ -26,12 +28,12 @@ class GeometryMorpher
     # impulse でスケールブースト（連続的に減衰）
     @scale += 0.8 * imp_overall
 
-    # 回転速度（通常）
+    # 回転速度（通常）- smooth values prevent sudden jumps
     @rotation[0] += bass * 0.15
     @rotation[1] += mid * 0.1
     @rotation[2] += high * 0.08
 
-    # impulse で回転を加速（帯域別、連続的に減衰）
+    # impulse で回転を加速（帯域別、連続的に減衰）- intentional beat reaction
     @rotation[0] += 0.5 * imp_bass
     @rotation[1] += 0.4 * imp_mid
     @rotation[2] += 0.3 * imp_high

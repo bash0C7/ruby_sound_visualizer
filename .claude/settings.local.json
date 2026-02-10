@@ -3,8 +3,16 @@
     "allow": [
       "WebFetch(domain:ruby.github.io)",
       "Bash(wc:*)",
-      "Bash(git add:*)"
-      "Bash(git commit:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(bundle exec ruby:*)",
+      "Bash(bundle install:*)",
+      "Bash(grep:*)",
+      "Bash(pgrep:*)",
+      "Bash(git log:*)",
+      "WebFetch(domain:pixiv.github.io)",
+      "Bash(git -C /Users/bash/dev/src/github.com/bash0C7/ruby_sound_visualizer log --oneline --all)",
+      "Bash(ruby:*)"
     ]
   }
 }

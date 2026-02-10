@@ -1,6 +1,6 @@
 require_relative 'test_helper'
 
-class TestVRMDancer < Minitest::Test
+class TestVRMDancer < Test::Unit::TestCase
   def setup
     JS.reset_global!
     @dancer = VRMDancer.new

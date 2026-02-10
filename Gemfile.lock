@@ -1,6 +1,9 @@
 GEM
   remote: https://rubygems.org/
   specs:
+    power_assert (3.0.1)
+    test-unit (3.7.7)
+      power_assert
     webrick (1.9.2)
 
 PLATFORMS
@@ -8,6 +11,7 @@ PLATFORMS
   ruby
 
 DEPENDENCIES
+  test-unit
   webrick (~> 1.8)
 
 RUBY VERSION

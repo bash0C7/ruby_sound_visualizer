@@ -29,6 +29,12 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v4
 
+      - name: Add cache-busting timestamps to Ruby files
+        run: |
+          TIMESTAMP=$(date +%s)
+          sed -i "s|src=\"src/ruby/\([^\"]*\)\.rb\"|src=\"src/ruby/\1.rb?v=$TIMESTAMP\"|g" index.html
+          echo "Added timestamp ?v=$TIMESTAMP to all .rb file references"
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:

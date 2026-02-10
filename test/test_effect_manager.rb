@@ -1,6 +1,6 @@
 require_relative 'test_helper'
 
-class TestEffectManagerImpulseAccessors < Minitest::Test
+class TestEffectManagerImpulseAccessors < Test::Unit::TestCase
   def setup
     JS.reset_global!
     @manager = EffectManager.new

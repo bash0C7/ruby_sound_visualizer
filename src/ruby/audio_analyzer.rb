@@ -16,12 +16,31 @@ class AudioAnalyzer
   BEAT_MIN_MID = 0.20
   BEAT_MIN_HIGH = 0.20
 
+  # Two-stage smoothing: beat detection vs visual
+  VISUAL_SMOOTHING_FACTOR = 0.70  # ビジュアル用（滑らか、30% 新規データ）
+  IMPULSE_DECAY = 0.65             # インパルスの減衰率（35% 減衰/フレーム）
+  EXPONENTIAL_THRESHOLD = 0.06     # この値以下を指数的に減衰（ノイズ処理）
+
   def initialize
     @frequency_mapper = FrequencyMapper.new
+
+    # Beat detection smoothing (fast response)
     @smoothed_bass = 0.0
     @smoothed_mid = 0.0
     @smoothed_high = 0.0
     @smoothing_factor = 0.55  # 高速反応でビート感を出す
+
+    # Visual smoothing (slow response, smooth motion)
+    @visual_bass = 0.0
+    @visual_mid = 0.0
+    @visual_high = 0.0
+    @visual_overall = 0.0
+
+    # Impulse values (spike on beat detection, decay over time)
+    @impulse_overall = 0.0
+    @impulse_bass = 0.0
+    @impulse_mid = 0.0
+    @impulse_high = 0.0
 
     # ビート検出用: エネルギー履歴（リングバッファ）
     @energy_history = Array.new(HISTORY_SIZE, 0.0)
@@ -56,12 +75,28 @@ class AudioAnalyzer
     high_energy = calculate_energy(bands[:high])
     overall_energy = calculate_energy(freq_array)
 
+    # Beat detection smoothing (fast response for accurate beat detection)
     @smoothed_bass = lerp(@smoothed_bass, bass_energy, 1.0 - @smoothing_factor)
     @smoothed_mid = lerp(@smoothed_mid, mid_energy, 1.0 - @smoothing_factor)
     @smoothed_high = lerp(@smoothed_high, high_energy, 1.0 - @smoothing_factor)
 
+    # Visual smoothing (slow response for smooth visuals, no sudden jumps)
+    @visual_bass = lerp(@visual_bass, bass_energy, 1.0 - VISUAL_SMOOTHING_FACTOR)
+    @visual_mid = lerp(@visual_mid, mid_energy, 1.0 - VISUAL_SMOOTHING_FACTOR)
+    @visual_high = lerp(@visual_high, high_energy, 1.0 - VISUAL_SMOOTHING_FACTOR)
+    @visual_overall = lerp(@visual_overall, overall_energy, 1.0 - VISUAL_SMOOTHING_FACTOR)
+
+    # Exponential decay for noise reduction (natural decay, no hard cut)
+    @visual_bass = exponential_decay(@visual_bass)
+    @visual_mid = exponential_decay(@visual_mid)
+    @visual_high = exponential_decay(@visual_high)
+    @visual_overall = exponential_decay(@visual_overall)
+
     # ビート検出（ベースライン適応型 + sensitivity 適用）
     detect_beats(overall_energy, bass_energy, mid_energy, high_energy, sensitivity)
+
+    # Generate impulse spikes on beat detection (decay over time)
+    update_impulses
 
     # 履歴に記録
     @energy_history[@history_index] = overall_energy
@@ -71,16 +106,22 @@ class AudioAnalyzer
     @history_index = (@history_index + 1) % HISTORY_SIZE
 
     {
-      bass: @smoothed_bass,
-      mid: @smoothed_mid,
-      high: @smoothed_high,
-      overall_energy: overall_energy,
+      bass: @visual_bass,           # Use visual values for smooth motion
+      mid: @visual_mid,
+      high: @visual_high,
+      overall_energy: @visual_overall,
       dominant_frequency: find_dominant_frequency(freq_array),
       beat: {
         overall: @beat_overall,
         bass: @beat_bass,
         mid: @beat_mid,
         high: @beat_high
+      },
+      impulse: {                    # Impulse for instantaneous reactions
+        overall: @impulse_overall,
+        bass: @impulse_bass,
+        mid: @impulse_mid,
+        high: @impulse_high
       },
       bands: {
         bass: bands[:bass],
@@ -187,6 +228,46 @@ class AudioAnalyzer
     a + (b - a) * t
   end
 
+  def exponential_decay(value)
+    # Apply exponential decay for values below threshold (natural noise reduction)
+    # This avoids hard-cut noise gate and provides smooth decay to zero
+    if value < EXPONENTIAL_THRESHOLD
+      # Quadratic decay: value^2 / threshold (approaches 0 smoothly)
+      value * value / EXPONENTIAL_THRESHOLD
+    else
+      value
+    end
+  end
+
+  def update_impulses
+    # Generate impulse spike on beat detection, then decay exponentially
+    # Impulse provides instantaneous reactions while visual values stay smooth
+
+    if @beat_bass
+      @impulse_bass = 1.0
+    else
+      @impulse_bass *= IMPULSE_DECAY
+    end
+
+    if @beat_mid
+      @impulse_mid = 1.0
+    else
+      @impulse_mid *= IMPULSE_DECAY
+    end
+
+    if @beat_high
+      @impulse_high = 1.0
+    else
+      @impulse_high *= IMPULSE_DECAY
+    end
+
+    if @beat_overall
+      @impulse_overall = 1.0
+    else
+      @impulse_overall *= IMPULSE_DECAY
+    end
+  end
+
   def empty_analysis
     {
       bass: 0.0,
@@ -199,6 +280,12 @@ class AudioAnalyzer
         bass: false,
         mid: false,
         high: false
+      },
+      impulse: {
+        overall: 0.0,
+        bass: 0.0,
+        mid: 0.0,
+        high: 0.0
       },
       bands: {
         bass: [],
