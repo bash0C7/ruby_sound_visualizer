@@ -36,6 +36,11 @@ module JSBridge
       strength = data[:strength].to_f
       threshold = data[:threshold].to_f
 
+      # Debug: log every 120 frames
+      if defined?($frame_count) && $frame_count % 120 == 0
+        JS.global[:console].log("[DEBUG BLOOM Ruby] strength=#{strength.round(2)} threshold=#{threshold.round(2)}")
+      end
+
       JS.global.updateBloom(strength, threshold)
     rescue => e
       JS.global[:console].error("JSBridge error updating bloom: #{e.message}")
@@ -87,6 +92,11 @@ module JSBridge
     begin
       intensity = config[:intensity] || 1.0
       color = config[:color] || [1.0, 1.0, 1.0]
+
+      # Debug: log every 60 frames
+      if defined?($frame_count) && $frame_count % 60 == 0
+        JS.global[:console].log("[DEBUG VRM] intensity=#{intensity.round(2)} color=#{color.map{|c| c.round(2)}.inspect}")
+      end
 
       JS.global.updateVRMMaterial(intensity, color)
     rescue => e

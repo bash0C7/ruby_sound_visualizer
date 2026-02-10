@@ -11,12 +11,12 @@
 #
 class VRMMaterialController
   # Base emissive intensity at zero energy
-  # This ensures VRM always has some bloom even in silence
-  DEFAULT_BASE_EMISSIVE_INTENSITY = 2.0
+  # Low value to prevent over-glow at silence (works with white emissive)
+  DEFAULT_BASE_EMISSIVE_INTENSITY = 0.2
 
   # Maximum emissive intensity at full energy
-  # Increased for better visibility and bloom effect
-  MAX_EMISSIVE_INTENSITY = 4.5
+  # Moderate value to produce visible bloom without whiteout (with white emissive)
+  MAX_EMISSIVE_INTENSITY = 1.0
 
   # Emissive color (white for natural glow)
   EMISSIVE_COLOR = [1.0, 1.0, 1.0].freeze
