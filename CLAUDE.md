@@ -6,6 +6,7 @@
 
 - **Documentation, git comments, code comments**: ALL in English
 - **User communication, information provision**: ALL in Japanese Kansai dialect (関西弁)
+- **README.md**: ABSOLUTE RULE - ALL in English, no bold emphasis (`**`), no emoji, fact-based language without hyperbole. Keep descriptions concise and matter-of-fact.
 
 ## git操作
 
