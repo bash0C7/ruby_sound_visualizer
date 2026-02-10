@@ -1,4 +1,4 @@
-require 'minitest/autorun'
+require 'test/unit'
 
 # Prevent `require 'js'` inside Ruby source files from failing.
 # Our mock JS module (below) replaces the real js gem.
@@ -89,3 +89,4 @@ require_relative '../src/ruby/camera_controller'
 require_relative '../src/ruby/bloom_controller'
 require_relative '../src/ruby/effect_manager'
 require_relative '../src/ruby/vrm_dancer'
+require_relative '../src/ruby/vrm_material_controller'

@@ -8,6 +8,9 @@ class VRMDancer
     rightUpperLeg rightLowerLeg
   ]
 
+  # Motion speed multiplier (centralized parameter)
+  MOTION_SPEED = 4.0
+
   def initialize
     @time = 0.0
     @beat_phase = 0.0
@@ -40,13 +43,14 @@ class VRMDancer
     # Use fixed periods for natural human movement
 
     # Constant phase accumulators (independent of audio)
-    @beat_phase += delta * 0.8       # Main body rhythm (~7.5 sec cycle)
-    @sway_phase += delta * 0.5       # Gentle sway (~12 sec cycle)
-    @head_nod_phase += delta * 1.2   # Head movement (~5 sec cycle)
-    @step_phase += delta * Math::PI / 2.0  # Leg step phase (~4 sec full cycle)
+    # Speed controlled by MOTION_SPEED constant
+    @beat_phase += delta * 0.8 * MOTION_SPEED       # Main body rhythm
+    @sway_phase += delta * 0.5 * MOTION_SPEED       # Gentle sway
+    @head_nod_phase += delta * 1.2 * MOTION_SPEED   # Head movement
+    @step_phase += delta * Math::PI / 2.0 * MOTION_SPEED  # Leg step phase
 
-    # Arm raise cycles smoothly (0 to 0.3 over 8 seconds)
-    arm_target = (Math.sin(@time * 0.8) + 1.0) * 0.15  # 0.0 to 0.3
+    # Arm raise cycles smoothly (0 to 0.2 over 8 seconds)
+    arm_target = (Math.sin(@time * 0.8) + 1.0) * 0.10  # 0.0 to 0.2
     @arm_raise = MathHelper.lerp(@arm_raise, arm_target, 2.0 * delta)
 
     # Blink periodically (2-4 seconds interval)
@@ -101,63 +105,78 @@ class VRMDancer
       Math.sin(@beat_phase) * 0.02                      # Slight tilt (±9° after 8x)
     ])
 
-    # left upper arm (natural human range - 前方 + 小 swing、横に超大きく広げる)
-    # Z rotation: 腕を下げる（頭にめり込まないように）
-    arm_wave = Math.sin(@beat_phase * 0.8) * 0.02  # Slow wave (小さく) ±9° after 8x
-    raise_l = @arm_raise * 0.3  # Raise を抑える（頭にめり込まない）
+    # left upper arm - ダンサブルな動き（周期的に上下しつつ、高さに応じて前傾・横広げ）
+    # 腕を常に前方に（体の横より前）
+    arm_swing_x = Math.sin(@sway_phase) * 0.02             # 前方で小さく揺れる ±9° after 8x（減らして常に前方）
+    arm_swing_y = Math.cos(@sway_phase) * 0.15             # 外側から内側へ大きく ±68° after 8x
+    arm_wave = Math.sin(@beat_phase * 0.8) * 0.02         # 上下の波 ±9° after 8x
+    raise_l = @arm_raise * 0.5  # 0.0 (下) to 0.1 (上)
+    max_raise = 0.1  # raise_l の最大値
+
+    # raise_l に応じた調整
+    x_forward_bonus = raise_l * 0.6       # 上のとき前に +30deg (0.0 to 0.06 rad)
+    y_outward_bonus = (max_raise - raise_l) * 0.4  # 下のとき横に広げる (0.04 to 0.0)
+
     rotations.concat([
-      0.17 + Math.sin(@beat_phase * 1.0) * 0.01,  # Forward + 小 swing (後ろ倒れず) 73°-82° after 8x
-      0.20 + Math.sin(@sway_phase * 0.9) * 0.05,  # Outward (クロスせず横に超広げる) 69°-115° after 8x
-      -0.05 + arm_wave + raise_l                  # 下げる（頭にめり込まない） -23° to 9° after 8x
+      0.40 + arm_swing_x + x_forward_bonus,       # 常に前方（0.38-0.48 rad = 173°-220° after 8x）
+      0.35 + arm_swing_y + y_outward_bonus,       # 横に広げる + 下のとき更に広げる
+      0.15 + arm_wave + raise_l * 2.0             # 周期的に上下
     ])
 
-    # left lower arm (natural elbow bend - human range: 0-145°)
-    # 0.02 to 0.08 rad → 9° to 37° after 8x amplification
-    elbow_l = 0.03 + Math.sin(@beat_phase * 1.2 + 0.3) * 0.03
-    rotations.concat([0, 0, elbow_l])
+    # left lower arm (natural elbow bend with subtle rotation)
+    # 肘をもっと曲げる（機械的に見えないように）
+    elbow_l = 0.06 + Math.sin(@beat_phase * 1.2 + 0.3) * 0.06  # Bend (Z-axis, 2x)
+    elbow_twist = Math.sin(@sway_phase * 1.3) * 0.02           # Twist (Y-axis, 2x)
+    rotations.concat([0, elbow_twist, elbow_l])
 
-    # left hand
-    rotations.concat([0, 0, 0])
+    # left hand (wrist - natural relaxed bend)
+    wrist_bend = Math.sin(@beat_phase * 1.5 + 0.5) * 0.02      # Gentle bend
+    wrist_twist = Math.cos(@sway_phase * 1.4) * 0.015          # Gentle twist
+    rotations.concat([0, wrist_twist, wrist_bend])
 
-    # right upper arm (mirror)
+    # right upper arm (mirror) - ダンサブルな動き
     rotations.concat([
-      0.17 + Math.sin(@beat_phase * 1.0) * 0.01,  # Forward + 小 swing (後ろ倒れず) same as left
-      -0.20 + Math.sin(@sway_phase * 0.9 + Math::PI) * 0.05,  # Outward (クロスせず横に超広げる) mirrored
-      -(-0.05 + arm_wave + raise_l)  # Mirror Z rotation (下げる)
+      0.40 + arm_swing_x + x_forward_bonus,        # 常に前方 (same as left)
+      -0.35 + Math.cos(@sway_phase + Math::PI) * 0.15 - y_outward_bonus,  # 横に広げる (mirrored)
+      0.15 + arm_wave + raise_l * 2.0              # 周期的に上下 (same as left)
     ])
 
-    # right lower arm (natural elbow bend)
-    elbow_r = 0.03 + Math.sin(@beat_phase * 1.2 - 0.3) * 0.03
-    rotations.concat([0, 0, -elbow_r])
+    # right lower arm (natural elbow bend with subtle rotation)
+    # 肘をもっと曲げる（機械的に見えないように）
+    elbow_r = 0.06 + Math.sin(@beat_phase * 1.2 - 0.3) * 0.06  # Bend (Z-axis, 2x)
+    rotations.concat([0, -elbow_twist, -elbow_r])
 
-    # right hand
-    rotations.concat([0, 0, 0])
+    # right hand (wrist - natural relaxed bend)
+    rotations.concat([0, -wrist_twist, -wrist_bend])
 
-    # legs - smooth alternating step using sin wave (natural human range)
-    # Hip extension/flexion: ±145°, Knee flexion: 0-145°
+    # legs - smooth alternating step with up/down and left/right sway (natural human range)
+    # 係数を2倍にしてダンサブルに
     step_sin = Math.sin(@step_phase)  # -1 to 1, smooth transition
-    step_forward = step_sin * 0.04    # ±18° after 8x (smooth left/right)
-    step_open = Math.sin(@beat_phase * 0.7) * 0.02  # Open/close (±9° after 8x)
+    step_forward = step_sin * 0.08    # ±36° after 8x (smooth left/right, 2x)
+    step_open = Math.sin(@beat_phase * 0.7) * 0.04  # Open/close (±18° after 8x, 2x)
+    leg_sway_lr = Math.sin(@sway_phase) * 0.03  # 左右の揺れ ±14° after 8x (2x)
+    leg_lift = Math.cos(@step_phase) * 0.04  # 上下の動き ±18° after 8x (2x)
 
     # Left leg: forward when step_sin > 0, back when step_sin < 0
-    # Right leg: opposite
     rotations.concat([
       -step_forward,           # Left upper leg (smooth forward/back)
-      -step_open,              # Left leg slightly inward (Y-axis)
-      0
+      -step_open + leg_sway_lr,  # Left leg: inward + 左右揺れ
+      leg_lift                 # 上下の動き
     ])
-    # Left knee bend: more when leg is back (step_sin < 0)
-    left_knee = 0.02 + [0.0, -step_sin * 0.02].max
-    rotations.concat([left_knee, 0, 0])
+    # Left knee: bend + subtle up/down and left/right (2x for danceable movement)
+    left_knee = 0.04 + [0.0, -step_sin * 0.04].max  # Bend (2x)
+    knee_sway = Math.sin(@sway_phase) * 0.02  # 膝の左右揺れ ±9° after 8x (2x)
+    rotations.concat([left_knee, knee_sway, 0])
 
+    # Right leg: opposite of left
     rotations.concat([
       step_forward,            # Right upper leg (opposite of left)
-      step_open,               # Right leg slightly outward (Y-axis)
-      0
+      step_open - leg_sway_lr,   # Right leg: outward + 左右揺れ (opposite sway)
+      -leg_lift                # 上下の動き (opposite)
     ])
-    # Right knee bend: more when leg is back (step_sin > 0)
-    right_knee = 0.02 + [0.0, step_sin * 0.02].max
-    rotations.concat([right_knee, 0, 0])
+    # Right knee: bend + subtle up/down and left/right (2x for danceable movement)
+    right_knee = 0.04 + [0.0, step_sin * 0.04].max  # Bend (2x)
+    rotations.concat([right_knee, -knee_sway, 0])
 
     # Apply smoothing to rotations (natural human movement has inertia)
     smoothing_factor = 8.0  # Higher = slower response, smoother movement

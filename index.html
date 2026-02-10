@@ -128,6 +128,7 @@
   <script type="text/ruby" src="src/ruby/bloom_controller.rb"></script>
   <script type="text/ruby" src="src/ruby/effect_manager.rb"></script>
   <script type="text/ruby" src="src/ruby/vrm_dancer.rb"></script>
+  <script type="text/ruby" src="src/ruby/vrm_material_controller.rb"></script>
   <script type="text/ruby" src="src/ruby/main.rb"></script>
 
   <script>
@@ -235,9 +236,9 @@
 
       bloomPass = new UnrealBloomPass(
         new THREE.Vector2(window.innerWidth, window.innerHeight),
-        3.0,  // VRM も bloom させるため strength を大幅に上げる
+        1.0,   // 50ec2bf (1.5) の 66% = 1.0
         0.4,
-        0.2   // VRM 全身を bloom させるため threshold を大幅に下げる
+        0.85   // 50ec2bf と同じ threshold
       );
       composer.addPass(bloomPass);
 
@@ -391,25 +392,24 @@
               geometryMesh.position.z = -2.0;
             }
 
-            // Boost VRM bloom effect (全 Material を強制的に発光させる)
+            // Initialize VRM materials with emissive for bloom
+            // (Ruby will control the intensity dynamically)
+            // Use material's base color for emissive to make all parts glow naturally
             currentVRM.scene.traverse((node) => {
               if (node.isMesh && node.material) {
                 const materials = Array.isArray(node.material) ? node.material : [node.material];
-
                 materials.forEach((mat) => {
-                  // 全 Material に emissive を強制設定（undefined でも）
                   if (!mat.emissive) {
-                    mat.emissive = new THREE.Color(0xffffff);
-                  } else {
-                    // 既存の emissive がある場合は、base color から明るい色を生成
-                    const baseColor = mat.color ? mat.color.clone() : new THREE.Color(0xffffff);
-                    mat.emissive.copy(baseColor);
+                    mat.emissive = new THREE.Color(0x000000);
                   }
-
-                  // EmissiveIntensity を bloom threshold (0.85) を超える値に
-                  mat.emissiveIntensity = 8.0;  // 大胆に発光（threshold 0.85 を大幅に超える）
-
-                  // Material を更新フラグ
+                  // Copy base color to emissive for natural glow
+                  if (mat.color) {
+                    mat.emissive.copy(mat.color);
+                  } else {
+                    mat.emissive.set(0xffffff);
+                  }
+                  // Initial intensity will be set by Ruby
+                  mat.emissiveIntensity = 2.0;
                   mat.needsUpdate = true;
                 });
               }
@@ -466,6 +466,26 @@
         expressionManager.setValue('aa', mouthOpenVertical);
         expressionManager.setValue('ee', mouthOpenHorizontal);
       }
+    };
+
+    // Update VRM material emissive for bloom effect
+    // Only update intensity, preserve the base color set during initialization
+    window.updateVRMMaterial = function(intensity, color) {
+      if (!currentVRM) return;
+
+      const emissiveIntensity = Number(intensity) || 1.0;
+
+      currentVRM.scene.traverse((node) => {
+        if (node.isMesh && node.material) {
+          const materials = Array.isArray(node.material) ? node.material : [node.material];
+          materials.forEach((mat) => {
+            if (mat.emissive && mat.emissiveIntensity !== undefined) {
+              // Only update intensity, keep the color (which was copied from mat.color)
+              mat.emissiveIntensity = emissiveIntensity;
+            }
+          });
+        }
+      });
     };
 
     // Update functions called from Ruby
@@ -532,13 +552,13 @@
           geometryMesh.material.color.setRGB(r, g, b);
         }
 
-        // Emissive (色相を保持しつつ intensity で明度制御) - 大胆に光らせる
+        // Emissive (色相を保持しつつ intensity で明度制御) - 50ec2bf と同じ
         if (geometryMesh.material.emissive) {
           const intensity = Number(emissiveIntensity) || 0;
           geometryMesh.material.emissive.setRGB(
-            r * intensity * 2.0,
-            g * intensity * 2.0,
-            b * intensity * 2.0
+            r * intensity * 0.5,
+            g * intensity * 0.5,
+            b * intensity * 0.5
           );
         }
       }

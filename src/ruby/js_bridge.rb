@@ -83,6 +83,17 @@ module JSBridge
     end
   end
 
+  def self.update_vrm_material(config)
+    begin
+      intensity = config[:intensity] || 1.0
+      color = config[:color] || [1.0, 1.0, 1.0]
+
+      JS.global.updateVRMMaterial(intensity, color)
+    rescue => e
+      JS.global[:console].error("JSBridge error updating VRM material: #{e.message}")
+    end
+  end
+
   def self.log(message)
     begin
       JS.global[:console].log("[Ruby] #{message}")

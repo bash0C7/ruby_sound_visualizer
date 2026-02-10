@@ -4,6 +4,7 @@ $initialized = false
 $audio_analyzer = nil
 $effect_manager = nil
 $vrm_dancer = nil
+$vrm_material_controller = nil
 $frame_count = 0
 $sensitivity = 1.0
 $max_brightness = 255
@@ -46,6 +47,7 @@ begin
   $audio_analyzer = AudioAnalyzer.new
   $effect_manager = EffectManager.new
   $vrm_dancer = VRMDancer.new  # Always initialize (VRM optional)
+  $vrm_material_controller = VRMMaterialController.new  # For VRM bloom control
 
   JS.global[:rubyUpdateVisuals] = lambda do |freq_array|
     begin
@@ -80,6 +82,10 @@ begin
       }
       vrm_data = $vrm_dancer.update(scaled_for_vrm)
       JSBridge.update_vrm(vrm_data)
+
+      # VRM material bloom control (based on audio energy)
+      vrm_material_config = $vrm_material_controller.apply_emissive(scaled_for_vrm[:overall_energy])
+      JSBridge.update_vrm_material(vrm_material_config)
 
       # VRM debug info (60フレームごとに更新、コンパクト表示)
       if $frame_count % 60 == 0
