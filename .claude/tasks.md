@@ -10,9 +10,10 @@
   - その他の情報は行をまとめる
   - Plan: [info-area-compact.md](plans/info-area-compact.md)
 
-- [ ] ガイド資料を作成する 🌐
+- [x] ガイド資料を作成する 🌐
   - シェーダー操作ガイド
   - 3D 基礎ガイド
+  - 3D プログラミング・シェーダー用語集
   - VRM 関連ガイド
   - JavaScript-ruby.wasm 連携ガイド
   - ruby.wasm 技術ガイド
