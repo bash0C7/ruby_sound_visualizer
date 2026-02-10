@@ -1,8 +1,21 @@
 # Ruby WASM Sound Visualizer
 
-A browser-based audio visualizer written in Ruby.
+**マイクの音に反応して、ブラウザで超派手な 3D ビジュアルエフェクトを生成する音響ビジュアライザー（VJ ソフトウェア）**
 
-Analyzes microphone input in real-time and generates 3D visual effects using Three.js.
+A browser-based audio visualizer (VJ software) written in Ruby that generates stunning 3D visual effects responding to your microphone input.
+
+## ✨ What You'll Experience
+
+- **🎤 Real-time Audio Reaction**: Play music near your microphone and watch the visuals explode with energy
+- **🌟 Massive Particle System**: 10,000 particles bursting and flowing with the beat
+- **💎 Dynamic Geometry**: 3D torus morphing and rotating in sync with bass, mid, and treble
+- **✨ Bloom Glow Effects**: Entire screen glows and pulses with the music intensity
+- **🎭 VRM Avatar Dancing**: Load your VRM character and watch it dance to the beat with glowing effects
+- **🎨 Multiple Color Modes**: Switch between grayscale, red spectrum, green spectrum, and blue spectrum
+- **🎚️ Real-time Controls**: Adjust sensitivity, brightness, hue, and more with keyboard shortcuts
+- **📊 Live Audio Analysis**: See BPM estimation and frequency breakdown (Bass/Mid/High) in real-time
+
+**No installation required** - just open in your browser, allow microphone access, and start the party! 🎉
 
 ## Quick Start
 
@@ -65,35 +78,55 @@ http://localhost:8000/index.html?sensitivity=1.5&maxBrightness=200&maxLightness=
 | `maxBrightness` | Max brightness (particle color output limit) | `255` | 0-255 |
 | `maxLightness` | Max lightness (HSV V value limit) | `255` | 0-255 |
 
-## Features
+## 🎯 Key Features
 
-### Visual Effects
+### 🎨 Visual Effects You Can Experience
 
-- Particle System: Massive particles exploding in response to sound and frequency bands
-- Beat Detection: Real-time beat detection for Bass, Mid, and High frequencies
-- BPM Estimation: Automatic BPM (Beats Per Minute) calculation from detected beats
-- Color Modes: Multiple color schemes (Grayscale, Red spectrum, Green spectrum, Blue spectrum) with manual hue shift
-- Frequency-Based Colors: Dynamic colors based on frequency bands (Bass/Mid/High)
-- Geometry Morphing: Torus (donut shape) scales and rotates with the music
-- Glow Effects: Bloom effect makes the entire screen glow
-- Camera Shake: Intense bass triggers camera shake for immersive experience
+- **Particle Explosions**: 10,000 particles burst and flow in response to sound intensity and frequency
+- **Morphing Geometry**: 3D torus (donut shape) scales and rotates with bass, mid, and treble frequencies
+- **Bloom Glow**: Screen glows and pulses with music energy - from subtle shimmer to intense white-hot brightness
+- **VRM Avatar Integration**: Load your own VRM character model and watch it dance and glow with the music
+- **Beat-Reactive Motion**: Real-time beat detection triggers dynamic movements and visual bursts
+- **Color Spectrum Modes**: Switch between 4 color schemes - grayscale, red, green, or blue spectrum palettes
+- **Camera Effects**: Intense bass triggers camera shake for immersive experience
 
-### Technology
+### 🎚️ Real-time Controls
 
-- Ruby 3.4.7 (@ruby/4.0-wasm-wasi) - All logic implemented in Ruby
-- Three.js - 3D rendering and post-processing
-- Web Audio API - Microphone input and frequency analysis
-- Single HTML File - Easy deployment
+- **Audio Sensitivity**: Adjust how strongly visuals react to sound (`-` / `+` keys)
+- **Color Mode Switching**: Change color palettes on the fly (`0`-`3` keys)
+- **Hue Shifting**: Fine-tune colors with manual hue rotation (`4` / `5` keys)
+- **Brightness Controls**: Adjust max brightness and lightness (`6`-`9` keys)
+- **Live Monitoring**: See current BPM, frequency levels, and settings on-screen
 
-## File Structure
+### 🛠️ Technology Stack
+
+- **Ruby 3.4.7** (@ruby/4.0-wasm-wasi) - All audio analysis and visual logic written in Ruby, running in browser via WebAssembly
+- **Three.js** - High-performance 3D rendering with post-processing effects
+- **Web Audio API** - Real-time microphone input and frequency analysis
+- **VRM Support** - 3D avatar character integration (@pixiv/three-vrm)
+- **Zero Backend** - Fully client-side, no server required after initial load
+
+## 📁 File Structure
 
 ```
 ruby_sound_visualizer/
-├── README.md           # This file
-├── CLAUDE.md           # Detailed documentation
-├── Gemfile             # Ruby dependency management
-├── .ruby-version       # Ruby version specification (3.4.7)
-└── index.html          # Main application (contains all code)
+├── index.html                    # Main HTML file (loads all components)
+├── src/ruby/                     # Ruby logic (loaded via ruby.wasm)
+│   ├── audio_analyzer.rb         # Frequency analysis and beat detection
+│   ├── particle_system.rb        # Particle physics and explosions
+│   ├── geometry_morpher.rb       # Torus scaling and rotation
+│   ├── color_palette.rb          # Color modes and HSV conversion
+│   ├── bloom_controller.rb       # Bloom glow effect parameters
+│   ├── camera_controller.rb      # Camera shake and positioning
+│   ├── vrm_dancer.rb             # VRM character animation
+│   ├── vrm_material_controller.rb # VRM glow intensity control
+│   ├── effect_manager.rb         # Coordinates all visual effects
+│   └── main.rb                   # Entry point and main loop
+├── README.md                     # This file (user guide)
+├── CLAUDE.md                     # Detailed technical documentation
+├── Gemfile                       # Ruby dependency management
+├── .ruby-version                 # Ruby version (3.4.7)
+└── .nojekyll                     # GitHub Pages: disable Jekyll processing
 ```
 
 ## Troubleshooting
@@ -139,20 +172,22 @@ open http://localhost:8000/index.html
 
 ### Code Modification
 
-You can edit code in the following sections of `index.html`:
+**Ruby Logic** - Edit files in `src/ruby/`:
+- `audio_analyzer.rb` - Frequency analysis algorithms and beat detection logic
+- `particle_system.rb` - Particle physics, explosion effects, and boundary conditions
+- `color_palette.rb` - Color mode calculations and HSV conversion
+- `geometry_morpher.rb` - Torus scaling and rotation parameters
+- `bloom_controller.rb` - Bloom glow strength and threshold settings
+- `vrm_material_controller.rb` - VRM character glow intensity (adjust `DEFAULT_BASE_EMISSIVE_INTENSITY` and `MAX_EMISSIVE_INTENSITY` here)
+- Other .rb files for additional effects
 
-- Ruby code: Inside `<script type="text/ruby" id="...">` blocks
-  - `ruby-analyzer`: Audio analysis and beat detection
-  - `ruby-particle-system`: Particle physics and explosion effects
-  - `ruby-color-palette`: Color calculation and hue modes
-  - `ruby-geometry-morpher`: Torus scaling and rotation
-  - And more...
-- JavaScript code: Inside `<script>` blocks at the bottom
-  - Web Audio API setup
-  - Three.js rendering
-  - Keyboard event handlers
+**JavaScript/HTML** - Edit `index.html`:
+- Web Audio API setup and microphone handling
+- Three.js scene configuration and rendering
+- Keyboard event handlers and UI updates
+- VRM loader and material setup
 
-Important: After making changes, reload the browser. Ruby WASM initialization may take 25-30 seconds on first load.
+**Important**: After making changes, **hard refresh** your browser (Ctrl+Shift+R / Cmd+Shift+R) to clear cached .rb files. Ruby WASM initialization takes 25-30 seconds on first load.
 
 ### Debugging
 
