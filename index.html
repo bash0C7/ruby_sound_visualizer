@@ -30,7 +30,7 @@
       left: 20px;
       color: #0f0;
       font-family: monospace;
-      font-size: 12px;
+      font-size: 10px;
       z-index: 50;
     }
     #vrmUpload {
@@ -71,11 +71,9 @@
     </div>
   </div>
   <div id="status">
-    <div>Ruby WASM Sound Visualizer</div>
-    <div id="fpsCounter" style="margin-top: 5px;">FPS: 0</div>
-    <div id="debugInfo" style="margin-top: 5px; white-space: pre-wrap;"></div>
-    <div id="paramInfo" style="margin-top: 5px; white-space: nowrap; overflow-x: auto;"></div>
-    <div id="keyGuide" style="margin-top: 5px; color: #888; font-size: 11px; white-space: pre-wrap;"></div>
+    <div style="line-height: 1.0;"><span id="fpsCounter">FPS: 0</span>  |  <span id="paramInfo"></span></div>
+    <div id="debugInfo" style="margin-top: 1px; line-height: 1.0; white-space: nowrap; overflow-x: auto;"></div>
+    <div id="keyGuide" style="margin-top: 1px; line-height: 1.0; color: #888; font-size: 9px; white-space: pre-wrap;"></div>
   </div>
 
   <!-- Ruby WASM (must load before async module scripts) -->
