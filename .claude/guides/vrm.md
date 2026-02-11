@@ -117,8 +117,8 @@ const bone = humanoid.getNormalizedBoneNode('hips');
 // 回転の設定 (ラジアン, Euler 角)
 bone.rotation.set(rx, ry, rz);
 
-// 位置の設定 (hips のみ推奨)
-bone.position.y = offsetY;
+// 位置の設定 (hips のみ)
+bone.position.y = hipsPositionY;  // 現在は常に 0.0 (バウンスなし)
 ```
 
 ### ボーン回転の軸
@@ -173,16 +173,23 @@ expressionManager.setValue('blink', 1.0);     // 目を閉じる
 expressionManager.setValue('aa', 0.5);        // 半分口を開ける
 ```
 
-### まばたきの実装パターン
+### 本プロジェクトの表情制御
 
-```
-1. タイマーを回す (2-4 秒間隔)
-2. タイマー到達時に blink = 1.0 に設定
-3. 毎フレーム blink -= decay_rate * deltaTime で減衰
-4. blink が 0.0 になったら次のタイマー開始
-```
+VRMDancer が毎フレーム以下を計算:
 
-瞬きの周期をランダムにすると自然に見える。
+- **blink**: 2-4 秒周期 (`Math.sin` で変動) で 1.0 にスパイク、`delta * 8.0` で約 0.125 秒で減衰
+- **mouth_open_vertical** (aa): `sin(@mouth_phase)` による約 6 秒周期、0.0-0.8 の範囲
+- **mouth_open_horizontal** (ee): `sin(@mouth_phase + PI/2)` で vertical と 90 度位相差、0.0-0.6 の範囲
+
+```ruby
+# vrm_dancer.rb - blink implementation
+@blink_timer += delta
+if @blink_timer > 3.0 + Math.sin(@time * 0.5) * 1.0  # 2-4 sec interval
+  @blink_timer = 0.0
+  @blink_value = 1.0  # Trigger
+end
+@blink_value = [@blink_value - delta * 8.0, 0.0].max  # Decay in ~0.125 sec
+```
 
 ## スプリングボーン
 
@@ -214,12 +221,13 @@ VRM モデルは以下のマテリアルタイプを使用する:
 VRM モデル全体を音に合わせて光らせるには、全マテリアルの `emissiveIntensity` を一括更新する:
 
 ```javascript
-vrm.scene.traverse((node) => {
+// index.html:500-533 (window.updateVRMMaterial)
+currentVRM.scene.traverse((node) => {
   if (node.isMesh && node.material) {
     const materials = Array.isArray(node.material) ? node.material : [node.material];
     materials.forEach((mat) => {
-      if (mat.emissiveIntensity !== undefined) {
-        mat.emissiveIntensity = newIntensity;
+      if (mat.emissive && mat.emissiveIntensity !== undefined) {
+        mat.emissiveIntensity = emissiveIntensity;
         mat.needsUpdate = true;
       }
     });
@@ -227,9 +235,35 @@ vrm.scene.traverse((node) => {
 });
 ```
 
-- `emissive` 色を白 (`0xffffff`) にすると、元のテクスチャ色を維持しつつ均一に発光する
-- `emissiveIntensity` の範囲: 0.0 (無発光) ~ 任意 (強い発光)
+Ruby 側の VRMMaterialController がエネルギーに応じた `emissiveIntensity` を計算 (0.2-1.0 の範囲で線形補間)。
+
+- VRM のマテリアルはローダーのデフォルト設定を尊重 (`emissive` 色は変更しない)
+- `emissiveIntensity` のみ毎フレーム動的更新
 - `needsUpdate = true` を設定しないとマテリアル変更が反映されない
+- 注: `scene.traverse()` は毎フレーム全ノードを走査するためパフォーマンスコストが高い
+
+### VRM のレイヤー構成
+
+VRM モデルはデフォルトのレイヤー 0 に配置される:
+
+- Layer 0: VRM モデル (Bloom の直接対象外)
+- Layer 1: BLOOM_LAYER (パーティクル / トーラス用、現在は無効化)
+- `camera.layers.enableAll()` で全レイヤーを描画
+
+### VRM に必要な照明
+
+VRM ロード時のみ DirectionalLight と AmbientLight を追加:
+
+```javascript
+// index.html:430-434
+const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+dirLight.position.set(1, 2, 1);
+scene.add(dirLight);
+const ambLight = new THREE.AmbientLight(0x666666);
+scene.add(ambLight);
+```
+
+VRM なしで起動する場合は照明を追加しない (パーティクル/トーラスは照明不要)。
 
 ## VRM アニメーションの実装パターン
 
@@ -237,15 +271,31 @@ vrm.scene.traverse((node) => {
 
 音楽ビジュアライザーでの VRM ダンスは、以下のアプローチが考えられる:
 
-#### 1. 周期関数ベース (本プロジェクトのアプローチ)
+#### 1. マルチフェーズ周期関数ベース (本プロジェクトのアプローチ)
 
-```
-各ボーンの回転 = sin(phase * speed) * amplitude
+4 つの独立した位相アキュムレータで、体の各部位に異なるリズムを与える:
+
+```ruby
+# vrm_dancer.rb - 位相アキュムレータ (MOTION_SPEED = 4.0 で統一制御)
+@beat_phase    += delta * 0.8 * MOTION_SPEED    # メイン体幹リズム
+@sway_phase    += delta * 0.5 * MOTION_SPEED    # 左右スウェイ
+@head_nod_phase += delta * 1.2 * MOTION_SPEED   # 頭の動き
+@step_phase    += delta * PI/2 * MOTION_SPEED   # 脚のステップ
 ```
 
-- 複数の位相 (`phase`) を独立に進行させ、体の各部位に異なるリズムを与える
-- 振幅 (`amplitude`) で動きの大きさを制御
-- 音声データとは独立したリズムで動かし、発光で音楽同期を表現
+各ボーンの回転は複数の位相を組み合わせて計算:
+
+```ruby
+# 例: hips の回転
+rotations.concat([
+  Math.sin(@beat_phase * 0.8) * 0.03,   # 前後傾き
+  Math.sin(@sway_phase) * 0.12,         # 左右ツイスト
+  Math.sin(@beat_phase * 0.6) * 0.04    # 左右リーン
+])
+```
+
+- 音声データとは独立したリズムで動かし、発光やインパルスで音楽同期を表現
+- VRM の動きは常時一定 (音量に関係なく踊り続ける)
 
 #### 2. キーフレームベース
 
@@ -263,15 +313,35 @@ vrm.scene.traverse((node) => {
 
 ボーン回転を直接設定すると動きが機械的になる。線形補間 (lerp) でスムージングを掛ける:
 
+```ruby
+# vrm_dancer.rb:181-188
+smoothing_factor = 8.0  # 高い = 追従が速い (慣性小)
+smoothed_rotations = []
+rotations.each_with_index do |target, i|
+  smoothed = MathHelper.lerp(@prev_rotations[i], target, smoothing_factor * delta)
+  smoothed_rotations << smoothed
+  @prev_rotations[i] = smoothed
+end
 ```
-実際の回転 = lerp(前フレームの回転, 目標回転, smoothing * deltaTime)
+
+`smoothing_factor * delta` が毎フレームの補間量を決定する。`@prev_rotations` に前フレームの値を保持し、滑らかに追従する。
+
+### 回転値の増幅 (8x)
+
+sin 関数の出力は小さい値 (±0.01-0.15 ラジアン) のため、最終的に 8 倍に増幅して視認可能な動きにする:
+
+```ruby
+# vrm_dancer.rb:191
+amplified_rotations = smoothed_rotations.map { |r| r * 8.0 }
 ```
 
-`smoothing` 値が大きいほど追従が速い (機敏)、小さいほど追従が遅い (慣性)。
+| 生の値 | 増幅後 | 角度換算 |
+|--------|--------|---------|
+| 0.03 rad | 0.24 rad | ±14 度 |
+| 0.12 rad | 0.96 rad | ±55 度 |
+| 0.15 rad | 1.20 rad | ±69 度 |
 
-### 回転値の増幅
-
-sin 関数の出力 (-1.0 ~ 1.0) をそのまま使うと動きが小さすぎる場合がある。最終的に増幅係数を掛けて視認性を確保する。
+増幅前の値で計算することで精度を保ち、最後に一括増幅する設計。
 
 ## 参考リンク
 

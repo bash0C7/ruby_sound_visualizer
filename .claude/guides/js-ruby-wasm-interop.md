@@ -277,6 +277,82 @@ JS.global.updateParticles(all_positions, all_colors, avg_size, avg_opacity)
 
 JavaScript 側で行う計算を可能な限り Ruby 側で行い、結果だけを渡す。これにより JavaScript の処理負荷を軽減し、Ruby 側でのテストも容易になる。
 
+### 本プロジェクトの毎フレーム境界呼び出し
+
+`main.rb` から JSBridge 経由で毎フレーム 9 回の境界呼び出しが発生する:
+
+| 呼び出し | データ量 | 呼び出し元 |
+|---------|---------|-----------|
+| `updateParticles(positions, colors, size, opacity)` | ~9000 floats | `JSBridge.update_particles` |
+| `updateGeometry(scale, rotation, emissive, color)` | ~8 values | `JSBridge.update_geometry` |
+| `updateBloom(strength, threshold)` | 2 values | `JSBridge.update_bloom` |
+| `updateCamera(position, shake)` | 6 values | `JSBridge.update_camera` |
+| `updateParticleRotation(rotation)` | 3 values | `JSBridge.update_particle_rotation` |
+| `updateVRM(rotations, hipsY, blink, mouthV, mouthH)` | ~47 values | `JSBridge.update_vrm` |
+| `updateVRMMaterial(intensity, color)` | 4 values | `JSBridge.update_vrm_material` |
+| `window.fpsText = ...` | string (1/sec) | `main.rb` |
+| `window.debugInfoText = ...` | string | `main.rb` |
+
+### JSBridge モジュールパターン
+
+本プロジェクトでは `JSBridge` モジュール (`src/ruby/js_bridge.rb`) が全ての Ruby→JS 呼び出しを集約:
+
+```ruby
+module JSBridge
+  def self.update_particles(data)
+    begin
+      JS.global.updateParticles(data[:positions], data[:colors], data[:avg_size], data[:avg_opacity])
+    rescue => e
+      JS.global[:console].error("JSBridge error: #{e.message}")
+    end
+  end
+  # ...
+end
+```
+
+- 全呼び出しに `rescue` ガードあり
+- デバッグログはフレーム数で間引き (`$frame_count % 60 == 0`)
+
+### デルタタイム共有パターン
+
+JS→Ruby 間でデルタタイムを共有するため、`window._animDeltaTime` グローバル変数を使用:
+
+```javascript
+// index.html:674
+window._animDeltaTime = deltaTime;
+```
+
+```ruby
+# vrm_dancer.rb:35-36
+dt = JS.global[:_animDeltaTime]
+delta = dt.typeof == "number" ? dt.to_f : 0.033  # fallback ~30fps
+```
+
+### DevTool 設定インターフェース
+
+`Config.register_devtool_callbacks` で Chrome DevTools から動的に設定値を変更できるコールバックを登録:
+
+```javascript
+// DevTools コンソールから使用:
+rubyConfigSet('sensitivity', 2.0)   // 設定値の変更
+rubyConfigGet('sensitivity')         // 現在値の取得
+rubyConfigList()                     // 全設定値の一覧
+rubyConfigReset()                    // デフォルト値にリセット
+```
+
+### ログバッファ (window.logBuffer)
+
+Chrome MCP 連携用のリングバッファ。コンソール出力を全て capture し、DevTools から取得可能:
+
+```javascript
+// index.html:140-162
+window.logBuffer.getLast(20)   // 直近20件
+window.logBuffer.getErrors()   // エラーのみ
+window.logBuffer.getRuby()     // Ruby出力のみ
+window.logBuffer.getJS()       // JS出力のみ
+window.logBuffer.dump()        // 全ログをテキスト出力
+```
+
 ## 既知の問題と回避策
 
 ### JS::Object#call() の TypeError (js gem 2.8.1)

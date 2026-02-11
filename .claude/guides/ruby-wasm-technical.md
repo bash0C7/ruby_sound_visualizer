@@ -61,6 +61,32 @@ Ruby 3.4.x ベースの場合、`@ruby/4.0-wasm-wasi` を使用。
 2. `type="text/ruby"` スクリプトは上から順に実行される
 3. 依存関係のあるファイルは先に読み込む (ユーティリティ → メイン)
 
+### 本プロジェクトの Ruby ファイル読み込み順序
+
+```html
+<!-- index.html:118-135 -->
+<script type="text/ruby" src="src/ruby/config.rb"></script>         <!-- 1. 設定定数 -->
+<script type="text/ruby" src="src/ruby/math_helper.rb"></script>    <!-- 2. 数学ユーティリティ -->
+<script type="text/ruby" src="src/ruby/js_bridge.rb"></script>      <!-- 3. JS連携ブリッジ -->
+<script type="text/ruby" src="src/ruby/frequency_mapper.rb"></script>
+<script type="text/ruby" src="src/ruby/audio_analyzer.rb"></script>
+<script type="text/ruby" src="src/ruby/color_palette.rb"></script>
+<script type="text/ruby" src="src/ruby/particle_system.rb"></script>
+<script type="text/ruby" src="src/ruby/geometry_morpher.rb"></script>
+<script type="text/ruby" src="src/ruby/camera_controller.rb"></script>
+<script type="text/ruby" src="src/ruby/bloom_controller.rb"></script>
+<script type="text/ruby" src="src/ruby/effect_manager.rb"></script>
+<script type="text/ruby" src="src/ruby/keyboard_handler.rb"></script>
+<script type="text/ruby" src="src/ruby/debug_formatter.rb"></script>
+<script type="text/ruby" src="src/ruby/bpm_estimator.rb"></script>
+<script type="text/ruby" src="src/ruby/frame_counter.rb"></script>
+<script type="text/ruby" src="src/ruby/vrm_dancer.rb"></script>
+<script type="text/ruby" src="src/ruby/vrm_material_controller.rb"></script>
+<script type="text/ruby" src="src/ruby/main.rb"></script>           <!-- 最後: エントリポイント -->
+```
+
+ポイント: `config.rb` を最初に読み込むことで、他の全クラスが `Config::` 定数を参照可能。`main.rb` は最後に読み込み、全クラスのインスタンス化とコールバック登録を行う。
+
 ### Import Maps との共存
 
 ruby.wasm のスクリプトと ES Modules (Three.js 等) を共存させる場合:
@@ -87,6 +113,32 @@ ruby.wasm のスクリプトと ES Modules (Three.js 等) を共存させる場�
 
 <!-- Ruby コード (THREE_READY を待ってから使用) -->
 <script type="text/ruby" src="main.rb"></script>
+```
+
+### グローバルコールバック登録パターン
+
+Ruby 側で `lambda` をグローバル変数に登録し、JS 側から呼び出す:
+
+```ruby
+# main.rb - メイン更新コールバック
+JS.global[:rubyUpdateVisuals] = lambda do |freq_array, timestamp|
+  begin
+    analysis = $audio_analyzer.analyze(freq_array, Config.sensitivity)
+    $effect_manager.update(analysis, Config.sensitivity)
+    JSBridge.update_particles($effect_manager.particle_data)
+    # ... 他の更新呼び出し
+  rescue => e
+    JSBridge.error "Error: #{e.message}"
+  end
+end
+```
+
+```javascript
+// index.html - JS側から呼び出し
+if (analyser && window.rubyUpdateVisuals) {
+  analyser.getByteFrequencyData(dataArray);
+  window.rubyUpdateVisuals(Array.from(dataArray), now);
+}
 ```
 
 ## 利用可能な機能と制約
@@ -200,7 +252,7 @@ ruby.wasm ランタイムのダウンロードと初期化に時間がかかる:
 - 初期化: ブラウザとネットワーク環境に依存
 - 2 回目以降: ブラウザキャッシュが効く
 
-ローディング画面を表示して待機させるのが一般的。
+本プロジェクトではローディング画面を表示し、VRM ファイルのアップロードオプション (またはスキップ) を提示して待機させている。
 
 ### メモリ使用量
 
@@ -226,22 +278,30 @@ python3 -m http.server 8000
 
 ブラウザに依存しないロジック (計算、データ変換等) は通常の Ruby テストフレームワークでテストできる:
 
-```ruby
-# test/test_my_class.rb
-require 'test-unit'
-require_relative '../src/ruby/my_class'
+```bash
+# Rake タスクでテスト実行
+bundle exec rake test
+```
 
-class TestMyClass < Test::Unit::TestCase
-  def test_calculation
-    assert_equal 42, MyClass.calculate(input)
+```ruby
+# test/test_audio_analyzer.rb (例)
+require 'test-unit'
+require_relative '../src/ruby/config'
+require_relative '../src/ruby/audio_analyzer'
+
+class TestAudioAnalyzer < Test::Unit::TestCase
+  def test_analyze_returns_expected_keys
+    analyzer = AudioAnalyzer.new
+    result = analyzer.analyze([0] * 1024)
+    assert_equal 0.0, result[:bass]
   end
 end
 ```
 
-ただし `require 'js'` を含むコードはブラウザ外では実行できない。`js` gem への依存を分離する設計が重要:
+`require 'js'` を含むコードはブラウザ外では実行できない。本プロジェクトでは以下のように依存を分離:
 
-- 計算ロジック: `js` gem 不要 → ユニットテスト可能
-- JS ブリッジ: `js` gem 必要 → ブラウザでのみテスト
+- **テスト可能**: `config.rb`, `audio_analyzer.rb`, `particle_system.rb`, `vrm_dancer.rb`, `bpm_estimator.rb`, `color_palette.rb` 等 (計算ロジック)
+- **ブラウザのみ**: `js_bridge.rb`, `main.rb` (`require 'js'` 必須)
 
 ### キャッシュ回避
 
