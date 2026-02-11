@@ -4,7 +4,7 @@
 
 ## 🚀 軽量タスク (Quick Wins)
 
-- [ ] 画面左下の情報エリアを 4 行にまとめる（文字サイズも小さくする） 🌐
+- [x] 画面左下の情報エリアを 4 行にまとめる（文字サイズも小さくする） 🌐
   - Ruby WASM Sound Visualizer 表示は不要
   - 最下段はキーマップを維持
   - その他の情報は行をまとめる
@@ -30,6 +30,11 @@
 - [x] 少し音を上げるとトーラスとVRMが画面いっぱいにホワイトアウト状態に飽和する 🖥️
   - ホワイトアウトが続いては画面表示がわからないしパーティクルが目立たなくなるしやりすぎになってしまう。ただし適切な度合いは実際にログや画面表示とマイクからの音入力が必要になるのでローカルのみ
 
+- [ ] BPMの判定が実測FPSと乖離する
+
+  - P2 Badge Use measured FPS below 30 when estimating BPM
+    - This call clamps fps to at least 30 before passing it into BPMEstimator, so any real frame rate in the 10–29 FPS range is treated as 30 FPS and BPM is systematically overestimated on slower devices (for example, a true 120 BPM stream at ~15 FPS will be reported near double). BPMEstimator already contains its own low-FPS guard (fps < 10), so this pre-clamp removes valid signal and regresses accuracy under load.
+
 - [ ] パフォーマンスチューニング 🖥️
   - 実際にChromeに接続して、FPS30を目指す
 
@@ -48,7 +53,7 @@
   - 設定値は共有の定数オブジェクトから参照
   - Plan: [config-centralization.md](plans/config-centralization.md)
 
-- [ ] DevTool コンソールから動的に設定値を変更できるインタフェースを実装 🌐
+- [x] DevTool コンソールから動的に設定値を変更できるインタフェースを実装 🌐
   - Ruby-JS 相互運用で動的に値を反映
   - デバッグ効率向上
   - Plan: [devtool-interface.md](plans/devtool-interface.md)
@@ -56,20 +61,20 @@
 
 ## 🏗️ 重量級タスク (Major Refactoring)
 
-- [ ] Ruby のクラスと振る舞いを構造化して、変更の影響を局所化 🌐
+- [x] Ruby のクラスと振る舞いを構造化して、変更の影響を局所化 🌐
   - スパゲッティコード → モジュール化
   - 各クラスの責任を明確化
   - 変更の波及範囲を最小化
   - Plan: [ruby-class-restructure.md](plans/ruby-class-restructure.md)
 
-- [ ] JavaScript のコードを最小化して ruby.wasm に寄せる 🌐
+- [x] JavaScript のコードを最小化して ruby.wasm に寄せる 🌐
   - ロジック層を Ruby に集約
   - JavaScript は WebGL 操作のみ
   - Ruby-JS 相互運用パターンの標準化
   - Plan: [js-to-ruby-migration.md](plans/js-to-ruby-migration.md)
   - Depends on: Ruby のクラスと振る舞いを構造化
 
-- [ ] ブラウザのコンソールログを Claude Code が読めるように可視化 🌐
+- [x] ブラウザのコンソールログを Claude Code が読めるように可視化 🌐
   - Chrome MCP ツール連携強化
   - オブザービリティの向上
   - スクリーンショット依存度を削減
