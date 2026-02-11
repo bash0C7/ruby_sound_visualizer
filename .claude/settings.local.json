@@ -17,7 +17,8 @@
       "Bash(bundle exec rake test:*)",
       "Bash(lsof:*)",
       "Bash(bundle exec rake:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(xargs kill:*)"
     ]
   }
 }
