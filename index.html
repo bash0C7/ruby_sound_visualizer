@@ -136,6 +136,47 @@
   <script type="text/ruby" src="src/ruby/main.rb"></script>
 
   <script>
+    // === Log Buffer for Chrome MCP Access ===
+    // Structured ring buffer accessible from DevTools: window.logBuffer.getLast(20)
+    window.logBuffer = {
+      entries: [],
+      maxSize: 500,
+      add(level, source, message) {
+        this.entries.push({
+          ts: new Date().toISOString().substr(11, 12),
+          level, source, message
+        });
+        if (this.entries.length > this.maxSize) {
+          this.entries = this.entries.slice(-this.maxSize);
+        }
+      },
+      getLast(n) { return this.entries.slice(-(n || 20)); },
+      getErrors() { return this.entries.filter(e => e.level === 'error'); },
+      getRuby() { return this.entries.filter(e => e.source === 'ruby'); },
+      getJS() { return this.entries.filter(e => e.source === 'js'); },
+      clear() { this.entries = []; },
+      dump() {
+        return this.entries.map(e =>
+          `${e.ts} [${e.level}][${e.source}] ${e.message}`
+        ).join('\n');
+      }
+    };
+
+    // Intercept console methods to capture all output into logBuffer
+    ['log', 'warn', 'error'].forEach(method => {
+      const original = console[method].bind(console);
+      console[method] = function(...args) {
+        original(...args);
+        try {
+          const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
+          const source = msg.startsWith('[Ruby]') ? 'ruby' :
+                         msg.startsWith('[JS]') ? 'js' :
+                         msg.startsWith('[DEBUG') ? 'debug' : 'other';
+          window.logBuffer.add(method === 'log' ? 'info' : method, source, msg);
+        } catch (e) { /* ignore logging errors */ }
+      };
+    });
+
     // Global state for JavaScript bridge
     let audioContext, analyser, dataArray;
     let scene, camera, renderer, composer;
