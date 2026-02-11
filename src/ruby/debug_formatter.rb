@@ -24,8 +24,7 @@ class DebugFormatter
     beat_now << "H" if beat[:high]
     beat_indicator = beat_now.empty? ? "" : " [#{beat_now.join("+")}]"
 
-    "Mode: #{mode_str}  |  Bass: #{bass_str}%  Mid: #{mid_str}%  High: #{high_str}%  Overall: #{overall_str}%  Vol: #{volume_db.round(1)}dB\n" \
-    "H: #{h_str}  S: #{s_str}%  B: #{b_str}%  |  #{bpm_str}#{beat_indicator}"
+    "Mode: #{mode_str}  |  B: #{bass_str}%  M: #{mid_str}%  H: #{high_str}%  O: #{overall_str}%  Vol: #{volume_db.round(1)}dB  |  HSV: #{h_str}/#{s_str}%/#{b_str}%  |  #{bpm_str}#{beat_indicator}"
   end
 
   def format_param_text

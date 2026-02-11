@@ -25,18 +25,18 @@ class TestDebugFormatter < Test::Unit::TestCase
     formatter = DebugFormatter.new
     analysis = { bass: 0.5, mid: 0.3, high: 0.2, overall_energy: 0.4 }
     result = formatter.format_debug_text(analysis, {}, bpm: 0)
-    assert_match(/Bass:/, result)
-    assert_match(/Mid:/, result)
-    assert_match(/High:/, result)
+    assert_match(/\bB:/, result)  # Word boundary to avoid matching "dB:"
+    assert_match(/\bM:/, result)
+    assert_match(/\bH:/, result)
+    assert_match(/\bO:/, result)  # Overall
   end
 
   def test_format_debug_text_contains_hsv
     formatter = DebugFormatter.new
     analysis = { bass: 0.5, mid: 0.3, high: 0.2, overall_energy: 0.4 }
     result = formatter.format_debug_text(analysis, {}, bpm: 0)
-    assert_match(/H:/, result)
-    assert_match(/S:/, result)
-    assert_match(/B:/, result)
+    assert_match(/HSV:/, result)  # Test for combined HSV: prefix
+    assert_match(%r{HSV: \d+(\.\d+)?/\d+(\.\d+)?%/\d+(\.\d+)?%}, result)  # Test slash-separated format (decimals optional)
   end
 
   def test_format_debug_text_shows_beat_indicator
