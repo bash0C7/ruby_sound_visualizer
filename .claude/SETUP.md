@@ -18,6 +18,21 @@ bundle install
 
 ### 2. Start Local Server
 
+#### Using Rake Tasks (Recommended)
+
+```bash
+# サーバーを起動（バックグラウンドで実行）
+bundle exec rake server:start
+
+# サーバーの状態を確認
+bundle exec rake server:status
+
+# サーバーを停止
+bundle exec rake server:stop
+```
+
+#### Manual Start
+
 ```bash
 bundle exec ruby -run -ehttpd . -p8000
 ```
@@ -126,16 +141,36 @@ http://localhost:8000/index.html?nocache=1234567890
 
 ## Development Workflow
 
+### Server Management
+
+```bash
+# サーバーを起動（バックグラウンドで実行）
+bundle exec rake server:start
+
+# 実行中か確認
+bundle exec rake server:status
+
+# サーバーを停止
+bundle exec rake server:stop
+
+# サーバーを再起動
+bundle exec rake server:restart
+```
+
 ### Making Changes
 
 1. [index.html](../index.html) を編集
-2. ブラウザをリロード（`?nocache=<random>` を使う）
-3. Ruby WASM 初期化を待つ（25-30秒）
+2. ブラウザでキャッシュをクリアしてリロード: `/browser-clean-session` スキル
+3. ユーザーアクションを待つ（VRM アップロードまたはスキップ）
 4. Chrome DevTools でコンソールを確認
 
 ### Testing Changes
 
-```
+```bash
+# 全テストを実行
+bundle exec rake test
+
+# ブラウザでの検証
 /debug-browser
 /visualizer-test --quick
 ```

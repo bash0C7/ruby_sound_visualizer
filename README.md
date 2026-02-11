@@ -166,7 +166,7 @@ JavaScript/HTML - Edit `index.html`:
 - Keyboard event handlers and UI updates
 - VRM loader and material setup
 
-After making changes, hard refresh your browser (Ctrl+Shift+R / Cmd+Shift+R) to clear cached .rb files. Ruby WASM initialization takes 25-30 seconds on first load.
+After making changes, hard refresh your browser (Ctrl+Shift+R / Cmd+Shift+R) to clear cached .rb files.
 
 ### Debugging
 

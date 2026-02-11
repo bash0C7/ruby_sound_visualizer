@@ -57,3 +57,7 @@ build-iPhoneSimulator/
 
 # PicoRuby compiled files (root only, subdirectories are tracked)
 /*.mrb
+
+# Rake server task files
+server.pid
+server.log

@@ -38,18 +38,25 @@ mcp__claude-in-chrome__navigate(
 - Use `?nocache=<random-number>` to bypass browser cache
 - Wait for page load completion
 
-### 4. Wait for Ruby WASM Initialization (CRITICAL)
+### 4. Wait for User Action (CRITICAL)
+
+Display message to user:
 
 ```
-mcp__claude-in-chrome__computer(
-  action: "wait",
-  duration: 30,
-  tabId: XXX
-)
+Browser session ready! The visualizer is loading Ruby WASM.
+
+Next steps:
+- If you need VRM model: Upload .vrm file when ready
+- If you don't need VRM: Click "Skip" button
+- Or provide your next instruction
+
+Let me know when you're ready to proceed!
 ```
 
-- Ruby WASM initialization takes **25-30 seconds**
-- DO NOT proceed before this wait completes
+**IMPORTANT**:
+- Pause skill execution here and wait for user's response in chat
+- User should upload VRM or click "Skip" after initialization completes
+- DO NOT proceed to screenshot/console checks until user confirms ready
 
 ### 5. Visual Verification
 
@@ -229,7 +236,7 @@ mcp__claude-in-chrome__javascript_tool(
 ## Best Practices
 
 1. **Always use Chrome MCP tools** - Never ask user to manually check browser
-2. **Wait 25-30 seconds** after navigation for Ruby WASM initialization
+2. **Wait for user action** - Let user upload VRM or click skip after Ruby WASM loads
 3. **Use pattern parameter** in `read_console_messages` to filter noise
 4. **Screenshot first** for visual confirmation before diving into logs
 5. **One debug variable per log** to avoid cascading exceptions

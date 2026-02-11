@@ -109,6 +109,7 @@ This project defines local skills in `.claude/skills/`. Use skills via Skill too
 
 Available skills:
 - **debug-browser**: Detailed browser debugging procedure for ruby.wasm app using Chrome MCP tools
+- **browser-clean-session**: Open visualizer in clean browser session with full cache clear
 - **troubleshoot**: Basic troubleshooting guide
 
 Skills are project-local and defined within this repository.
@@ -117,12 +118,30 @@ Skills are project-local and defined within this repository.
 
 See [.claude/SETUP.md](.claude/SETUP.md) for detailed setup instructions.
 
+### Using Rake Tasks
+
+```bash
+# Start server
+bundle exec rake server:start
+
+# Check status
+bundle exec rake server:status
+
+# Stop server
+bundle exec rake server:stop
+
+# Run tests
+bundle exec rake test
+```
+
+### Manual Server Control
+
 ```bash
 bundle install
 bundle exec ruby -run -ehttpd . -p8000
 ```
 
-Open `http://localhost:8000/index.html` in browser (wait 30 seconds on first load).
+Open `http://localhost:8000/index.html` in browser.
 
 ## Technical Guides
 

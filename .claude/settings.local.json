@@ -12,7 +12,11 @@
       "Bash(git log:*)",
       "WebFetch(domain:pixiv.github.io)",
       "Bash(git -C /Users/bash/dev/src/github.com/bash0C7/ruby_sound_visualizer log --oneline --all)",
-      "Bash(ruby:*)"
+      "Bash(ruby:*)",
+      "Bash(rake test:*)",
+      "Bash(bundle exec rake test:*)",
+      "Bash(lsof:*)",
+      "Bash(bundle exec rake:*)"
     ]
   }
 }
