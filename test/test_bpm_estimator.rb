@@ -75,12 +75,52 @@ class TestBPMEstimator < Test::Unit::TestCase
     assert_equal 120, @estimator.estimated_bpm
   end
 
-  def test_fps_below_10_defaults_to_30
-    # If FPS is unreasonably low, default to 30
+  def test_fps_below_10_clamps_to_10
+    # If FPS is unreasonably low (< 10), clamp to 10 instead of jumping to 30
+    # This provides gentler degradation and closer approximation to actual FPS
     @estimator.record_beat(0, fps: 5.0)
-    @estimator.record_beat(15, fps: 5.0)
-    @estimator.record_beat(30, fps: 5.0)
-    # With default 30fps: 60/(15/30) = 120 BPM
+    @estimator.record_beat(5, fps: 5.0)
+    @estimator.record_beat(10, fps: 5.0)
+    # With clamped 10fps: 60/(5/10) = 120 BPM
+    assert_equal 120, @estimator.estimated_bpm
+  end
+
+  def test_bpm_at_15_fps
+    # Simulate 120 BPM at 15fps: beat every 7.5 frames
+    # 120 BPM = 2 beats/sec, interval = 0.5 sec = 7.5 frames at 15fps
+    @estimator.record_beat(0, fps: 15.0)
+    @estimator.record_beat(8, fps: 15.0)   # ~0.53 sec
+    @estimator.record_beat(15, fps: 15.0)  # ~1.0 sec
+    # Average interval: (8+7)/2 = 7.5 frames, 7.5/15 = 0.5 sec, 60/0.5 = 120 BPM
+    assert_equal 120, @estimator.estimated_bpm
+  end
+
+  def test_bpm_at_20_fps
+    # Simulate 120 BPM at 20fps: beat every 10 frames
+    # 120 BPM = 2 beats/sec, interval = 0.5 sec = 10 frames at 20fps
+    @estimator.record_beat(0, fps: 20.0)
+    @estimator.record_beat(10, fps: 20.0)
+    @estimator.record_beat(20, fps: 20.0)
+    assert_equal 120, @estimator.estimated_bpm
+  end
+
+  def test_bpm_at_25_fps
+    # Simulate 120 BPM at 25fps: beat every 12.5 frames
+    # 120 BPM = 2 beats/sec, interval = 0.5 sec = 12.5 frames at 25fps
+    @estimator.record_beat(0, fps: 25.0)
+    @estimator.record_beat(12, fps: 25.0)  # ~0.48 sec
+    @estimator.record_beat(25, fps: 25.0)  # ~1.0 sec
+    # Average interval: (12+13)/2 = 12.5 frames, 12.5/25 = 0.5 sec, 60/0.5 = 120 BPM
+    assert_equal 120, @estimator.estimated_bpm
+  end
+
+  def test_bpm_at_10_fps_boundary
+    # Boundary: exactly 10 FPS should use actual value, not default to 30
+    # Simulate 120 BPM at 10fps: beat every 5 frames
+    # 120 BPM = 2 beats/sec, interval = 0.5 sec = 5 frames at 10fps
+    @estimator.record_beat(0, fps: 10.0)
+    @estimator.record_beat(5, fps: 10.0)
+    @estimator.record_beat(10, fps: 10.0)
     assert_equal 120, @estimator.estimated_bpm
   end
 end

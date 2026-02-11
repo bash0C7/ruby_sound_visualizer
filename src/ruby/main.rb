@@ -87,7 +87,7 @@ begin
       # BPM estimation
       beat = analysis[:beat] || {}
       if beat[:bass]
-        $bpm_estimator.record_beat(frame_count, fps: [($frame_counter.current_fps), 30].max.to_f)
+        $bpm_estimator.record_beat(frame_count, fps: $frame_counter.current_fps.to_f)
       end
 
       # Debug display update (once per second when FPS report is ready)

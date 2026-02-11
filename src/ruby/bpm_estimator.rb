@@ -24,7 +24,8 @@ class BPMEstimator
   def recalculate(fps)
     return if @beat_times.length < 3
 
-    fps = 30.0 if fps < 10
+    # Clamp extremely low FPS to 10 instead of 30 for gentler degradation
+    fps = 10.0 if fps < 10
 
     intervals = []
     (@beat_times.length - 1).times do |i|
