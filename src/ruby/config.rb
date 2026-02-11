@@ -44,7 +44,7 @@ module Config
   BLOOM_BASE_STRENGTH = 1.5    # Base bloom strength
   BLOOM_BASE_THRESHOLD = 0.0   # Base bloom threshold (allow all emissive to glow)
   BLOOM_MAX_STRENGTH = 1.5     # Maximum bloom strength
-  BLOOM_MIN_THRESHOLD = 0.0    # Minimum bloom threshold (lower = more glow)
+  BLOOM_MIN_THRESHOLD = 0.1    # Minimum bloom threshold (lower = more glow)
 
   # Runtime mutable config (set by URL params / keyboard)
   @@sensitivity = 1.0
