@@ -16,11 +16,11 @@ class BloomController
     @strength = [@strength, Config::BLOOM_MAX_STRENGTH].min
 
     # Threshold adjusted for VRM emissiveIntensity range (0.3-1.5)
-    # Low energy: threshold ~0.15, High energy: threshold ~0.0
+    # Low energy: threshold ~0.15, High energy: threshold ~BLOOM_MIN_THRESHOLD
     # This allows bloom to work with lower emissive intensities
     @threshold = 0.15 - Math.tanh(energy) * 0.15
     @threshold -= 0.04 * imp_overall
-    @threshold = [@threshold, 0.0].max
+    @threshold = [@threshold, Config::BLOOM_MIN_THRESHOLD].max
   end
 
   def get_data
