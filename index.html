@@ -921,6 +921,16 @@
 
     console.log('[JS] Keyboard listener registered (0-3: color, 4/5: hue, 6/7: brightness, 8/9: lightness, +/-: sensitivity, a/s: camera X, w/x: camera Y, q/z: camera Z)');
 
+    // DevTool console interface for dynamic config changes
+    // Usage: rubyConfig.set('sensitivity', 2.5) / .get('sensitivity') / .list() / .reset()
+    window.rubyConfig = {
+      set: (key, value) => window.rubyConfigSet?.(key, value) ?? 'Ruby VM not ready',
+      get: (key) => window.rubyConfigGet?.(key) ?? 'Ruby VM not ready',
+      list: () => window.rubyConfigList?.() ?? 'Ruby VM not ready',
+      reset: () => window.rubyConfigReset?.() ?? 'Ruby VM not ready',
+      help: () => console.log('Usage: rubyConfig.set(key, value) | .get(key) | .list() | .reset()')
+    };
+
     // Handle window resize
     window.addEventListener('resize', function() {
       const width = window.innerWidth;

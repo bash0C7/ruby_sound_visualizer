@@ -35,6 +35,7 @@ begin
   $keyboard_handler = KeyboardHandler.new
   $debug_formatter = DebugFormatter.new
   $bpm_estimator = BPMEstimator.new
+  Config.register_devtool_callbacks
 
   JS.global[:rubyUpdateVisuals] = lambda do |freq_array|
     begin
