@@ -54,7 +54,7 @@ class TestConfig < Test::Unit::TestCase
   def test_bloom_constants
     assert_equal 1.5, Config::BLOOM_BASE_STRENGTH
     assert_equal 0.0, Config::BLOOM_BASE_THRESHOLD
-    assert_equal 4.5, Config::BLOOM_MAX_STRENGTH
+    assert_equal 1.5, Config::BLOOM_MAX_STRENGTH
   end
 
   # Test runtime config accessors

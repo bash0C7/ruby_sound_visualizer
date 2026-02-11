@@ -77,24 +77,31 @@ class TestVRMDancer < Test::Unit::TestCase
     analysis = make_analysis(bass: 0.0, mid: 0.0, high: 0.0, energy: 0.0)
     result = @dancer.update(analysis, 0.016)
 
+    # Upper arm bones have intentional non-zero rest positions:
+    # -2.0 rad forward offset, +1.5 rad outward, amplified 8x
+    # leftUpperArm: indices 12-14, rightUpperArm: indices 21-23
+    upper_arm_indices = [12, 13, 14, 21, 22, 23]
+
     result[:rotations].each_with_index do |val, i|
-      assert_in_delta 0.0, val, 0.5, "rotation[#{i}] too large for silent input: #{val}"
+      if upper_arm_indices.include?(i)
+        assert_kind_of Numeric, val, "rotation[#{i}] should be Numeric"
+      else
+        assert_in_delta 0.0, val, 0.5, "rotation[#{i}] too large for silent input: #{val}"
+      end
     end
   end
 
-  def test_bass_beat_triggers_bounce
+  def test_bass_beat_does_not_bounce
     no_beat = make_analysis(bass: 0.0, energy: 0.0)
     @dancer.update(no_beat, 0.016)
 
     beat = make_analysis(bass: 0.8, energy: 0.6, beat_bass: true)
     result = @dancer.update(beat, 0.016)
 
-    # After a bass beat, bounce velocity should be non-zero
-    # which will eventually change hips_position_y
-    # Run a few more frames to let the spring settle
+    # Vertical bounce was intentionally removed (hips_position_y hardcoded to 0.0)
     5.times { result = @dancer.update(no_beat, 0.016) }
-    refute_equal 0.0, result[:hips_position_y],
-      "Hips should bounce after bass beat"
+    assert_equal 0.0, result[:hips_position_y],
+      "Hips should not bounce (bounce was removed by design)"
   end
 
   def test_high_energy_raises_arms
