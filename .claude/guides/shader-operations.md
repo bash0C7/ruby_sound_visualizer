@@ -18,13 +18,15 @@ Three.js のポストプロセッシングは、レンダリング結果の画�
 ### EffectComposer の構造
 
 ```
-EffectComposer
+EffectComposer (index.html:275-290)
   ├── RenderPass        … シーンを通常描画してフレームバッファに書き出す
-  ├── 各種エフェクト Pass … フレームバッファの画像を加工
-  └── OutputPass        … トーンマッピングと最終出力
+  ├── UnrealBloomPass   … Bloom (グロー) エフェクト
+  └── OutputPass        … トーンマッピングと最終出力 (Three.js r0.160.0 で必須)
 ```
 
 各 Pass はフレームバッファ (テクスチャ) の読み書きでチェーンされ、最終的に画面に表示される。
+
+OutputPass は Three.js r0.160.0 以降で追加が必要。これがないと最終出力にトーンマッピングが適用されず、色味が変わる場合がある。
 
 ### 主要な Pass の種類
 
@@ -64,6 +66,18 @@ UE4 の Bloom アルゴリズムを移植したポストプロセッシングパ
 
 threshold を低くすると VRM モデルなど emissiveIntensity が低いオブジェクトにも Bloom が掛かる。
 
+### 本プロジェクトの初期値
+
+```javascript
+// index.html:280-286
+bloomPass = new UnrealBloomPass(
+  new THREE.Vector2(window.innerWidth, window.innerHeight),
+  1.5,   // strength (BLOOM_BASE_STRENGTH)
+  0.4,   // radius (固定)
+  0.0    // threshold (BLOOM_BASE_THRESHOLD, 全体を輝かせる)
+);
+```
+
 ### 動的パラメーター変更
 
 ```javascript
@@ -72,7 +86,18 @@ bloomPass.threshold = newThreshold;
 // radius は通常固定で運用
 ```
 
-毎フレーム値を更新するだけで即座に反映される。
+毎フレーム値を更新するだけで即座に反映される。Ruby の BloomController が毎フレーム計算し、JSBridge 経由で `window.updateBloom(strength, threshold)` を呼ぶ:
+
+```ruby
+# bloom_controller.rb
+@strength = Config::BLOOM_BASE_STRENGTH + Math.tanh(energy * 2.0) * 2.5
+@strength += Math.tanh(imp_overall) * 1.5
+@strength = [@strength, Config::BLOOM_MAX_STRENGTH].min  # 1.5 でキャップ
+
+@threshold = 0.15 - Math.tanh(energy) * 0.15
+@threshold -= 0.04 * imp_overall
+@threshold = [@threshold, Config::BLOOM_MIN_THRESHOLD].max  # 0.1 が下限
+```
 
 ## マテリアルと発光 (Emissive)
 

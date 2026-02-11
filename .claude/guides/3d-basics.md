@@ -20,13 +20,13 @@ Three.js はシーングラフ (ツリー構造) でオブジェクトを管理�
 
 ```
 Scene (ルート)
-  ├── Camera
+  ├── Camera (layers.enableAll() で全レイヤー表示)
   ├── Lights
-  │   ├── DirectionalLight
-  │   └── AmbientLight
-  ├── Mesh (ジオメトリ + マテリアル)
-  ├── Points (パーティクルシステム)
-  └── Group / Object3D (子オブジェクトをまとめる)
+  │   ├── DirectionalLight (VRM 用)
+  │   └── AmbientLight (VRM 用)
+  ├── Mesh (トーラス: ジオメトリ + MeshStandardMaterial)
+  ├── Points (パーティクルシステム: 3000 パーティクル)
+  └── VRM Scene (オプション: ユーザーアップロード)
 ```
 
 - `scene.add(object)` でシーンにオブジェクトを追加
@@ -94,6 +94,15 @@ camera.layers.set(1);      // レイヤー 1 のみ表示
 ```
 
 選択的 Bloom (一部のオブジェクトだけ光らせる) などに利用できる。
+
+### 本プロジェクトのレイヤー構成
+
+```javascript
+// Layer 0: VRM モデル (デフォルトレイヤー、bloom なし)
+// Layer 1: Bloom 対象 (BLOOM_LAYER 定数)
+//   ※ 現在はパーティクルとトーラスの layers.set(BLOOM_LAYER) は無効化されている
+//   ※ camera.layers.enableAll() で全レイヤーを描画対象にしている
+```
 
 ## ジオメトリとメッシュ
 
@@ -172,13 +181,15 @@ positionAttribute.needsUpdate = true;
 
 ### パーティクル数とパフォーマンス
 
-パーティクル数は FPS に直接影響する:
+本プロジェクトでは 3000 パーティクルを使用 (`Config::PARTICLE_COUNT = 3000`)。パーティクル数は FPS に直接影響する:
 
 | パーティクル数 | 目安 FPS (一般的な PC) | 用途 |
 |-------------|---------------------|------|
-| 1,000-3,000 | 60 FPS | 軽量な表現 |
+| 1,000-3,000 | 60 FPS | 軽量な表現 (本プロジェクト) |
 | 5,000-10,000 | 30-60 FPS | リッチな表現 |
 | 10,000-50,000 | 15-30 FPS | ヘビーな表現 |
+
+パーティクル数が少ない分、個々のサイズを 2.5 倍に補填して視覚的な密度を維持している。
 
 ## 照明
 
@@ -198,16 +209,16 @@ PBR マテリアル (`MeshStandardMaterial`) は照明が必要。`PointsMateria
 VRM モデルは PBR マテリアルを使用するため、照明がないと真っ黒になる:
 
 ```javascript
-// 最低限の照明セット
-const dirLight = new THREE.DirectionalLight(0xffffff, intensity);
-dirLight.position.set(x, y, z);
+// VRM ロード時に照明を追加 (index.html:430-434)
+const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+dirLight.position.set(1, 2, 1);
 scene.add(dirLight);
 
 const ambLight = new THREE.AmbientLight(0x666666);
 scene.add(ambLight);
 ```
 
-一方、パーティクル (`PointsMaterial`) やワイヤーフレーム表示は照明不要。
+一方、パーティクル (`PointsMaterial`) やワイヤーフレーム表示は照明不要。照明は VRM ロード時に動的に追加され、VRM なしで起動した場合は追加されない。
 
 ## アニメーションループ
 
@@ -221,16 +232,42 @@ function animate() {
 
   // 1. デルタタイム計算
   const now = Date.now();
-  const deltaTime = (now - lastTime) / 1000;
-  lastTime = now;
+  const deltaTime = (now - animLastTime) / 1000;
+  animLastTime = now;
+  window._animDeltaTime = deltaTime;  // Ruby 側から参照可能
 
-  // 2. 各オブジェクトの更新 (音声データ反映など)
-  update(deltaTime);
+  // 2. FFT データ抽出 → Ruby コールバック呼び出し
+  if (analyser && window.rubyUpdateVisuals) {
+    analyser.getByteFrequencyData(dataArray);
+    window.rubyUpdateVisuals(Array.from(dataArray), now);
+    // Ruby 側で全計算を行い、JS の update 関数群を呼び出す
+  }
 
-  // 3. 描画
-  composer.render();  // ポストプロセッシングあり
-  // または renderer.render(scene, camera);  // なし
+  // 3. DOM 更新 (15 フレームごとにスロットリング)
+  if (frameCount % 15 === 0) { /* debugInfo, paramInfo 等の表示更新 */ }
+
+  // 4. VRM スプリングボーン更新
+  if (currentVRM) currentVRM.update(deltaTime);
+
+  // 5. 描画
+  composer.render();  // EffectComposer 経由 (RenderPass → BloomPass → OutputPass)
 }
+```
+
+### Ruby → JS コールバックによる更新パターン
+
+本プロジェクトでは Ruby 側で全てのビジュアル計算を行い、結果を JS の関数群に渡す:
+
+```
+Ruby (WASM)                    JavaScript
+  analyze(freq_data)    →
+  effect_manager.update →
+  JSBridge.update_particles  → window.updateParticles(positions, colors, size, opacity)
+  JSBridge.update_geometry   → window.updateGeometry(scale, rotation, emissive, color)
+  JSBridge.update_bloom      → window.updateBloom(strength, threshold)
+  JSBridge.update_camera     → window.updateCamera(position, shake)
+  JSBridge.update_vrm        → window.updateVRM(rotations, hipsY, blink, mouthV, mouthH)
+  JSBridge.update_vrm_material → window.updateVRMMaterial(intensity, color)
 ```
 
 ### デルタタイムの重要性
