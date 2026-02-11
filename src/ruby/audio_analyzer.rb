@@ -1,26 +1,4 @@
 class AudioAnalyzer
-  SAMPLE_RATE = 48000
-  FFT_SIZE = 2048
-  HISTORY_SIZE = 43  # 約2秒分（~21fps想定）
-
-  BASELINE_RATE = 0.02       # ベースライン追従速度（ゆっくり = 移動平均的）
-  WARMUP_RATE = 0.15         # ウォームアップ中の高速追従
-  WARMUP_FRAMES = 30         # 約1秒間はビート検出しない（キャリブレーション）
-
-  # ビート検出閾値（ベースラインからの偏差）
-  BEAT_BASS_DEVIATION = 0.06
-  BEAT_MID_DEVIATION = 0.08
-  BEAT_HIGH_DEVIATION = 0.08
-  # 最低エネルギー（環境ノイズとの区別）
-  BEAT_MIN_BASS = 0.25
-  BEAT_MIN_MID = 0.20
-  BEAT_MIN_HIGH = 0.20
-
-  # Two-stage smoothing: beat detection vs visual
-  VISUAL_SMOOTHING_FACTOR = 0.70  # ビジュアル用（滑らか、30% 新規データ）
-  IMPULSE_DECAY = 0.65             # インパルスの減衰率（35% 減衰/フレーム）
-  EXPONENTIAL_THRESHOLD = 0.06     # この値以下を指数的に減衰（ノイズ処理）
-
   def initialize
     @frequency_mapper = FrequencyMapper.new
 
@@ -28,7 +6,6 @@ class AudioAnalyzer
     @smoothed_bass = 0.0
     @smoothed_mid = 0.0
     @smoothed_high = 0.0
-    @smoothing_factor = 0.55  # 高速反応でビート感を出す
 
     # Visual smoothing (slow response, smooth motion)
     @visual_bass = 0.0
@@ -43,17 +20,17 @@ class AudioAnalyzer
     @impulse_high = 0.0
 
     # ビート検出用: エネルギー履歴（リングバッファ）
-    @energy_history = Array.new(HISTORY_SIZE, 0.0)
-    @bass_history = Array.new(HISTORY_SIZE, 0.0)
-    @mid_history = Array.new(HISTORY_SIZE, 0.0)
-    @high_history = Array.new(HISTORY_SIZE, 0.0)
+    @energy_history = Array.new(Config::HISTORY_SIZE, 0.0)
+    @bass_history = Array.new(Config::HISTORY_SIZE, 0.0)
+    @mid_history = Array.new(Config::HISTORY_SIZE, 0.0)
+    @high_history = Array.new(Config::HISTORY_SIZE, 0.0)
     @history_index = 0
 
     # ベースライン（環境ノイズレベル）の追跡
     @baseline_bass = 0.0
     @baseline_mid = 0.0
     @baseline_high = 0.0
-    @warmup_remaining = WARMUP_FRAMES
+    @warmup_remaining = Config::WARMUP_FRAMES
 
     # ビート状態
     @beat_overall = false
@@ -76,15 +53,15 @@ class AudioAnalyzer
     overall_energy = calculate_energy(freq_array)
 
     # Beat detection smoothing (fast response for accurate beat detection)
-    @smoothed_bass = lerp(@smoothed_bass, bass_energy, 1.0 - @smoothing_factor)
-    @smoothed_mid = lerp(@smoothed_mid, mid_energy, 1.0 - @smoothing_factor)
-    @smoothed_high = lerp(@smoothed_high, high_energy, 1.0 - @smoothing_factor)
+    @smoothed_bass = lerp(@smoothed_bass, bass_energy, 1.0 - Config::AUDIO_SMOOTHING_FACTOR)
+    @smoothed_mid = lerp(@smoothed_mid, mid_energy, 1.0 - Config::AUDIO_SMOOTHING_FACTOR)
+    @smoothed_high = lerp(@smoothed_high, high_energy, 1.0 - Config::AUDIO_SMOOTHING_FACTOR)
 
     # Visual smoothing (slow response for smooth visuals, no sudden jumps)
-    @visual_bass = lerp(@visual_bass, bass_energy, 1.0 - VISUAL_SMOOTHING_FACTOR)
-    @visual_mid = lerp(@visual_mid, mid_energy, 1.0 - VISUAL_SMOOTHING_FACTOR)
-    @visual_high = lerp(@visual_high, high_energy, 1.0 - VISUAL_SMOOTHING_FACTOR)
-    @visual_overall = lerp(@visual_overall, overall_energy, 1.0 - VISUAL_SMOOTHING_FACTOR)
+    @visual_bass = lerp(@visual_bass, bass_energy, 1.0 - Config::VISUAL_SMOOTHING_FACTOR)
+    @visual_mid = lerp(@visual_mid, mid_energy, 1.0 - Config::VISUAL_SMOOTHING_FACTOR)
+    @visual_high = lerp(@visual_high, high_energy, 1.0 - Config::VISUAL_SMOOTHING_FACTOR)
+    @visual_overall = lerp(@visual_overall, overall_energy, 1.0 - Config::VISUAL_SMOOTHING_FACTOR)
 
     # Exponential decay for noise reduction (natural decay, no hard cut)
     @visual_bass = exponential_decay(@visual_bass)
@@ -103,7 +80,7 @@ class AudioAnalyzer
     @bass_history[@history_index] = bass_energy
     @mid_history[@history_index] = mid_energy
     @high_history[@history_index] = high_energy
-    @history_index = (@history_index + 1) % HISTORY_SIZE
+    @history_index = (@history_index + 1) % Config::HISTORY_SIZE
 
     {
       bass: @visual_bass,           # Use visual values for smooth motion
@@ -142,14 +119,14 @@ class AudioAnalyzer
       @beat_mid = false
       @beat_high = false
       # クールダウン中もベースラインは更新（遅い追従）
-      update_baseline(bass, mid, high, BASELINE_RATE)
+      update_baseline(bass, mid, high, Config::BASELINE_RATE)
       return
     end
 
     # ウォームアップ中: ベースラインのキャリブレーションのみ
     if @warmup_remaining > 0
       @warmup_remaining -= 1
-      update_baseline(bass, mid, high, WARMUP_RATE)
+      update_baseline(bass, mid, high, Config::WARMUP_RATE)
       @beat_overall = false
       @beat_bass = false
       @beat_mid = false
@@ -160,7 +137,7 @@ class AudioAnalyzer
     # ベースライン（環境ノイズレベル）を移動平均で更新
     # ビート中はベースラインを上げない（ビート値で汚染されるのを防ぐ）
     unless @beat_overall
-      update_baseline(bass, mid, high, BASELINE_RATE)
+      update_baseline(bass, mid, high, Config::BASELINE_RATE)
     end
 
     # ベースラインからの偏差に sensitivity を適用
@@ -170,9 +147,9 @@ class AudioAnalyzer
 
     # バスドラム（bass）を主軸にビート検出
     # 条件: ベースラインからの偏差が閾値以上 かつ 絶対値も最低レベル以上
-    @beat_bass = bass_dev > BEAT_BASS_DEVIATION && bass > BEAT_MIN_BASS
-    @beat_mid = mid_dev > BEAT_MID_DEVIATION && mid > BEAT_MIN_MID
-    @beat_high = high_dev > BEAT_HIGH_DEVIATION && high > BEAT_MIN_HIGH
+    @beat_bass = bass_dev > Config::BEAT_BASS_DEVIATION && bass > Config::BEAT_MIN_BASS
+    @beat_mid = mid_dev > Config::BEAT_MID_DEVIATION && mid > Config::BEAT_MIN_MID
+    @beat_high = high_dev > Config::BEAT_HIGH_DEVIATION && high > Config::BEAT_MIN_HIGH
 
     # overall は bass（バスドラム）がメイン。mid+high は補助的
     @beat_overall = @beat_bass
@@ -221,7 +198,7 @@ class AudioAnalyzer
       end
     end
 
-    max_index * (SAMPLE_RATE / 2.0) / (FFT_SIZE / 2.0)
+    max_index * (Config::SAMPLE_RATE / 2.0) / (Config::FFT_SIZE / 2.0)
   end
 
   def lerp(a, b, t)
@@ -231,9 +208,9 @@ class AudioAnalyzer
   def exponential_decay(value)
     # Apply exponential decay for values below threshold (natural noise reduction)
     # This avoids hard-cut noise gate and provides smooth decay to zero
-    if value < EXPONENTIAL_THRESHOLD
+    if value < Config::EXPONENTIAL_THRESHOLD
       # Quadratic decay: value^2 / threshold (approaches 0 smoothly)
-      value * value / EXPONENTIAL_THRESHOLD
+      value * value / Config::EXPONENTIAL_THRESHOLD
     else
       value
     end
@@ -246,25 +223,25 @@ class AudioAnalyzer
     if @beat_bass
       @impulse_bass = 1.0
     else
-      @impulse_bass *= IMPULSE_DECAY
+      @impulse_bass *= Config::IMPULSE_DECAY_AUDIO
     end
 
     if @beat_mid
       @impulse_mid = 1.0
     else
-      @impulse_mid *= IMPULSE_DECAY
+      @impulse_mid *= Config::IMPULSE_DECAY_AUDIO
     end
 
     if @beat_high
       @impulse_high = 1.0
     else
-      @impulse_high *= IMPULSE_DECAY
+      @impulse_high *= Config::IMPULSE_DECAY_AUDIO
     end
 
     if @beat_overall
       @impulse_overall = 1.0
     else
-      @impulse_overall *= IMPULSE_DECAY
+      @impulse_overall *= Config::IMPULSE_DECAY_AUDIO
     end
   end
 
