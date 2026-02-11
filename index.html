@@ -30,7 +30,7 @@
       left: 20px;
       color: #0f0;
       font-family: monospace;
-      font-size: 12px;
+      font-size: 10px;
       z-index: 50;
     }
     #vrmUpload {
@@ -71,11 +71,9 @@
     </div>
   </div>
   <div id="status">
-    <div>Ruby WASM Sound Visualizer</div>
-    <div id="fpsCounter" style="margin-top: 5px;">FPS: 0</div>
-    <div id="debugInfo" style="margin-top: 5px; white-space: pre-wrap;"></div>
-    <div id="paramInfo" style="margin-top: 5px; white-space: nowrap; overflow-x: auto;"></div>
-    <div id="keyGuide" style="margin-top: 5px; color: #888; font-size: 11px; white-space: pre-wrap;"></div>
+    <div style="line-height: 1.0;"><span id="fpsCounter">FPS: 0</span>  |  <span id="paramInfo"></span></div>
+    <div id="debugInfo" style="margin-top: 1px; line-height: 1.0; white-space: nowrap; overflow-x: auto;"></div>
+    <div id="keyGuide" style="margin-top: 1px; line-height: 1.0; color: #888; font-size: 9px; white-space: pre-wrap;"></div>
   </div>
 
   <!-- Ruby WASM (must load before async module scripts) -->
@@ -128,18 +126,62 @@
   <script type="text/ruby" src="src/ruby/camera_controller.rb"></script>
   <script type="text/ruby" src="src/ruby/bloom_controller.rb"></script>
   <script type="text/ruby" src="src/ruby/effect_manager.rb"></script>
+  <script type="text/ruby" src="src/ruby/keyboard_handler.rb"></script>
+  <script type="text/ruby" src="src/ruby/debug_formatter.rb"></script>
+  <script type="text/ruby" src="src/ruby/bpm_estimator.rb"></script>
+  <script type="text/ruby" src="src/ruby/frame_counter.rb"></script>
   <script type="text/ruby" src="src/ruby/vrm_dancer.rb"></script>
   <script type="text/ruby" src="src/ruby/vrm_material_controller.rb"></script>
   <script type="text/ruby" src="src/ruby/main.rb"></script>
 
   <script>
+    // === Log Buffer for Chrome MCP Access ===
+    // Structured ring buffer accessible from DevTools: window.logBuffer.getLast(20)
+    window.logBuffer = {
+      entries: [],
+      maxSize: 500,
+      add(level, source, message) {
+        this.entries.push({
+          ts: new Date().toISOString().substr(11, 12),
+          level, source, message
+        });
+        if (this.entries.length > this.maxSize) {
+          this.entries = this.entries.slice(-this.maxSize);
+        }
+      },
+      getLast(n) { return this.entries.slice(-(n || 20)); },
+      getErrors() { return this.entries.filter(e => e.level === 'error'); },
+      getRuby() { return this.entries.filter(e => e.source === 'ruby'); },
+      getJS() { return this.entries.filter(e => e.source === 'js'); },
+      clear() { this.entries = []; },
+      dump() {
+        return this.entries.map(e =>
+          `${e.ts} [${e.level}][${e.source}] ${e.message}`
+        ).join('\n');
+      }
+    };
+
+    // Intercept console methods to capture all output into logBuffer
+    ['log', 'warn', 'error'].forEach(method => {
+      const original = console[method].bind(console);
+      console[method] = function(...args) {
+        original(...args);
+        try {
+          const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
+          const source = msg.startsWith('[Ruby]') ? 'ruby' :
+                         msg.startsWith('[JS]') ? 'js' :
+                         msg.startsWith('[DEBUG') ? 'debug' : 'other';
+          window.logBuffer.add(method === 'log' ? 'info' : method, source, msg);
+        } catch (e) { /* ignore logging errors */ }
+      };
+    });
+
     // Global state for JavaScript bridge
     let audioContext, analyser, dataArray;
     let scene, camera, renderer, composer;
     let particleSystem, geometryMesh;
     let renderPass, bloomPass;
-    let lastFrameTime = Date.now();
-    let frameCount = 0;
+    let frameCount = 0;  // Used for DOM update throttle only
 
     // VRM state
     let currentVRM = null;
@@ -621,104 +663,56 @@
       }
     }
 
-    // Animation loop
+    // Animation loop (thin: data extraction + Ruby callback + render)
     function animate() {
       requestAnimationFrame(animate);
 
-      // Delta time for VRM and Ruby
-      const animNow = Date.now();
-      const deltaTime = (animNow - animLastTime) / 1000;
-      animLastTime = animNow;
+      // Delta time for VRM
+      const now = Date.now();
+      const deltaTime = (now - animLastTime) / 1000;
+      animLastTime = now;
       window._animDeltaTime = deltaTime;
 
-      if (analyser) {
-        analyser.getByteFrequencyData(dataArray);
-
-        if (window.rubyUpdateVisuals) {
-          try {
-            const freqArray = Array.from(dataArray);
-            // Call Ruby update with frequency data
-            window.rubyUpdateVisuals(freqArray);
-          } catch (error) {
-            console.error('[JS] Error calling Ruby update:', error);
-          }
-        } else {
-          console.warn('[JS] rubyUpdateVisuals not available');
+      // Extract frequency data and call Ruby (Ruby handles FPS, debug, BPM)
+      if (analyser && window.rubyUpdateVisuals) {
+        try {
+          analyser.getByteFrequencyData(dataArray);
+          window.rubyUpdateVisuals(Array.from(dataArray), now);
+        } catch (error) {
+          console.error('[JS] Error calling Ruby update:', error);
         }
-      } else {
-        console.warn('[JS] analyser not available');
       }
 
+      // Display update: read Ruby-formatted strings
       frameCount++;
-      const now = Date.now();
-      if (now - lastFrameTime >= 1000) {
-        document.getElementById('fpsCounter').textContent = 'FPS: ' + frameCount;
-        window.currentFPS = frameCount;  // Ruby に FPS を渡す
-
-        // デバッグ情報表示（Ruby でフォーマット済み）
+      if (frameCount % 15 === 0) {  // Update DOM every ~15 frames
+        if (window.fpsText) {
+          document.getElementById('fpsCounter').textContent = window.fpsText;
+        }
         if (window.debugInfoText) {
           document.getElementById('debugInfo').textContent = window.debugInfoText;
         }
 
-        // パラメーター情報表示（Ruby でフォーマット済み）
         let paramText = window.paramInfoText || '';
-
-        // カメラ位置を追加
         if (camera) {
-          const camPos = `Cam: (${camera.position.x.toFixed(1)}, ${camera.position.y.toFixed(1)}, ${camera.position.z.toFixed(1)})`;
-          paramText += `  |  ${camPos}`;
+          paramText += `  |  Cam: (${camera.position.x.toFixed(1)}, ${camera.position.y.toFixed(1)}, ${camera.position.z.toFixed(1)})`;
         }
-
-        // VRM デバッグ情報を追加（横に並べる）
         if (window.vrmDebugText) {
           paramText += `  |  ${window.vrmDebugText}`;
         }
-
         if (paramText) {
           document.getElementById('paramInfo').textContent = paramText;
         }
-
-        // キーガイド表示（Ruby でフォーマット済み）
         if (window.keyGuideText) {
           document.getElementById('keyGuide').textContent = window.keyGuideText;
         }
-
-        frameCount = 0;
-        lastFrameTime = now;
       }
 
-      // パーティクル回転は Ruby 側で計算済み（updateParticleRotation）
+      // VRM spring bones update
+      if (currentVRM) currentVRM.update(deltaTime);
 
-      // VRM model update (spring bones, materials, etc.)
-      if (currentVRM) {
-        currentVRM.update(deltaTime);
-      }
-
-      if (composer) {
-        // DISABLED: Selective Bloom (back to normal rendering)
-        // if (vrmMode && currentVRM) {
-        //   // Selective Bloom for VRM mode:
-        //   // 1. Render all objects normally without bloom
-        //   renderer.autoClear = true;
-        //   renderer.render(scene, camera);
-        //
-        //   // 2. Render bloom layer only (particles/torus) with bloom effect (additive)
-        //   camera.layers.set(BLOOM_LAYER);   // Show only bloom layer
-        //   renderPass.clear = false;         // Don't clear previous render
-        //   composer.render();                // Apply bloom to particles/torus
-        //
-        //   // 3. Restore camera layers and clear flag
-        //   camera.layers.enableAll();
-        //   renderPass.clear = true;
-        // } else {
-        //   // Normal mode: render everything with bloom
-        //   renderPass.clear = true;
-        //   composer.render();
-        // }
-
-        // Normal rendering for all modes
-        composer.render();
-      }
+      // Render
+      if (composer) composer.render();
     }
 
     // Load Ruby code from embedded script tags
@@ -793,89 +787,43 @@
       document.removeEventListener('click', resumeAudio);
     });
 
-    // Keyboard event listener for color mode control
+    // Keyboard handler: Ruby handles config/color keys, JS handles camera (WebGL direct)
     window.addEventListener('keydown', function(event) {
       const key = event.key;
-      if (key >= '0' && key <= '3') {
-        const keyNumber = parseInt(key, 10);
 
-        if (window.rubySetColorMode) {
-          try {
-            window.rubySetColorMode(keyNumber);
-          } catch (error) {
-            console.error('[JS] Error calling rubySetColorMode:', error);
-          }
-        } else {
-          console.warn('[JS] rubySetColorMode not available yet');
-        }
-      } else if (key === '4' || key === '5') {
-        // 4: 色相-5度, 5: 色相+5度（マニュアルシフト）
-        if (window.rubyShiftHue) {
-          try {
-            const delta = (key === '4') ? -5 : 5;
-            window.rubyShiftHue(delta);
-          } catch (error) {
-            console.error('[JS] Error calling rubyShiftHue:', error);
-          }
-        }
-      } else if (key === '6' || key === '7') {
-        // 6: 最大輝度-5, 7: 最大輝度+5
-        if (window.rubyAdjustMaxBrightness) {
-          try {
-            const delta = (key === '6') ? -5 : 5;
-            window.rubyAdjustMaxBrightness(delta);
-          } catch (error) {
-            console.error('[JS] Error calling rubyAdjustMaxBrightness:', error);
-          }
-        }
-      } else if (key === '8' || key === '9') {
-        // 8: 最大明度-5, 9: 最大明度+5
-        if (window.rubyAdjustMaxLightness) {
-          try {
-            const delta = (key === '8') ? -5 : 5;
-            window.rubyAdjustMaxLightness(delta);
-          } catch (error) {
-            console.error('[JS] Error calling rubyAdjustMaxLightness:', error);
-          }
-        }
-      } else if (key === '-' || key === '+' || key === '=') {
-        // +/- で sensitivity を 0.05 ずつ増減（= は Shift なしの + キー対応）
-        if (window.rubyAdjustSensitivity) {
-          try {
-            const delta = (key === '-') ? -0.05 : 0.05;
-            window.rubyAdjustSensitivity(delta);
-          } catch (error) {
-            console.error('[JS] Error calling rubyAdjustSensitivity:', error);
-          }
-        }
-      } else if (key === 'a' || key === 's' || key === 'w' || key === 'x' || key === 'q' || key === 'z') {
-        // Camera controls (step=0.5 for fine control)
-        if (camera) {
-          const step = 0.5;
-          if (key === 'a') {
-            camera.position.x -= step; // Left
-            console.log('[JS] Camera X:', camera.position.x.toFixed(2));
-          } else if (key === 's') {
-            camera.position.x += step; // Right
-            console.log('[JS] Camera X:', camera.position.x.toFixed(2));
-          } else if (key === 'w') {
-            camera.position.y += step; // Up
-            console.log('[JS] Camera Y:', camera.position.y.toFixed(2));
-          } else if (key === 'x') {
-            camera.position.y -= step; // Down
-            console.log('[JS] Camera Y:', camera.position.y.toFixed(2));
-          } else if (key === 'q') {
-            camera.position.z += step; // Away
-            console.log('[JS] Camera Z:', camera.position.z.toFixed(2));
-          } else if (key === 'z') {
-            camera.position.z -= step; // Closer
-            console.log('[JS] Camera Z:', camera.position.z.toFixed(2));
-          }
+      // Camera position controls (must stay in JS - direct Three.js manipulation)
+      if ('aswxqz'.includes(key) && camera) {
+        const step = 0.5;
+        if (key === 'a') camera.position.x -= step;
+        else if (key === 's') camera.position.x += step;
+        else if (key === 'w') camera.position.y += step;
+        else if (key === 'x') camera.position.y -= step;
+        else if (key === 'q') camera.position.z += step;
+        else if (key === 'z') camera.position.z -= step;
+        return;
+      }
+
+      // All other keys dispatched to Ruby master handler
+      if (window.rubyHandleKey) {
+        try {
+          window.rubyHandleKey(key);
+        } catch (error) {
+          console.error('[JS] Error calling rubyHandleKey:', error);
         }
       }
     });
 
-    console.log('[JS] Keyboard listener registered (0-3: color, 4/5: hue, 6/7: brightness, 8/9: lightness, +/-: sensitivity, a/s: camera X, w/x: camera Y, q/z: camera Z)');
+    console.log('[JS] Keyboard: Ruby handles config keys, JS handles camera (a/s/w/x/q/z, d/f/e/c)');
+
+    // DevTool console interface for dynamic config changes
+    // Usage: rubyConfig.set('sensitivity', 2.5) / .get('sensitivity') / .list() / .reset()
+    window.rubyConfig = {
+      set: (key, value) => window.rubyConfigSet?.(key, value) ?? 'Ruby VM not ready',
+      get: (key) => window.rubyConfigGet?.(key) ?? 'Ruby VM not ready',
+      list: () => window.rubyConfigList?.() ?? 'Ruby VM not ready',
+      reset: () => window.rubyConfigReset?.() ?? 'Ruby VM not ready',
+      help: () => console.log('Usage: rubyConfig.set(key, value) | .get(key) | .list() | .reset()')
+    };
 
     // Handle window resize
     window.addEventListener('resize', function() {

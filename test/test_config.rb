@@ -54,7 +54,7 @@ class TestConfig < Test::Unit::TestCase
   def test_bloom_constants
     assert_equal 1.5, Config::BLOOM_BASE_STRENGTH
     assert_equal 0.0, Config::BLOOM_BASE_THRESHOLD
-    assert_equal 4.5, Config::BLOOM_MAX_STRENGTH
+    assert_equal 1.5, Config::BLOOM_MAX_STRENGTH
   end
 
   # Test runtime config accessors
@@ -95,5 +95,65 @@ class TestConfig < Test::Unit::TestCase
 
     Config.max_lightness = -10
     assert_equal 0, Config.max_lightness, "Max lightness should be clamped to 0"
+  end
+
+  # DevTool interface tests
+  def test_mutable_keys_defined
+    assert Config::MUTABLE_KEYS.is_a?(Hash)
+    assert Config::MUTABLE_KEYS.key?('sensitivity')
+    assert Config::MUTABLE_KEYS.key?('max_brightness')
+    assert Config::MUTABLE_KEYS.key?('max_lightness')
+  end
+
+  def test_set_by_key_sensitivity
+    result = Config.set_by_key('sensitivity', 2.5)
+    assert_equal 2.5, Config.sensitivity
+    assert_match(/sensitivity/, result)
+  end
+
+  def test_set_by_key_clamps_to_range
+    Config.set_by_key('sensitivity', 999.0)
+    assert_equal 10.0, Config.sensitivity
+
+    Config.set_by_key('sensitivity', -5.0)
+    assert_equal 0.05, Config.sensitivity
+  end
+
+  def test_set_by_key_max_brightness
+    Config.set_by_key('max_brightness', 128)
+    assert_equal 128, Config.max_brightness
+  end
+
+  def test_set_by_key_unknown_key
+    result = Config.set_by_key('nonexistent', 42)
+    assert_match(/Unknown key/, result)
+  end
+
+  def test_get_by_key
+    Config.sensitivity = 2.0
+    assert_equal 2.0, Config.get_by_key('sensitivity')
+  end
+
+  def test_get_by_key_unknown
+    result = Config.get_by_key('nonexistent')
+    assert_match(/Unknown key/, result)
+  end
+
+  def test_list_keys_returns_string
+    result = Config.list_keys
+    assert_instance_of String, result
+    assert_match(/sensitivity/, result)
+    assert_match(/max_brightness/, result)
+    assert_match(/max_lightness/, result)
+  end
+
+  def test_reset_runtime
+    Config.sensitivity = 5.0
+    Config.max_brightness = 100
+    Config.max_lightness = 100
+    Config.reset_runtime
+    assert_equal 1.0, Config.sensitivity
+    assert_equal 255, Config.max_brightness
+    assert_equal 255, Config.max_lightness
   end
 end
