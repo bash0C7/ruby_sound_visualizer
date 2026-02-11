@@ -837,89 +837,33 @@
       document.removeEventListener('click', resumeAudio);
     });
 
-    // Keyboard event listener for color mode control
+    // Keyboard handler: Ruby handles config/color keys, JS handles camera (WebGL direct)
     window.addEventListener('keydown', function(event) {
       const key = event.key;
-      if (key >= '0' && key <= '3') {
-        const keyNumber = parseInt(key, 10);
 
-        if (window.rubySetColorMode) {
-          try {
-            window.rubySetColorMode(keyNumber);
-          } catch (error) {
-            console.error('[JS] Error calling rubySetColorMode:', error);
-          }
-        } else {
-          console.warn('[JS] rubySetColorMode not available yet');
-        }
-      } else if (key === '4' || key === '5') {
-        // 4: 色相-5度, 5: 色相+5度（マニュアルシフト）
-        if (window.rubyShiftHue) {
-          try {
-            const delta = (key === '4') ? -5 : 5;
-            window.rubyShiftHue(delta);
-          } catch (error) {
-            console.error('[JS] Error calling rubyShiftHue:', error);
-          }
-        }
-      } else if (key === '6' || key === '7') {
-        // 6: 最大輝度-5, 7: 最大輝度+5
-        if (window.rubyAdjustMaxBrightness) {
-          try {
-            const delta = (key === '6') ? -5 : 5;
-            window.rubyAdjustMaxBrightness(delta);
-          } catch (error) {
-            console.error('[JS] Error calling rubyAdjustMaxBrightness:', error);
-          }
-        }
-      } else if (key === '8' || key === '9') {
-        // 8: 最大明度-5, 9: 最大明度+5
-        if (window.rubyAdjustMaxLightness) {
-          try {
-            const delta = (key === '8') ? -5 : 5;
-            window.rubyAdjustMaxLightness(delta);
-          } catch (error) {
-            console.error('[JS] Error calling rubyAdjustMaxLightness:', error);
-          }
-        }
-      } else if (key === '-' || key === '+' || key === '=') {
-        // +/- で sensitivity を 0.05 ずつ増減（= は Shift なしの + キー対応）
-        if (window.rubyAdjustSensitivity) {
-          try {
-            const delta = (key === '-') ? -0.05 : 0.05;
-            window.rubyAdjustSensitivity(delta);
-          } catch (error) {
-            console.error('[JS] Error calling rubyAdjustSensitivity:', error);
-          }
-        }
-      } else if (key === 'a' || key === 's' || key === 'w' || key === 'x' || key === 'q' || key === 'z') {
-        // Camera controls (step=0.5 for fine control)
-        if (camera) {
-          const step = 0.5;
-          if (key === 'a') {
-            camera.position.x -= step; // Left
-            console.log('[JS] Camera X:', camera.position.x.toFixed(2));
-          } else if (key === 's') {
-            camera.position.x += step; // Right
-            console.log('[JS] Camera X:', camera.position.x.toFixed(2));
-          } else if (key === 'w') {
-            camera.position.y += step; // Up
-            console.log('[JS] Camera Y:', camera.position.y.toFixed(2));
-          } else if (key === 'x') {
-            camera.position.y -= step; // Down
-            console.log('[JS] Camera Y:', camera.position.y.toFixed(2));
-          } else if (key === 'q') {
-            camera.position.z += step; // Away
-            console.log('[JS] Camera Z:', camera.position.z.toFixed(2));
-          } else if (key === 'z') {
-            camera.position.z -= step; // Closer
-            console.log('[JS] Camera Z:', camera.position.z.toFixed(2));
-          }
+      // Camera position controls (must stay in JS - direct Three.js manipulation)
+      if ('aswxqz'.includes(key) && camera) {
+        const step = 0.5;
+        if (key === 'a') camera.position.x -= step;
+        else if (key === 's') camera.position.x += step;
+        else if (key === 'w') camera.position.y += step;
+        else if (key === 'x') camera.position.y -= step;
+        else if (key === 'q') camera.position.z += step;
+        else if (key === 'z') camera.position.z -= step;
+        return;
+      }
+
+      // All other keys dispatched to Ruby master handler
+      if (window.rubyHandleKey) {
+        try {
+          window.rubyHandleKey(key);
+        } catch (error) {
+          console.error('[JS] Error calling rubyHandleKey:', error);
         }
       }
     });
 
-    console.log('[JS] Keyboard listener registered (0-3: color, 4/5: hue, 6/7: brightness, 8/9: lightness, +/-: sensitivity, a/s: camera X, w/x: camera Y, q/z: camera Z)');
+    console.log('[JS] Keyboard: Ruby handles config keys, JS handles camera (a/s/w/x/q/z, d/f/e/c)');
 
     // DevTool console interface for dynamic config changes
     // Usage: rubyConfig.set('sensitivity', 2.5) / .get('sensitivity') / .list() / .reset()

@@ -1,8 +1,27 @@
 # Handles all keyboard input callbacks from JavaScript.
-# Extracted from main.rb to isolate input handling concerns.
+# Master dispatch via rubyHandleKey + individual callbacks for backward compat.
 class KeyboardHandler
   def initialize
     register_callbacks
+    register_master_dispatch
+  end
+
+  # Master dispatch: called by JS with raw key string
+  def handle_key(key)
+    case key
+    when '0' then handle_color_mode(0)
+    when '1' then handle_color_mode(1)
+    when '2' then handle_color_mode(2)
+    when '3' then handle_color_mode(3)
+    when '4' then handle_hue_shift(-5)
+    when '5' then handle_hue_shift(5)
+    when '6' then handle_brightness(-5)
+    when '7' then handle_brightness(5)
+    when '8' then handle_lightness(-5)
+    when '9' then handle_lightness(5)
+    when '-' then handle_sensitivity(-0.05)
+    when '+', '=' then handle_sensitivity(0.05)
+    end
   end
 
   def handle_color_mode(key)
@@ -44,6 +63,17 @@ class KeyboardHandler
   end
 
   private
+
+  def register_master_dispatch
+    handler = self
+    JS.global[:rubyHandleKey] = lambda do |key|
+      begin
+        handler.handle_key(key.to_s)
+      rescue => e
+        JSBridge.error "KeyboardHandler: #{e.message}"
+      end
+    end
+  end
 
   def register_callbacks
     JS.global[:rubySetColorMode] = lambda do |key_number|
