@@ -8,6 +8,7 @@ $vrm_material_controller = nil
 $keyboard_handler = nil
 $debug_formatter = nil
 $bpm_estimator = nil
+$frame_counter = nil
 $frame_count = 0  # Kept for JSBridge debug logging throttle
 
 # URL parameter parsing -> Config
@@ -35,9 +36,11 @@ begin
   $keyboard_handler = KeyboardHandler.new
   $debug_formatter = DebugFormatter.new
   $bpm_estimator = BPMEstimator.new
+  $frame_counter = FrameCounter.new
   Config.register_devtool_callbacks
 
-  JS.global[:rubyUpdateVisuals] = lambda do |freq_array|
+  # Main update callback: receives frequency data and timestamp from JS
+  JS.global[:rubyUpdateVisuals] = lambda do |freq_array, timestamp|
     begin
       unless $initialized
         JSBridge.log "First update received, initializing effect system..."
@@ -74,11 +77,26 @@ begin
       vrm_material_config = $vrm_material_controller.apply_emissive(scaled_for_vrm[:overall_energy])
       JSBridge.update_vrm_material(vrm_material_config)
 
-      # Frame tracking
+      # Frame tracking (Ruby-side FPS calculation)
       $bpm_estimator.tick
+      ts = timestamp.typeof == "number" ? timestamp.to_f : 0.0
+      $frame_counter.tick(ts) if ts > 0
       frame_count = $bpm_estimator.frame_count
       $frame_count = frame_count  # Sync for JSBridge debug logging
 
+      # BPM estimation
+      beat = analysis[:beat] || {}
+      if beat[:bass]
+        $bpm_estimator.record_beat(frame_count, fps: [($frame_counter.current_fps), 30].max.to_f)
+      end
+
+      # Debug display update (once per second when FPS report is ready)
+      if $frame_counter.report_ready?
+        JS.global[:fpsText] = $frame_counter.fps_text
+        $frame_counter.clear_report
+      end
+
+      # VRM debug info (every 60 frames)
       if frame_count % 60 == 0
         rotations = vrm_data[:rotations] || []
         if rotations.length >= 9
@@ -90,15 +108,7 @@ begin
         end
       end
 
-      # BPM estimation
-      beat = analysis[:beat] || {}
-      if beat[:bass]
-        fps_val = JS.global[:currentFPS]
-        fps = fps_val.typeof == "number" ? fps_val.to_f : 30.0
-        $bpm_estimator.record_beat(frame_count, fps: fps)
-      end
-
-      # Debug info display (formatted in Ruby)
+      # Debug info (formatted in Ruby, displayed every frame for responsiveness)
       JS.global[:debugInfoText] = $debug_formatter.format_debug_text(analysis, beat, bpm: $bpm_estimator.estimated_bpm)
       JS.global[:paramInfoText] = $debug_formatter.format_param_text
       JS.global[:keyGuideText] = $debug_formatter.format_key_guide
