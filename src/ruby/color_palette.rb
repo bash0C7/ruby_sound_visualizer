@@ -1,30 +1,25 @@
+# Generates RGB colors based on audio frequency and energy.
+# Instance-based: each instance holds its own hue_mode, hue_offset state.
 class ColorPalette
-  @@hue_mode = nil  # nil = grayscale, 1,2,3 = 色相モード
-  @@hue_offset = 0.0  # 手動オフセット（度数、0-360循環）
-  @@last_hsv = [0, 0, 0.3]  # デバッグ用: 最後に計算した H, S, V
+  attr_reader :hue_offset, :last_hsv
+  attr_accessor :hue_mode
 
-  def self.set_hue_mode(mode)
-    @@hue_mode = mode
-    @@hue_offset = 0.0  # プリセット選択時はオフセットリセット
+  def initialize
+    @hue_mode = nil    # nil = grayscale, 1,2,3 = hue modes
+    @hue_offset = 0.0  # manual offset (degrees, 0-360 circular)
+    @last_hsv = [0, 0, 0.3]
   end
 
-  def self.get_hue_mode
-    @@hue_mode
+  def hue_mode=(mode)
+    @hue_mode = mode
+    @hue_offset = 0.0  # reset offset on preset change
   end
 
-  def self.get_hue_offset
-    @@hue_offset
+  def shift_hue_offset(delta)
+    @hue_offset = (@hue_offset + delta) % 360.0
   end
 
-  def self.shift_hue_offset(delta)
-    @@hue_offset = (@@hue_offset + delta) % 360.0
-  end
-
-  def self.get_last_hsv
-    @@last_hsv
-  end
-
-  def self.frequency_to_color(analysis)
+  def frequency_to_color(analysis)
     bass = analysis[:bass]
     mid = analysis[:mid]
     high = analysis[:high]
@@ -32,59 +27,44 @@ class ColorPalette
     total = bass + mid + high
 
     if total < 0.01
-      @@last_hsv = [0, 0, 0.3]
+      @last_hsv = [0, 0, 0.3]
       return [0.3, 0.3, 0.3]
     end
 
-    # 全モード統一：明度（ソフトクリッピングで大音量での飽和を防ぐ）
+    # Soft-clipped value to prevent saturation at high volume
     value = 0.4 + Math.tanh(total * 0.5) * 0.3
 
-    # 最大明度キャップ適用
-    if defined?($max_lightness) && $max_lightness < 255
-      max_v = $max_lightness / 255.0
-      value = [value, max_v].min
-    end
+    # Max lightness cap
+    max_v = Config.max_lightness / 255.0
+    value = [value, max_v].min if Config.max_lightness < 255
 
     # Grayscale mode
-    if @@hue_mode.nil?
-      @@last_hsv = [0, 0, value]
+    if @hue_mode.nil?
+      @last_hsv = [0, 0, value]
       return hsv_to_rgb(0, 0, value)
     end
 
-    # 色相シフト: bass→低, mid→中, high→高 の重み付き
-    # bass=0.0, mid=0.5, high=1.0 寄りにマッピング
-    if total > 0.01
-      hue_shift = (mid * 0.5 + high * 1.0) / total
-    else
-      hue_shift = 0.5
+    # Hue shift: bass=0.0, mid=0.5, high=1.0 weighted
+    hue_shift = total > 0.01 ? (mid * 0.5 + high * 1.0) / total : 0.5
+
+    # Mode-specific hue range (240 degrees each) + manual offset
+    offset = @hue_offset / 360.0
+    hue = case @hue_mode
+    when 1 then (0.667 + offset + hue_shift * 0.667) % 1.0  # Red center
+    when 2 then (offset + hue_shift * 0.667) % 1.0           # Green center
+    when 3 then (0.333 + offset + hue_shift * 0.667) % 1.0   # Blue center
+    else 0
     end
 
-    # モードに応じて色相範囲（各240度幅） + 手動オフセット
-    offset = @@hue_offset / 360.0
-    case @@hue_mode
-    when 1
-      # 赤中心: 240-120度 (マゼンタ←赤→黄→緑)
-      hue = (0.667 + offset + hue_shift * 0.667) % 1.0
-    when 2
-      # 緑中心: 0-240度 (赤→黄→緑→シアン→青)
-      hue = (offset + hue_shift * 0.667) % 1.0
-    when 3
-      # 青中心: 120-360度 (緑→シアン→青→紫→マゼンタ)
-      hue = (0.333 + offset + hue_shift * 0.667) % 1.0
-    else
-      hue = 0
-    end
-
-    # 彩度: ソフトクリッピング
+    # Saturation: soft-clipped
     saturation = 0.65 + Math.tanh(total * 0.5) * 0.15
 
-    @@last_hsv = [hue, saturation, value]
+    @last_hsv = [hue, saturation, value]
     hsv_to_rgb(hue, saturation, value)
   end
 
-  # 距離ベースの色計算（円状グラデーション用）
-  # distance: 0.0（中心）〜 1.0（外縁）
-  def self.frequency_to_color_at_distance(analysis, distance)
+  # Distance-based color (circular gradient)
+  def frequency_to_color_at_distance(analysis, distance)
     bass = analysis[:bass]
     mid = analysis[:mid]
     high = analysis[:high]
@@ -94,27 +74,17 @@ class ColorPalette
 
     value = 0.4 + Math.tanh(total * 0.5) * 0.3
 
-    # 最大明度キャップ適用
-    if defined?($max_lightness) && $max_lightness < 255
-      max_v = $max_lightness / 255.0
-      value = [value, max_v].min
-    end
+    max_v = Config.max_lightness / 255.0
+    value = [value, max_v].min if Config.max_lightness < 255
 
-    if @@hue_mode.nil?
-      return hsv_to_rgb(0, 0, value)
-    end
+    return hsv_to_rgb(0, 0, value) if @hue_mode.nil?
 
-    # 距離で色相範囲内をグラデーション（各240度幅） + 手動オフセット
-    offset = @@hue_offset / 360.0
-    case @@hue_mode
-    when 1
-      hue = (0.667 + offset + distance * 0.667) % 1.0
-    when 2
-      hue = (offset + distance * 0.667) % 1.0
-    when 3
-      hue = (0.333 + offset + distance * 0.667) % 1.0
-    else
-      hue = 0
+    offset = @hue_offset / 360.0
+    hue = case @hue_mode
+    when 1 then (0.667 + offset + distance * 0.667) % 1.0
+    when 2 then (offset + distance * 0.667) % 1.0
+    when 3 then (0.333 + offset + distance * 0.667) % 1.0
+    else 0
     end
 
     saturation = 0.65 + Math.tanh(total * 0.5) * 0.15
@@ -122,13 +92,53 @@ class ColorPalette
     hsv_to_rgb(hue, saturation, value)
   end
 
-  def self.energy_to_brightness(energy)
+  def energy_to_brightness(energy)
     0.5 + (energy ** 0.4) * 2.5
+  end
+
+  # Class-level shared instance for backward compatibility
+  # Used by KeyboardHandler, DebugFormatter, and main.rb during transition
+  @@shared_instance = nil
+
+  def self.shared
+    @@shared_instance ||= new
+  end
+
+  def self.set_hue_mode(mode)
+    shared.hue_mode = mode
+  end
+
+  def self.get_hue_mode
+    shared.hue_mode
+  end
+
+  def self.get_hue_offset
+    shared.hue_offset
+  end
+
+  def self.shift_hue_offset(delta)
+    shared.shift_hue_offset(delta)
+  end
+
+  def self.get_last_hsv
+    shared.last_hsv
+  end
+
+  def self.frequency_to_color(analysis)
+    shared.frequency_to_color(analysis)
+  end
+
+  def self.frequency_to_color_at_distance(analysis, distance)
+    shared.frequency_to_color_at_distance(analysis, distance)
+  end
+
+  def self.energy_to_brightness(energy)
+    shared.energy_to_brightness(energy)
   end
 
   private
 
-  def self.hsv_to_rgb(h, s, v)
+  def hsv_to_rgb(h, s, v)
     c = v * s
     x = c * (1 - ((h * 6) % 2 - 1).abs)
     m = v - c
@@ -145,4 +155,3 @@ class ColorPalette
     [r + m, g + m, b + m]
   end
 end
-  
