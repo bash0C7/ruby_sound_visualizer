@@ -4,6 +4,11 @@ class ColorPalette
   attr_reader :hue_offset, :last_hsv
   attr_accessor :hue_mode
 
+  # Base hue for each mode (in degrees, 0-360)
+  BASE_HUES = { 1 => 0.0, 2 => 60.0, 3 => 180.0 }
+  # Hue range: ±70 degrees from base (total 140 degrees)
+  HUE_RANGE = 140.0
+
   def initialize
     @hue_mode = nil    # nil = grayscale, 1,2,3 = hue modes
     @hue_offset = 0.0  # manual offset (degrees, 0-360 circular)
@@ -44,17 +49,14 @@ class ColorPalette
       return hsv_to_rgb(0, 0, value)
     end
 
-    # Hue shift: bass=0.0, mid=0.5, high=1.0 weighted
-    hue_shift = total > 0.01 ? (mid * 0.5 + high * 1.0) / total : 0.5
+    # Three-band hue mapping: bass=0.0 (base-70deg), mid=0.5 (base), high=1.0 (base+70deg)
+    position = total > 0.01 ? (mid * 0.5 + high * 1.0) / total : 0.5
 
-    # Mode-specific hue range (240 degrees each) + manual offset
-    offset = @hue_offset / 360.0
-    hue = case @hue_mode
-    when 1 then (0.667 + offset + hue_shift * 0.667) % 1.0  # Red center
-    when 2 then (offset + hue_shift * 0.667) % 1.0           # Green center
-    when 3 then (0.333 + offset + hue_shift * 0.667) % 1.0   # Blue center
-    else 0
-    end
+    # Calculate hue: base + offset from position (-70 to +70 degrees)
+    base_hue = BASE_HUES[@hue_mode] || 0.0
+    hue_offset_deg = (position - 0.5) * HUE_RANGE
+    hue_deg = (base_hue + hue_offset_deg + @hue_offset) % 360.0
+    hue = hue_deg / 360.0
 
     # Saturation: soft-clipped
     saturation = 0.65 + Math.tanh(total * 0.5) * 0.15
@@ -79,13 +81,11 @@ class ColorPalette
 
     return hsv_to_rgb(0, 0, value) if @hue_mode.nil?
 
-    offset = @hue_offset / 360.0
-    hue = case @hue_mode
-    when 1 then (0.667 + offset + distance * 0.667) % 1.0
-    when 2 then (offset + distance * 0.667) % 1.0
-    when 3 then (0.333 + offset + distance * 0.667) % 1.0
-    else 0
-    end
+    # Distance-based hue: use same 140-degree range as frequency-based
+    base_hue = BASE_HUES[@hue_mode] || 0.0
+    hue_offset_deg = (distance - 0.5) * HUE_RANGE
+    hue_deg = (base_hue + hue_offset_deg + @hue_offset) % 360.0
+    hue = hue_deg / 360.0
 
     saturation = 0.65 + Math.tanh(total * 0.5) * 0.15
 

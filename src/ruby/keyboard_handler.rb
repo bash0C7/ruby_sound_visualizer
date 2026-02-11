@@ -31,13 +31,13 @@ class KeyboardHandler
       JSBridge.log "Color Mode: Grayscale"
     when 1
       ColorPalette.set_hue_mode(1)
-      JSBridge.log "Color Mode: 1:Red (240-120deg)"
+      JSBridge.log "Color Mode: 1:Vivid Red (±70deg)"
     when 2
       ColorPalette.set_hue_mode(2)
-      JSBridge.log "Color Mode: 2:Green (0-240deg)"
+      JSBridge.log "Color Mode: 2:Shocking Yellow (±70deg)"
     when 3
       ColorPalette.set_hue_mode(3)
-      JSBridge.log "Color Mode: 3:Blue (120-360deg)"
+      JSBridge.log "Color Mode: 3:Turquoise Blue (±70deg)"
     end
   end
 
