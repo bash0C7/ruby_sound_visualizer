@@ -23,7 +23,7 @@ namespace :server do
     end
 
     puts "Starting server on port #{PORT}..."
-    pid = spawn('bundle', 'exec', 'ruby', '-run', '-ehttpd', '.', "-p#{PORT}",
+    pid = spawn('bundle', 'exec', 'ruby', 'lib/dev_server.rb', PORT.to_s, '.',
                 out: 'server.log', err: 'server.log')
     Process.detach(pid)
     File.write(PID_FILE, pid)
