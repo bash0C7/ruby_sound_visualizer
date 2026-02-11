@@ -1,10 +1,9 @@
 class ParticleSystem
-  PARTICLE_COUNT = 3000
-
   def initialize
-    @particles = Array.new(PARTICLE_COUNT) do
+    @particles = Array.new(Config::PARTICLE_COUNT) do
+      range = Config::PARTICLE_SPAWN_RANGE
       {
-        position: [rand_range(-5, 5), rand_range(-5, 5), rand_range(-5, 5)],
+        position: [rand_range(-range, range), rand_range(-range, range), rand_range(-range, range)],
         velocity: [0, 0, 0],
         color: [0.3, 0.3, 0.3]  # dim gray (グレースケール起動)
       }
@@ -32,9 +31,9 @@ class ParticleSystem
     brightness = [brightness, 1.5].min
 
     # 動的爆発確率（20-70%、エネルギーに応じて変化）
-    explosion_probability = 0.20 + energy * 0.50
+    explosion_probability = Config::PARTICLE_EXPLOSION_BASE_PROB + energy * Config::PARTICLE_EXPLOSION_ENERGY_SCALE
     # 爆発力を強化（パーティクル数減で個別の動きを大きく）
-    explosion_force = energy * 0.55
+    explosion_force = energy * Config::PARTICLE_EXPLOSION_FORCE_SCALE
 
     # impulse で爆発確率と爆発力をブースト（連続的に減衰）
     explosion_probability = [explosion_probability + 0.3 * imp_overall, 0.9].min
@@ -86,7 +85,7 @@ class ParticleSystem
       normalized_dist = [dist / 10.0, 1.0].min  # 0.0(中心)〜1.0(外縁)
       dist_color = ColorPalette.frequency_to_color_at_distance(analysis, normalized_dist)
       # 最大輝度キャップ適用
-      max_c = (defined?($max_brightness) && $max_brightness < 255) ? $max_brightness / 255.0 : 1.0
+      max_c = Config.max_brightness < 255 ? Config.max_brightness / 255.0 : 1.0
       particle[:color] = dist_color.map { |c| [[c * brightness, 0.0].max, max_c].min }
 
       # 位置更新
@@ -95,14 +94,15 @@ class ParticleSystem
       particle[:position][2] += particle[:velocity][2]
 
       # 摩擦（高速フェードアウトでビート感を出す）
-      particle[:velocity][0] *= 0.86
-      particle[:velocity][1] *= 0.86
-      particle[:velocity][2] *= 0.86
+      particle[:velocity][0] *= Config::PARTICLE_FRICTION
+      particle[:velocity][1] *= Config::PARTICLE_FRICTION
+      particle[:velocity][2] *= Config::PARTICLE_FRICTION
 
       # 境界処理
       3.times do |i|
-        if particle[:position][i].abs > 10
-          particle[:position][i] = rand_range(-5, 5)
+        if particle[:position][i].abs > Config::PARTICLE_BOUNDARY
+          range = Config::PARTICLE_SPAWN_RANGE
+          particle[:position][i] = rand_range(-range, range)
           particle[:velocity][i] = 0
         end
       end

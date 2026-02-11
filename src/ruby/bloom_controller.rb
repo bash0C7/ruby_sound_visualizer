@@ -1,9 +1,7 @@
 class BloomController
   def initialize
-    @base_strength = 1.5
-    @base_threshold = 0.0  # Allow all emissive materials to glow
-    @strength = @base_strength
-    @threshold = @base_threshold
+    @strength = Config::BLOOM_BASE_STRENGTH
+    @threshold = Config::BLOOM_BASE_THRESHOLD
   end
 
   def update(analysis)
@@ -12,10 +10,10 @@ class BloomController
     imp_overall = impulse[:overall] || 0.0
 
     # エネルギーに応じてBloom強度（ソフトクリッピングで飽和防止）
-    @strength = @base_strength + Math.tanh(energy * 2.0) * 2.5
+    @strength = Config::BLOOM_BASE_STRENGTH + Math.tanh(energy * 2.0) * 2.5
     # impulse フラッシュ（抑制付き）
     @strength += Math.tanh(imp_overall) * 1.5
-    @strength = [@strength, 4.5].min
+    @strength = [@strength, Config::BLOOM_MAX_STRENGTH].min
 
     # Threshold adjusted for VRM emissiveIntensity range (0.3-1.5)
     # Low energy: threshold ~0.15, High energy: threshold ~0.0

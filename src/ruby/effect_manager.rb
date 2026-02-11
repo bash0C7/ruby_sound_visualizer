@@ -1,6 +1,4 @@
 class EffectManager
-  IMPULSE_DECAY = 0.82  # 毎フレーム18%減衰（素早く変わるが連続的）
-
   attr_reader :particle_data, :geometry_data, :bloom_data, :camera_data,
               :impulse_overall, :impulse_bass, :impulse_mid, :impulse_high
 
@@ -51,10 +49,10 @@ class EffectManager
     @camera_data = @camera_controller.get_data
 
     # impulse を減衰（毎フレーム）
-    @impulse_bass *= IMPULSE_DECAY
-    @impulse_mid *= IMPULSE_DECAY
-    @impulse_high *= IMPULSE_DECAY
-    @impulse_overall *= IMPULSE_DECAY
+    @impulse_bass *= Config::IMPULSE_DECAY_EFFECT
+    @impulse_mid *= Config::IMPULSE_DECAY_EFFECT
+    @impulse_high *= Config::IMPULSE_DECAY_EFFECT
+    @impulse_overall *= Config::IMPULSE_DECAY_EFFECT
   end
 end
   

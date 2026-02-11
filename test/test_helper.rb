@@ -78,6 +78,7 @@ end
 # lambda registrations on JS.global).
 RUBY_SRC_DIR = File.expand_path('../src/ruby', __dir__)
 
+require_relative '../src/ruby/config'
 require_relative '../src/ruby/math_helper'
 require_relative '../src/ruby/js_bridge'
 require_relative '../src/ruby/frequency_mapper'

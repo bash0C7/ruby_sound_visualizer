@@ -6,9 +6,6 @@ $effect_manager = nil
 $vrm_dancer = nil
 $vrm_material_controller = nil
 $frame_count = 0
-$sensitivity = 1.0
-$max_brightness = 255
-$max_lightness = 255
 $beat_times = []  # ビート検出時のフレーム番号を記録
 $estimated_bpm = 0
 
@@ -22,27 +19,23 @@ begin
   if search_str.is_a?(String) && search_str.length > 0
     match = search_str.match(/sensitivity=([0-9.]+)/)
     if match
-      $sensitivity = match[1].to_f
-      $sensitivity = [$sensitivity, 0.1].max  # 最小 0.1
+      Config.sensitivity = match[1].to_f
     end
     match_br = search_str.match(/maxBrightness=([0-9]+)/)
     if match_br
-      $max_brightness = [[match_br[1].to_i, 0].max, 255].min
+      Config.max_brightness = match_br[1].to_i
     end
     match_lt = search_str.match(/maxLightness=([0-9]+)/)
     if match_lt
-      $max_lightness = [[match_lt[1].to_i, 0].max, 255].min
+      Config.max_lightness = match_lt[1].to_i
     end
   end
 rescue => e
-  # URLパラメーター読取失敗時はデフォルト値を使用
-  $sensitivity = 1.0
-  $max_brightness = 255
-  $max_lightness = 255
+  # URLパラメーター読取失敗時はデフォルト値を使用（Config モジュールの初期値）
 end
 
 begin
-  JSBridge.log "Ruby VM started, initializing... (Sensitivity: #{$sensitivity})"
+  JSBridge.log "Ruby VM started, initializing... (Sensitivity: #{Config.sensitivity})"
 
   $audio_analyzer = AudioAnalyzer.new
   $effect_manager = EffectManager.new
@@ -56,8 +49,8 @@ begin
         $initialized = true
       end
 
-      analysis = $audio_analyzer.analyze(freq_array, $sensitivity)
-      $effect_manager.update(analysis, $sensitivity)
+      analysis = $audio_analyzer.analyze(freq_array, Config.sensitivity)
+      $effect_manager.update(analysis, Config.sensitivity)
 
       JSBridge.update_particles($effect_manager.particle_data)
       JSBridge.update_geometry($effect_manager.geometry_data)
@@ -68,10 +61,10 @@ begin
 
       # VRM dance update (always update, JavaScript will use if VRM is loaded)
       scaled_for_vrm = {
-        bass: [analysis[:bass] * $sensitivity, 1.0].min,
-        mid: [analysis[:mid] * $sensitivity, 1.0].min,
-        high: [analysis[:high] * $sensitivity, 1.0].min,
-        overall_energy: [analysis[:overall_energy] * $sensitivity, 1.0].min,
+        bass: [analysis[:bass] * Config.sensitivity, 1.0].min,
+        mid: [analysis[:mid] * Config.sensitivity, 1.0].min,
+        high: [analysis[:high] * Config.sensitivity, 1.0].min,
+        overall_energy: [analysis[:overall_energy] * Config.sensitivity, 1.0].min,
         beat: analysis[:beat],
         impulse: {
           overall: $effect_manager.impulse_overall || 0.0,
@@ -158,7 +151,7 @@ begin
       JS.global[:debugInfoText] = debug_text
 
       # パラメーター情報文字列も Ruby でフォーマット
-      param_text = "Sensitivity: #{$sensitivity.round(2)}x  |  MaxBrightness: #{$max_brightness}  |  MaxLightness: #{$max_lightness}"
+      param_text = "Sensitivity: #{Config.sensitivity.round(2)}x  |  MaxBrightness: #{Config.max_brightness}  |  MaxLightness: #{Config.max_lightness}"
       JS.global[:paramInfoText] = param_text
 
       # キーガイド（固定文字列だが統一のため Ruby で定義）
@@ -169,7 +162,7 @@ begin
         mid = (analysis[:mid] * 100).round(1)
         high = (analysis[:high] * 100).round(1)
         overall = (analysis[:overall_energy] * 100).round(1)
-        sensitivity_str = $sensitivity.round(2).to_s
+        sensitivity_str = Config.sensitivity.round(2).to_s
         JSBridge.log "Audio: Bass=#{bass}% Mid=#{mid}% High=#{high}% Overall=#{overall}% | Sensitivity: #{sensitivity_str}x"
       end
     rescue => e
@@ -206,8 +199,8 @@ begin
   JS.global[:rubyAdjustSensitivity] = lambda do |delta|
     begin
       d = delta.to_f
-      $sensitivity = [($sensitivity + d).round(2), 0.05].max
-      JSBridge.log "Sensitivity: #{$sensitivity}x"
+      Config.sensitivity = [(Config.sensitivity + d).round(2), 0.05].max
+      JSBridge.log "Sensitivity: #{Config.sensitivity}x"
     rescue => e
       JSBridge.error "Error in rubyAdjustSensitivity: #{e.message}"
     end
@@ -229,8 +222,8 @@ begin
   JS.global[:rubyAdjustMaxBrightness] = lambda do |delta|
     begin
       d = delta.to_i
-      $max_brightness = [[$max_brightness + d, 0].max, 255].min
-      JSBridge.log "MaxBrightness: #{$max_brightness}"
+      Config.max_brightness = [[Config.max_brightness + d, 0].max, 255].min
+      JSBridge.log "MaxBrightness: #{Config.max_brightness}"
     rescue => e
       JSBridge.error "Error in rubyAdjustMaxBrightness: #{e.message}"
     end
@@ -240,8 +233,8 @@ begin
   JS.global[:rubyAdjustMaxLightness] = lambda do |delta|
     begin
       d = delta.to_i
-      $max_lightness = [[$max_lightness + d, 0].max, 255].min
-      JSBridge.log "MaxLightness: #{$max_lightness}"
+      Config.max_lightness = [[Config.max_lightness + d, 0].max, 255].min
+      JSBridge.log "MaxLightness: #{Config.max_lightness}"
     rescue => e
       JSBridge.error "Error in rubyAdjustMaxLightness: #{e.message}"
     end
