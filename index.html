@@ -92,6 +92,12 @@
   </style>
 </head>
 <body>
+  <!-- Tab video background (hidden until tab capture starts) -->
+  <video id="tabVideo" autoplay playsinline muted
+         style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; object-fit:cover; z-index:-2;"></video>
+  <div id="tabOverlay"
+       style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:-1;"></div>
+
   <div id="loading">
     <div id="loadingTitle">Loading Ruby WASM Sound Visualizer...</div>
     <div id="loadingStatus" style="font-size: 12px; margin-top: 20px;"></div>
@@ -99,6 +105,7 @@
       <label for="vrmFileInput" class="vrm-upload-btn">Upload VRM File</label>
       <input type="file" id="vrmFileInput" accept=".vrm" style="display: none;">
       <button id="skipVrmBtn" class="vrm-upload-btn" style="margin-left: 10px;">Start without VRM</button>
+      <button id="captureTabBtn" class="vrm-upload-btn" style="margin-left: 10px;">Capture Tab</button>
       <div id="vrmFileName"></div>
     </div>
   </div>
@@ -163,6 +170,7 @@
   <script type="text/ruby" src="src/ruby/camera_controller.rb"></script>
   <script type="text/ruby" src="src/ruby/bloom_controller.rb"></script>
   <script type="text/ruby" src="src/ruby/effect_manager.rb"></script>
+  <script type="text/ruby" src="src/ruby/audio_input_manager.rb"></script>
   <script type="text/ruby" src="src/ruby/keyboard_handler.rb"></script>
   <script type="text/ruby" src="src/ruby/vj_pad.rb"></script>
   <script type="text/ruby" src="src/ruby/debug_formatter.rb"></script>
@@ -221,6 +229,13 @@
     let renderPass, bloomPass;
     let frameCount = 0;  // Used for DOM update throttle only
 
+    // Audio input state
+    let micGain = null;
+    let micMuted = false;
+    let tabStream = null;
+    let tabAudioSource = null;
+    let tabAudioGain = null;
+
     // VRM state
     let currentVRM = null;
     let animLastTime = Date.now();
@@ -253,7 +268,10 @@
     async function initAudio() {
       console.log('[JS] Initializing Web Audio API...');
       try {
-        audioContext = new AudioContext();
+        // Reuse AudioContext if already created (e.g. by tab capture during startup)
+        if (!audioContext) {
+          audioContext = new AudioContext();
+        }
 
         // Chrome のオートプレイポリシー対策: suspended なら resume する
         if (audioContext.state === 'suspended') {
@@ -262,15 +280,21 @@
           console.log('[JS] AudioContext resumed, state:', audioContext.state);
         }
 
-        analyser = audioContext.createAnalyser();
-        analyser.fftSize = 2048;
-        analyser.smoothingTimeConstant = 0.5;  // ビート検出のため低めに設定
+        // Reuse analyser if already created
+        if (!analyser) {
+          analyser = audioContext.createAnalyser();
+          analyser.fftSize = 2048;
+          analyser.smoothingTimeConstant = 0.5;  // ビート検出のため低めに設定
+        }
         const bufferLength = analyser.frequencyBinCount;
         dataArray = new Uint8Array(bufferLength);
 
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         const source = audioContext.createMediaStreamSource(stream);
-        source.connect(analyser);
+        micGain = audioContext.createGain();
+        micGain.gain.value = 1.0;
+        source.connect(micGain);
+        micGain.connect(analyser);
         console.log('[JS] Web Audio API initialized successfully, context state:', audioContext.state);
 
         // getUserMedia 後にまだ suspended なら再度 resume
@@ -282,6 +306,109 @@
       } catch (error) {
         console.error('[JS] Audio init error:', error);
         throw error;
+      }
+    }
+
+    // Toggle microphone mute/unmute
+    function toggleMic() {
+      if (!micGain) return;
+      micMuted = !micMuted;
+      micGain.gain.value = micMuted ? 0 : 1;
+      console.log('[JS] Mic ' + (micMuted ? 'muted' : 'unmuted'));
+      if (window.rubyOnMicToggle) window.rubyOnMicToggle(micMuted);
+    }
+
+    // Set mic mute state explicitly (0=mute, 1=unmute)
+    function setMicMute(mute) {
+      if (!micGain) return;
+      micMuted = !!mute;
+      micGain.gain.value = micMuted ? 0 : 1;
+      console.log('[JS] Mic ' + (micMuted ? 'muted' : 'unmuted'));
+      if (window.rubyOnMicToggle) window.rubyOnMicToggle(micMuted);
+    }
+
+    // Start capturing audio/video from another Chrome tab
+    async function startTabCapture() {
+      try {
+        tabStream = await navigator.mediaDevices.getDisplayMedia({
+          video: true,
+          audio: true
+        });
+
+        // Audio: connect tab audio to analyser via gain node
+        const audioTracks = tabStream.getAudioTracks();
+        if (audioTracks.length > 0) {
+          tabAudioSource = audioContext.createMediaStreamSource(
+            new MediaStream(audioTracks)
+          );
+          tabAudioGain = audioContext.createGain();
+          tabAudioGain.gain.value = 1.0;
+          tabAudioSource.connect(tabAudioGain);
+          tabAudioGain.connect(analyser);
+          console.log('[JS] Tab audio connected to analyser');
+        }
+
+        // Video: display in background video element
+        const videoTracks = tabStream.getVideoTracks();
+        if (videoTracks.length > 0) {
+          const videoEl = document.getElementById('tabVideo');
+          videoEl.srcObject = new MediaStream(videoTracks);
+          videoEl.play();
+          videoEl.style.display = 'block';
+          document.getElementById('tabOverlay').style.display = 'block';
+          if (renderer && renderer.domElement) {
+            renderer.domElement.style.mixBlendMode = 'screen';
+          }
+          console.log('[JS] Tab video overlay active');
+        }
+
+        // Handle stream end (user stops sharing via browser UI)
+        tabStream.getTracks().forEach(track => {
+          track.addEventListener('ended', stopTabCapture);
+        });
+
+        if (window.rubyOnTabToggle) window.rubyOnTabToggle(true);
+        console.log('[JS] Tab capture started');
+      } catch (error) {
+        console.error('[JS] Tab capture error:', error);
+        tabStream = null;
+      }
+    }
+
+    // Stop tab capture and clean up
+    function stopTabCapture() {
+      if (tabStream) {
+        tabStream.getTracks().forEach(t => t.stop());
+        tabStream = null;
+      }
+      if (tabAudioSource) {
+        tabAudioSource.disconnect();
+        tabAudioSource = null;
+      }
+      if (tabAudioGain) {
+        tabAudioGain.disconnect();
+        tabAudioGain = null;
+      }
+      const videoEl = document.getElementById('tabVideo');
+      if (videoEl) {
+        videoEl.srcObject = null;
+        videoEl.style.display = 'none';
+      }
+      const overlayEl = document.getElementById('tabOverlay');
+      if (overlayEl) overlayEl.style.display = 'none';
+      if (renderer && renderer.domElement) {
+        renderer.domElement.style.mixBlendMode = 'normal';
+      }
+      if (window.rubyOnTabToggle) window.rubyOnTabToggle(false);
+      console.log('[JS] Tab capture stopped');
+    }
+
+    // Toggle tab capture on/off
+    function toggleTabCapture() {
+      if (tabStream) {
+        stopTabCapture();
+      } else {
+        startTabCapture();
       }
     }
 
@@ -304,10 +431,17 @@
       // Enable all layers for camera (Layer 0 for VRM, Layer 1 for particles/torus)
       camera.layers.enableAll();
 
-      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
       renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.setClearColor(0x000000);
+      renderer.setClearColor(0x000000, 0);
       document.body.appendChild(renderer.domElement);
+
+      // If tab video is active, apply mix-blend-mode
+      const tabVideo = document.getElementById('tabVideo');
+      if (tabVideo && tabVideo.style.display === 'block') {
+        renderer.domElement.style.mixBlendMode = 'screen';
+        console.log('[JS] Applied mix-blend-mode: screen for tab video overlay');
+      }
 
       // Post-processing setup
       composer = new EffectComposer(renderer);
@@ -426,6 +560,7 @@
       return new Promise((resolve) => {
         const input = document.getElementById('vrmFileInput');
         const skipBtn = document.getElementById('skipVrmBtn');
+        const captureBtn = document.getElementById('captureTabBtn');
 
         input.addEventListener('change', (event) => {
           const file = event.target.files[0];
@@ -437,6 +572,25 @@
 
         skipBtn.addEventListener('click', () => {
           resolve(null);  // No VRM file, start without it
+        });
+
+        // Tab capture can be started during startup (independent of VRM choice)
+        captureBtn.addEventListener('click', async () => {
+          try {
+            // Need AudioContext before tab capture for audio routing
+            if (!audioContext) {
+              audioContext = new AudioContext();
+              analyser = audioContext.createAnalyser();
+              analyser.fftSize = 2048;
+              analyser.smoothingTimeConstant = 0.5;
+              dataArray = new Uint8Array(analyser.frequencyBinCount);
+            }
+            await startTabCapture();
+            captureBtn.textContent = 'Tab Captured!';
+            captureBtn.disabled = true;
+          } catch (error) {
+            console.error('[JS] Tab capture during startup error:', error);
+          }
         });
       });
     }
@@ -899,6 +1053,10 @@
 
       // Backtick toggles VJ Pad prompt
       if (key === '`') { event.preventDefault(); vjPromptToggle(); return; }
+
+      // Audio input controls (must stay in JS - direct Web Audio manipulation)
+      if (key === 'm') { toggleMic(); return; }
+      if (key === 't') { toggleTabCapture(); return; }
 
       // Camera position controls (must stay in JS - direct Three.js manipulation)
       if ('aswxqz'.includes(key) && camera) {

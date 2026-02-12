@@ -12,7 +12,8 @@ class VJPad
 
   COLOR_NAMES = { 0 => 'gray', 1 => 'red', 2 => 'yellow', 3 => 'blue' }.freeze
 
-  def initialize
+  def initialize(audio_input_manager = nil)
+    @audio_input_manager = audio_input_manager
     @history = []
     @last_result = nil
     @pending_actions = []
@@ -108,6 +109,59 @@ class VJPad
     bl = VisualizerPolicy.max_bloom
     ex = VisualizerPolicy.exclude_max
     "c:#{cn} h:#{ho} | s:#{se} br:#{b} lt:#{l} | em:#{e} bm:#{bl} x:#{ex}"
+  end
+
+  # --- Audio Input Commands ---
+
+  def mic(val = :_get)
+    if @audio_input_manager
+      # Use AudioInputManager for state management
+      is_muted = @audio_input_manager.mic_muted?
+      if val == :_get
+        return "mic: #{is_muted ? 'muted' : 'on'}"
+      end
+      target_mute = val.to_i == 0
+      if target_mute
+        @audio_input_manager.mute_mic
+      else
+        @audio_input_manager.unmute_mic
+      end
+      JS.global.setMicMute(target_mute) if JS.global.respond_to?(:setMicMute)
+      "mic: #{target_mute ? 'muted' : 'on'}"
+    else
+      # Fallback to JS.global for backward compatibility
+      muted = JS.global[:micMuted]
+      is_muted = muted == true
+      if val == :_get
+        return "mic: #{is_muted ? 'muted' : 'on'}"
+      end
+      target_mute = val.to_i == 0
+      JS.global.setMicMute(target_mute)
+      "mic: #{target_mute ? 'muted' : 'on'}"
+    end
+  end
+
+  def tab(val = :_get)
+    if @audio_input_manager
+      # Use AudioInputManager for state management
+      is_active = @audio_input_manager.tab_capture?
+      if val == :_get
+        return "tab: #{is_active ? 'on' : 'off'}"
+      end
+      # val is non-:_get, so we're setting/toggling
+      @audio_input_manager.switch_to_tab
+      JS.global.toggleTabCapture() if JS.global.respond_to?(:toggleTabCapture)
+      "tab: toggled"
+    else
+      # Fallback to JS.global for backward compatibility
+      stream = JS.global[:tabStream]
+      is_active = stream.respond_to?(:typeof) ? stream.typeof.to_s != "undefined" && stream.typeof.to_s != "null" : !!stream
+      if val == :_get
+        return "tab: #{is_active ? 'on' : 'off'}"
+      end
+      JS.global.toggleTabCapture()
+      "tab: toggled"
+    end
   end
 
   # --- Action Commands ---

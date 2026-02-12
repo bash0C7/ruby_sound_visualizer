@@ -1,7 +1,8 @@
 # Handles all keyboard input callbacks from JavaScript.
 # Master dispatch via rubyHandleKey + individual callbacks for backward compat.
 class KeyboardHandler
-  def initialize
+  def initialize(audio_input_manager = nil)
+    @audio_input_manager = audio_input_manager
     register_callbacks
     register_master_dispatch
   end
@@ -21,6 +22,8 @@ class KeyboardHandler
     when '9' then handle_lightness(5)
     when '-' then handle_sensitivity(-0.05)
     when '+', '=' then handle_sensitivity(0.05)
+    when 'm' then handle_mic_toggle
+    when 't' then handle_tab_capture
     end
   end
 
@@ -60,6 +63,27 @@ class KeyboardHandler
   def handle_lightness(delta)
     VisualizerPolicy.max_lightness = [[VisualizerPolicy.max_lightness + delta, 0].max, 255].min
     JSBridge.log "MaxLightness: #{VisualizerPolicy.max_lightness}"
+  end
+
+  def handle_mic_toggle
+    return unless @audio_input_manager
+
+    @audio_input_manager.toggle_mic
+    volume = @audio_input_manager.mic_volume
+    JS.global.call(:setMicVolume, volume) if JS.global.respond_to?(:call)
+
+    status = @audio_input_manager.mic_muted? ? "OFF" : "ON"
+    JSBridge.log "Mic: #{status}"
+  end
+
+  def handle_tab_capture
+    return unless @audio_input_manager
+
+    @audio_input_manager.switch_to_tab
+    JS.global.call(:captureTab, true) if JS.global.respond_to?(:call)
+
+    status = @audio_input_manager.tab_capture? ? "ON" : "OFF"
+    JSBridge.log "Tab Capture: #{status}"
   end
 
   private

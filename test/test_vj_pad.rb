@@ -400,4 +400,117 @@ class TestVJPad < Test::Unit::TestCase
     assert_match(/h:90\.0/, result)
     assert_match(/s:1\.5/, result)
   end
+
+  # === mic command ===
+
+  def test_mic_getter_default
+    JS.set_global('micMuted', false)
+    result = @pad.mic
+    assert_equal "mic: on", result
+  end
+
+  def test_mic_getter_muted
+    JS.set_global('micMuted', true)
+    result = @pad.mic
+    assert_equal "mic: muted", result
+  end
+
+  def test_mic_set_mute
+    JS.set_global('micMuted', false)
+    result = @pad.mic(0)
+    assert_match(/mic:/, result)
+  end
+
+  def test_mic_set_unmute
+    JS.set_global('micMuted', true)
+    result = @pad.mic(1)
+    assert_match(/mic:/, result)
+  end
+
+  def test_mic_via_exec
+    JS.set_global('micMuted', false)
+    result = @pad.exec("mic")
+    assert_equal true, result[:ok]
+    assert_equal "mic: on", result[:msg]
+  end
+
+  # === tab command ===
+
+  def test_tab_getter_no_capture
+    result = @pad.tab
+    assert_equal "tab: off", result
+  end
+
+  def test_tab_getter_active
+    JS.set_global('tabStream', 'active')
+    result = @pad.tab
+    assert_equal "tab: on", result
+  end
+
+  def test_tab_toggle_via_exec
+    result = @pad.exec("tab")
+    assert_equal true, result[:ok]
+  end
+
+  # === AudioInputManager integration tests ===
+
+  def test_vj_pad_accepts_audio_input_manager
+    manager = AudioInputManager.new
+    _pad = VJPad.new(manager)
+    # Should not raise
+  end
+
+  def test_mic_getter_reads_from_audio_input_manager
+    manager = AudioInputManager.new
+    pad = VJPad.new(manager)
+    result = pad.mic
+    assert_equal "mic: on", result  # default is unmuted
+
+    manager.mute_mic
+    result = pad.mic
+    assert_equal "mic: muted", result
+  end
+
+  def test_mic_setter_updates_audio_input_manager_and_calls_js
+    manager = AudioInputManager.new
+    pad = VJPad.new(manager)
+
+    # mic(0) should mute
+    result = pad.mic(0)
+    assert_equal true, manager.mic_muted?
+    assert_match(/mic: muted/, result)
+
+    # mic(1) should unmute
+    result = pad.mic(1)
+    assert_equal false, manager.mic_muted?
+    assert_match(/mic: on/, result)
+  end
+
+  def test_tab_getter_reads_from_audio_input_manager
+    manager = AudioInputManager.new
+    pad = VJPad.new(manager)
+    result = pad.tab
+    assert_equal "tab: off", result  # default is :microphone
+
+    manager.switch_to_tab
+    result = pad.tab
+    assert_equal "tab: on", result
+  end
+
+  def test_tab_setter_updates_audio_input_manager_and_calls_js
+    manager = AudioInputManager.new
+    pad = VJPad.new(manager)
+
+    # tab(1) should switch to tab capture
+    result = pad.tab(1)
+    assert_equal :tab, manager.source
+    assert_match(/tab:/, result)
+  end
+
+  def test_vj_pad_backward_compatibility_without_audio_input_manager
+    pad = VJPad.new(nil)
+    # Should not raise on other commands
+    result = pad.c(1)
+    assert_equal "color: red", result
+  end
 end
