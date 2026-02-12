@@ -57,25 +57,29 @@ begin
       JSBridge.update_camera($effect_manager.camera_data)
       JSBridge.update_particle_rotation($effect_manager.geometry_data[:rotation])
 
-      # VRM dance update
-      scaled_for_vrm = {
-        bass: [analysis[:bass] * VisualizerPolicy.sensitivity, 1.0].min,
-        mid: [analysis[:mid] * VisualizerPolicy.sensitivity, 1.0].min,
-        high: [analysis[:high] * VisualizerPolicy.sensitivity, 1.0].min,
-        overall_energy: [analysis[:overall_energy] * VisualizerPolicy.sensitivity, 1.0].min,
-        beat: analysis[:beat],
-        impulse: {
-          overall: $effect_manager.impulse_overall || 0.0,
-          bass: $effect_manager.impulse_bass || 0.0,
-          mid: $effect_manager.impulse_mid || 0.0,
-          high: $effect_manager.impulse_high || 0.0
-        }
-      }
-      vrm_data = $vrm_dancer.update(scaled_for_vrm)
-      JSBridge.update_vrm(vrm_data)
+      # VRM dance update (only if VRM is loaded)
+      has_vrm = JS.global[:currentVRM].typeof.to_s != "undefined"
 
-      vrm_material_config = $vrm_material_controller.apply_emissive(scaled_for_vrm[:overall_energy])
-      JSBridge.update_vrm_material(vrm_material_config)
+      if has_vrm
+        scaled_for_vrm = {
+          bass: [analysis[:bass] * VisualizerPolicy.sensitivity, 1.0].min,
+          mid: [analysis[:mid] * VisualizerPolicy.sensitivity, 1.0].min,
+          high: [analysis[:high] * VisualizerPolicy.sensitivity, 1.0].min,
+          overall_energy: [analysis[:overall_energy] * VisualizerPolicy.sensitivity, 1.0].min,
+          beat: analysis[:beat],
+          impulse: {
+            overall: $effect_manager.impulse_overall || 0.0,
+            bass: $effect_manager.impulse_bass || 0.0,
+            mid: $effect_manager.impulse_mid || 0.0,
+            high: $effect_manager.impulse_high || 0.0
+          }
+        }
+        vrm_data = $vrm_dancer.update(scaled_for_vrm)
+        JSBridge.update_vrm(vrm_data)
+
+        vrm_material_config = $vrm_material_controller.apply_emissive(scaled_for_vrm[:overall_energy])
+        JSBridge.update_vrm_material(vrm_material_config)
+      end
 
       # Frame tracking (Ruby-side FPS calculation)
       $bpm_estimator.tick
@@ -96,8 +100,8 @@ begin
         $frame_counter.clear_report
       end
 
-      # VRM debug info (every 60 frames)
-      if frame_count % 60 == 0
+      # VRM debug info (every 60 frames, only if VRM loaded)
+      if has_vrm && frame_count % 60 == 0
         rotations = vrm_data[:rotations] || []
         if rotations.length >= 9
           hips_rot_max = rotations[0..2].map(&:abs).max.round(3)
