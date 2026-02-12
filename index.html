@@ -430,10 +430,17 @@
       // Enable all layers for camera (Layer 0 for VRM, Layer 1 for particles/torus)
       camera.layers.enableAll();
 
-      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
       renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.setClearColor(0x000000);
+      renderer.setClearColor(0x000000, 0);
       document.body.appendChild(renderer.domElement);
+
+      // If tab video is active, apply mix-blend-mode
+      const tabVideo = document.getElementById('tabVideo');
+      if (tabVideo && tabVideo.style.display === 'block') {
+        renderer.domElement.style.mixBlendMode = 'screen';
+        console.log('[JS] Applied mix-blend-mode: screen for tab video overlay');
+      }
 
       // Post-processing setup
       composer = new EffectComposer(renderer);
