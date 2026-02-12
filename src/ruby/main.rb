@@ -36,7 +36,7 @@ begin
   $effect_manager = EffectManager.new
   $vrm_dancer = VRMDancer.new
   $vrm_material_controller = VRMMaterialController.new
-  $keyboard_handler = KeyboardHandler.new
+  $keyboard_handler = KeyboardHandler.new($audio_input_manager)
   $debug_formatter = DebugFormatter.new
   $bpm_estimator = BPMEstimator.new
   $frame_counter = FrameCounter.new

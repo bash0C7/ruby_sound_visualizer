@@ -191,4 +191,67 @@ class TestKeyboardHandler < Test::Unit::TestCase
     # Should not raise
     handler.handle_key('`')
   end
+
+  # === Mic toggle ('m' key) tests ===
+
+  def test_m_key_toggles_mic_mute_state_via_audio_input_manager
+    manager = AudioInputManager.new
+    handler = KeyboardHandler.new(manager)
+
+    # Initial state: unmuted
+    assert_equal false, manager.mic_muted?
+
+    # Press 'm' to mute
+    handler.handle_key('m')
+    assert_equal true, manager.mic_muted?
+
+    # Press 'm' again to unmute
+    handler.handle_key('m')
+    assert_equal false, manager.mic_muted?
+  end
+
+  def test_multiple_m_key_presses_toggle_mic_state
+    manager = AudioInputManager.new
+    handler = KeyboardHandler.new(manager)
+
+    # Toggle 5 times
+    5.times { handler.handle_key('m') }
+    assert_equal true, manager.mic_muted?
+
+    # Toggle once more
+    handler.handle_key('m')
+    assert_equal false, manager.mic_muted?
+  end
+
+  # === Tab capture ('t' key) tests ===
+
+  def test_t_key_switches_to_tab_capture_via_audio_input_manager
+    manager = AudioInputManager.new
+    handler = KeyboardHandler.new(manager)
+
+    # Initial state: microphone
+    assert_equal :microphone, manager.source
+
+    # Press 't' to switch to tab
+    handler.handle_key('t')
+    assert_equal :tab, manager.source
+  end
+
+  # === Backward compatibility tests ===
+
+  def test_keyboard_handler_without_audio_input_manager_still_works
+    # KeyboardHandler should still work without audio_input_manager for backward compatibility
+    handler = KeyboardHandler.new(nil)
+
+    # Should not raise when handling color mode keys
+    handler.handle_key('0')
+    assert_nil ColorPalette.get_hue_mode
+  end
+
+  def test_m_key_without_audio_input_manager_does_nothing
+    handler = KeyboardHandler.new(nil)
+
+    # Should not raise, just silently do nothing
+    handler.handle_key('m')
+  end
 end
