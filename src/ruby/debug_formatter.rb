@@ -28,7 +28,7 @@ class DebugFormatter
   end
 
   def format_param_text
-    "Sensitivity: #{Config.sensitivity.round(2)}x  |  MaxBrightness: #{Config.max_brightness}  |  MaxLightness: #{Config.max_lightness}"
+    "Sensitivity: #{VisualizerPolicy.sensitivity.round(2)}x  |  MaxBrightness: #{VisualizerPolicy.max_brightness}  |  MaxLightness: #{VisualizerPolicy.max_lightness}"
   end
 
   def format_key_guide

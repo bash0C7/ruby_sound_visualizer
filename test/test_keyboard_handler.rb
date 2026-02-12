@@ -4,9 +4,9 @@ class TestKeyboardHandler < Test::Unit::TestCase
   def setup
     JS.reset_global!
     # Reset Config to defaults
-    Config.sensitivity = 1.0
-    Config.max_brightness = 255
-    Config.max_lightness = 255
+    VisualizerPolicy.sensitivity = 1.0
+    VisualizerPolicy.max_brightness = 255
+    VisualizerPolicy.max_lightness = 255
     # Reset ColorPalette state
     ColorPalette.set_hue_mode(nil)
   end
@@ -48,20 +48,20 @@ class TestKeyboardHandler < Test::Unit::TestCase
   def test_adjust_sensitivity_increase
     handler = KeyboardHandler.new
     handler.handle_sensitivity(0.05)
-    assert_in_delta 1.05, Config.sensitivity, 0.001
+    assert_in_delta 1.05, VisualizerPolicy.sensitivity, 0.001
   end
 
   def test_adjust_sensitivity_decrease
     handler = KeyboardHandler.new
     handler.handle_sensitivity(-0.05)
-    assert_in_delta 0.95, Config.sensitivity, 0.001
+    assert_in_delta 0.95, VisualizerPolicy.sensitivity, 0.001
   end
 
   def test_adjust_sensitivity_minimum_clamp
     handler = KeyboardHandler.new
-    Config.sensitivity = 0.05
+    VisualizerPolicy.sensitivity = 0.05
     handler.handle_sensitivity(-0.10)
-    assert_in_delta 0.05, Config.sensitivity, 0.001
+    assert_in_delta 0.05, VisualizerPolicy.sensitivity, 0.001
   end
 
   def test_shift_hue_positive
@@ -78,44 +78,44 @@ class TestKeyboardHandler < Test::Unit::TestCase
 
   def test_adjust_max_brightness_increase
     handler = KeyboardHandler.new
-    Config.max_brightness = 200
+    VisualizerPolicy.max_brightness = 200
     handler.handle_brightness(5)
-    assert_equal 205, Config.max_brightness
+    assert_equal 205, VisualizerPolicy.max_brightness
   end
 
   def test_adjust_max_brightness_decrease
     handler = KeyboardHandler.new
-    Config.max_brightness = 200
+    VisualizerPolicy.max_brightness = 200
     handler.handle_brightness(-5)
-    assert_equal 195, Config.max_brightness
+    assert_equal 195, VisualizerPolicy.max_brightness
   end
 
   def test_adjust_max_brightness_clamp_upper
     handler = KeyboardHandler.new
-    Config.max_brightness = 253
+    VisualizerPolicy.max_brightness = 253
     handler.handle_brightness(5)
-    assert_equal 255, Config.max_brightness
+    assert_equal 255, VisualizerPolicy.max_brightness
   end
 
   def test_adjust_max_brightness_clamp_lower
     handler = KeyboardHandler.new
-    Config.max_brightness = 3
+    VisualizerPolicy.max_brightness = 3
     handler.handle_brightness(-5)
-    assert_equal 0, Config.max_brightness
+    assert_equal 0, VisualizerPolicy.max_brightness
   end
 
   def test_adjust_max_lightness_increase
     handler = KeyboardHandler.new
-    Config.max_lightness = 200
+    VisualizerPolicy.max_lightness = 200
     handler.handle_lightness(5)
-    assert_equal 205, Config.max_lightness
+    assert_equal 205, VisualizerPolicy.max_lightness
   end
 
   def test_adjust_max_lightness_clamp_upper
     handler = KeyboardHandler.new
-    Config.max_lightness = 253
+    VisualizerPolicy.max_lightness = 253
     handler.handle_lightness(5)
-    assert_equal 255, Config.max_lightness
+    assert_equal 255, VisualizerPolicy.max_lightness
   end
 
   # Master dispatch tests (rubyHandleKey)
@@ -152,38 +152,38 @@ class TestKeyboardHandler < Test::Unit::TestCase
   def test_dispatch_brightness_6
     handler = KeyboardHandler.new
     handler.handle_key('6')
-    assert_equal 250, Config.max_brightness
+    assert_equal 250, VisualizerPolicy.max_brightness
   end
 
   def test_dispatch_brightness_7
     handler = KeyboardHandler.new
-    Config.max_brightness = 200
+    VisualizerPolicy.max_brightness = 200
     handler.handle_key('7')
-    assert_equal 205, Config.max_brightness
+    assert_equal 205, VisualizerPolicy.max_brightness
   end
 
   def test_dispatch_lightness_8
     handler = KeyboardHandler.new
     handler.handle_key('8')
-    assert_equal 250, Config.max_lightness
+    assert_equal 250, VisualizerPolicy.max_lightness
   end
 
   def test_dispatch_sensitivity_minus
     handler = KeyboardHandler.new
     handler.handle_key('-')
-    assert_in_delta 0.95, Config.sensitivity, 0.001
+    assert_in_delta 0.95, VisualizerPolicy.sensitivity, 0.001
   end
 
   def test_dispatch_sensitivity_plus
     handler = KeyboardHandler.new
     handler.handle_key('+')
-    assert_in_delta 1.05, Config.sensitivity, 0.001
+    assert_in_delta 1.05, VisualizerPolicy.sensitivity, 0.001
   end
 
   def test_dispatch_sensitivity_equals
     handler = KeyboardHandler.new
     handler.handle_key('=')
-    assert_in_delta 1.05, Config.sensitivity, 0.001
+    assert_in_delta 1.05, VisualizerPolicy.sensitivity, 0.001
   end
 
   def test_dispatch_unknown_key_does_nothing

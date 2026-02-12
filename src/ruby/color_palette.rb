@@ -40,8 +40,8 @@ class ColorPalette
     value = 0.4 + Math.tanh(total * 0.5) * 0.3
 
     # Max lightness cap
-    max_v = Config.max_lightness / 255.0
-    value = [value, max_v].min if Config.max_lightness < 255
+    max_v = VisualizerPolicy.max_lightness / 255.0
+    value = [value, max_v].min if VisualizerPolicy.max_lightness < 255
 
     # Grayscale mode
     if @hue_mode.nil?
@@ -76,8 +76,8 @@ class ColorPalette
 
     value = 0.4 + Math.tanh(total * 0.5) * 0.3
 
-    max_v = Config.max_lightness / 255.0
-    value = [value, max_v].min if Config.max_lightness < 255
+    max_v = VisualizerPolicy.max_lightness / 255.0
+    value = [value, max_v].min if VisualizerPolicy.max_lightness < 255
 
     return hsv_to_rgb(0, 0, value) if @hue_mode.nil?
 

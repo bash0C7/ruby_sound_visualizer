@@ -42,8 +42,8 @@ class KeyboardHandler
   end
 
   def handle_sensitivity(delta)
-    Config.sensitivity = [(Config.sensitivity + delta).round(2), 0.05].max
-    JSBridge.log "Sensitivity: #{Config.sensitivity}x"
+    VisualizerPolicy.sensitivity = [(VisualizerPolicy.sensitivity + delta).round(2), 0.05].max
+    JSBridge.log "Sensitivity: #{VisualizerPolicy.sensitivity}x"
   end
 
   def handle_hue_shift(delta)
@@ -53,13 +53,13 @@ class KeyboardHandler
   end
 
   def handle_brightness(delta)
-    Config.max_brightness = [[Config.max_brightness + delta, 0].max, 255].min
-    JSBridge.log "MaxBrightness: #{Config.max_brightness}"
+    VisualizerPolicy.max_brightness = [[VisualizerPolicy.max_brightness + delta, 0].max, 255].min
+    JSBridge.log "MaxBrightness: #{VisualizerPolicy.max_brightness}"
   end
 
   def handle_lightness(delta)
-    Config.max_lightness = [[Config.max_lightness + delta, 0].max, 255].min
-    JSBridge.log "MaxLightness: #{Config.max_lightness}"
+    VisualizerPolicy.max_lightness = [[VisualizerPolicy.max_lightness + delta, 0].max, 255].min
+    JSBridge.log "MaxLightness: #{VisualizerPolicy.max_lightness}"
   end
 
   private

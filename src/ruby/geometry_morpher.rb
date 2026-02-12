@@ -1,7 +1,7 @@
 class GeometryMorpher
   def initialize
     @rotation = [0, 0, 0]
-    @scale = Config::GEOMETRY_BASE_SCALE
+    @scale = VisualizerPolicy::GEOMETRY_BASE_SCALE
     @emissive_intensity = 0.0
     @color = [0.3, 0.3, 0.3]  # 初期値 dim gray
   end
@@ -23,7 +23,7 @@ class GeometryMorpher
     @color = ColorPalette.frequency_to_color(analysis)
 
     # スケールを大幅に強化（最大3.5倍）
-    @scale = Config::GEOMETRY_BASE_SCALE + energy * Config::GEOMETRY_SCALE_MULTIPLIER
+    @scale = VisualizerPolicy::GEOMETRY_BASE_SCALE + energy * VisualizerPolicy::GEOMETRY_SCALE_MULTIPLIER
     # impulse でスケールブースト（連続的に減衰）
     @scale += 0.8 * imp_overall
 
@@ -40,7 +40,7 @@ class GeometryMorpher
     # 発光強度（ソフトクリッピングでホワイトアウト防止）
     @emissive_intensity = Math.tanh(energy * 1.5) * 1.5
     @emissive_intensity += Math.tanh(imp_overall) * 0.8
-    @emissive_intensity = [@emissive_intensity, Config::GEOMETRY_MAX_EMISSIVE].min
+    @emissive_intensity = [@emissive_intensity, VisualizerPolicy::GEOMETRY_MAX_EMISSIVE].min
   end
 
   def get_data

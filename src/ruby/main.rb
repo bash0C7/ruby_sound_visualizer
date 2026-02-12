@@ -16,18 +16,18 @@ begin
   search_str = JS.global[:location][:search].to_s
   if search_str.is_a?(String) && search_str.length > 0
     match = search_str.match(/sensitivity=([0-9.]+)/)
-    Config.sensitivity = match[1].to_f if match
+    VisualizerPolicy.sensitivity = match[1].to_f if match
     match_br = search_str.match(/maxBrightness=([0-9]+)/)
-    Config.max_brightness = match_br[1].to_i if match_br
+    VisualizerPolicy.max_brightness = match_br[1].to_i if match_br
     match_lt = search_str.match(/maxLightness=([0-9]+)/)
-    Config.max_lightness = match_lt[1].to_i if match_lt
+    VisualizerPolicy.max_lightness = match_lt[1].to_i if match_lt
   end
 rescue => e
   # URL parameter parse failure: use Config defaults
 end
 
 begin
-  JSBridge.log "Ruby VM started, initializing... (Sensitivity: #{Config.sensitivity})"
+  JSBridge.log "Ruby VM started, initializing... (Sensitivity: #{VisualizerPolicy.sensitivity})"
 
   $audio_analyzer = AudioAnalyzer.new
   $effect_manager = EffectManager.new
@@ -37,7 +37,7 @@ begin
   $debug_formatter = DebugFormatter.new
   $bpm_estimator = BPMEstimator.new
   $frame_counter = FrameCounter.new
-  Config.register_devtool_callbacks
+  VisualizerPolicy.register_devtool_callbacks
 
   # Main update callback: receives frequency data and timestamp from JS
   JS.global[:rubyUpdateVisuals] = lambda do |freq_array, timestamp|
@@ -47,8 +47,8 @@ begin
         $initialized = true
       end
 
-      analysis = $audio_analyzer.analyze(freq_array, Config.sensitivity)
-      $effect_manager.update(analysis, Config.sensitivity)
+      analysis = $audio_analyzer.analyze(freq_array, VisualizerPolicy.sensitivity)
+      $effect_manager.update(analysis, VisualizerPolicy.sensitivity)
 
       # Send visual data to JavaScript
       JSBridge.update_particles($effect_manager.particle_data)
@@ -59,10 +59,10 @@ begin
 
       # VRM dance update
       scaled_for_vrm = {
-        bass: [analysis[:bass] * Config.sensitivity, 1.0].min,
-        mid: [analysis[:mid] * Config.sensitivity, 1.0].min,
-        high: [analysis[:high] * Config.sensitivity, 1.0].min,
-        overall_energy: [analysis[:overall_energy] * Config.sensitivity, 1.0].min,
+        bass: [analysis[:bass] * VisualizerPolicy.sensitivity, 1.0].min,
+        mid: [analysis[:mid] * VisualizerPolicy.sensitivity, 1.0].min,
+        high: [analysis[:high] * VisualizerPolicy.sensitivity, 1.0].min,
+        overall_energy: [analysis[:overall_energy] * VisualizerPolicy.sensitivity, 1.0].min,
         beat: analysis[:beat],
         impulse: {
           overall: $effect_manager.impulse_overall || 0.0,
@@ -119,7 +119,7 @@ begin
         mid = (analysis[:mid] * 100).round(1)
         high = (analysis[:high] * 100).round(1)
         overall = (analysis[:overall_energy] * 100).round(1)
-        JSBridge.log "Audio: Bass=#{bass}% Mid=#{mid}% High=#{high}% Overall=#{overall}% | Sensitivity: #{Config.sensitivity.round(2)}x"
+        JSBridge.log "Audio: Bass=#{bass}% Mid=#{mid}% High=#{high}% Overall=#{overall}% | Sensitivity: #{VisualizerPolicy.sensitivity.round(2)}x"
       end
     rescue => e
       JSBridge.error "Error in rubyUpdateVisuals: #{e.class} #{e.message}"

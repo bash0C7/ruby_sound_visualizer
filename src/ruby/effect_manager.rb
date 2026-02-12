@@ -49,10 +49,10 @@ class EffectManager
     @camera_data = @camera_controller.get_data
 
     # impulse を減衰（毎フレーム）
-    @impulse_bass *= Config::IMPULSE_DECAY_EFFECT
-    @impulse_mid *= Config::IMPULSE_DECAY_EFFECT
-    @impulse_high *= Config::IMPULSE_DECAY_EFFECT
-    @impulse_overall *= Config::IMPULSE_DECAY_EFFECT
+    @impulse_bass *= VisualizerPolicy::IMPULSE_DECAY_EFFECT
+    @impulse_mid *= VisualizerPolicy::IMPULSE_DECAY_EFFECT
+    @impulse_high *= VisualizerPolicy::IMPULSE_DECAY_EFFECT
+    @impulse_overall *= VisualizerPolicy::IMPULSE_DECAY_EFFECT
   end
 end
   

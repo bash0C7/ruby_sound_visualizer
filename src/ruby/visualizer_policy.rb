@@ -1,7 +1,7 @@
-# Centralized configuration for all default values and constants.
-# Each class references Config:: constants instead of defining their own.
-# This makes it easier to adjust parameters and understand the system behavior.
-module Config
+# Centralized policy module for visualizer behavior, constraints, and configuration.
+# Includes audio analysis constants, rendering policies (brightness/lightness caps),
+# and runtime-mutable settings. Replaces the former Config module with broader scope.
+module VisualizerPolicy
   # Audio Analysis
   SAMPLE_RATE = 48000
   FFT_SIZE = 2048
@@ -50,6 +50,9 @@ module Config
   @@sensitivity = 1.0
   @@max_brightness = 255
   @@max_lightness = 255
+  @@max_emissive = 2.0
+  @@max_bloom = 4.5
+  @@exclude_max = false  # When true, bypass all max caps
 
   def self.sensitivity
     @@sensitivity
@@ -75,13 +78,65 @@ module Config
     @@max_lightness = [[v, 0].max, 255].min
   end
 
+  def self.max_emissive
+    @@max_emissive
+  end
+
+  def self.max_emissive=(v)
+    @@max_emissive = [v, 0.0].max
+  end
+
+  def self.max_bloom
+    @@max_bloom
+  end
+
+  def self.max_bloom=(v)
+    @@max_bloom = [v, 0.0].max
+  end
+
+  def self.exclude_max
+    @@exclude_max
+  end
+
+  def self.exclude_max=(v)
+    @@exclude_max = !!v  # Convert to boolean
+  end
+
+  # === Rendering Policy Cap Methods ===
+  # Centralized capping to prevent configuration oversights
+
+  def self.cap_rgb(r, g, b)
+    return [r, g, b] if @@exclude_max
+    max_c = @@max_brightness / 255.0
+    [[r, max_c].min, [g, max_c].min, [b, max_c].min]
+  end
+
+  def self.cap_value(v)
+    return v if @@exclude_max
+    max_v = @@max_lightness / 255.0
+    [v, max_v].min
+  end
+
+  def self.cap_emissive(intensity)
+    return intensity if @@exclude_max
+    [intensity, @@max_emissive].min
+  end
+
+  def self.cap_bloom(strength)
+    return strength if @@exclude_max
+    [strength, @@max_bloom].min
+  end
+
   # === DevTool Console Interface ===
-  # Allows dynamic config changes from Chrome DevTools via rubyConfig.set/get/list/reset
+  # Allows dynamic config changes from Chrome DevTools via rubyVisualizerPolicy.set/get/list/reset
 
   MUTABLE_KEYS = {
     'sensitivity' => { min: 0.05, max: 10.0, type: :float, default: 1.0 },
     'max_brightness' => { min: 0, max: 255, type: :int, default: 255 },
-    'max_lightness' => { min: 0, max: 255, type: :int, default: 255 }
+    'max_lightness' => { min: 0, max: 255, type: :int, default: 255 },
+    'max_emissive' => { min: 0.0, max: 10.0, type: :float, default: 2.0 },
+    'max_bloom' => { min: 0.0, max: 10.0, type: :float, default: 4.5 },
+    'exclude_max' => { min: 0, max: 1, type: :bool, default: false }
   }.freeze
 
   def self.set_by_key(key, value)
@@ -89,13 +144,21 @@ module Config
     spec = MUTABLE_KEYS[key_str]
     return "Unknown key: #{key_str}. Use list() to see available keys." unless spec
 
-    val = spec[:type] == :int ? value.to_i : value.to_f
-    val = [[val, spec[:min]].max, spec[:max]].min
+    val = case spec[:type]
+    when :int then value.to_i
+    when :bool then value.to_s == 'true' || value.to_i == 1
+    else value.to_f
+    end
+
+    val = [[val, spec[:min]].max, spec[:max]].min unless spec[:type] == :bool
 
     case key_str
     when 'sensitivity' then self.sensitivity = val
     when 'max_brightness' then self.max_brightness = val
     when 'max_lightness' then self.max_lightness = val
+    when 'max_emissive' then self.max_emissive = val
+    when 'max_bloom' then self.max_bloom = val
+    when 'exclude_max' then self.exclude_max = val
     end
 
     "#{key_str} = #{val}"
@@ -106,6 +169,9 @@ module Config
     when 'sensitivity' then sensitivity
     when 'max_brightness' then max_brightness
     when 'max_lightness' then max_lightness
+    when 'max_emissive' then max_emissive
+    when 'max_bloom' then max_bloom
+    when 'exclude_max' then exclude_max
     else "Unknown key: #{key}"
     end
   end
@@ -121,30 +187,33 @@ module Config
     self.sensitivity = 1.0
     self.max_brightness = 255
     self.max_lightness = 255
+    self.max_emissive = 2.0
+    self.max_bloom = 4.5
+    self.exclude_max = false
     "All runtime values reset to defaults"
   end
 
   def self.register_devtool_callbacks
     JS.global[:rubyConfigSet] = lambda { |key, value|
       begin
-        result = Config.set_by_key(key.to_s, value.to_f)
-        JS.global[:console].log("[Config] #{result}")
+        result = VisualizerPolicy.set_by_key(key.to_s, value.to_f)
+        JS.global[:console].log("[VisualizerPolicy] #{result}")
         result
       rescue => e
-        JS.global[:console].error("[Config] Error: #{e.message}")
+        JS.global[:console].error("[VisualizerPolicy] Error: #{e.message}")
       end
     }
     JS.global[:rubyConfigGet] = lambda { |key|
-      Config.get_by_key(key.to_s)
+      VisualizerPolicy.get_by_key(key.to_s)
     }
     JS.global[:rubyConfigList] = lambda {
-      result = Config.list_keys
-      JS.global[:console].log("[Config]\n#{result}")
+      result = VisualizerPolicy.list_keys
+      JS.global[:console].log("[VisualizerPolicy]\n#{result}")
       result
     }
     JS.global[:rubyConfigReset] = lambda {
-      result = Config.reset_runtime
-      JS.global[:console].log("[Config] #{result}")
+      result = VisualizerPolicy.reset_runtime
+      JS.global[:console].log("[VisualizerPolicy] #{result}")
       result
     }
   end
