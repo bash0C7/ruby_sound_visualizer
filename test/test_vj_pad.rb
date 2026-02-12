@@ -400,4 +400,55 @@ class TestVJPad < Test::Unit::TestCase
     assert_match(/h:90\.0/, result)
     assert_match(/s:1\.5/, result)
   end
+
+  # === mic command ===
+
+  def test_mic_getter_default
+    JS.set_global('micMuted', false)
+    result = @pad.mic
+    assert_equal "mic: on", result
+  end
+
+  def test_mic_getter_muted
+    JS.set_global('micMuted', true)
+    result = @pad.mic
+    assert_equal "mic: muted", result
+  end
+
+  def test_mic_set_mute
+    JS.set_global('micMuted', false)
+    result = @pad.mic(0)
+    assert_match(/mic:/, result)
+  end
+
+  def test_mic_set_unmute
+    JS.set_global('micMuted', true)
+    result = @pad.mic(1)
+    assert_match(/mic:/, result)
+  end
+
+  def test_mic_via_exec
+    JS.set_global('micMuted', false)
+    result = @pad.exec("mic")
+    assert_equal true, result[:ok]
+    assert_equal "mic: on", result[:msg]
+  end
+
+  # === tab command ===
+
+  def test_tab_getter_no_capture
+    result = @pad.tab
+    assert_equal "tab: off", result
+  end
+
+  def test_tab_getter_active
+    JS.set_global('tabStream', 'active')
+    result = @pad.tab
+    assert_equal "tab: on", result
+  end
+
+  def test_tab_toggle_via_exec
+    result = @pad.exec("tab")
+    assert_equal true, result[:ok]
+  end
 end

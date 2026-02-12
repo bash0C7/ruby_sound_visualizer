@@ -110,6 +110,29 @@ class VJPad
     "c:#{cn} h:#{ho} | s:#{se} br:#{b} lt:#{l} | em:#{e} bm:#{bl} x:#{ex}"
   end
 
+  # --- Audio Input Commands ---
+
+  def mic(val = :_get)
+    muted = JS.global[:micMuted]
+    is_muted = muted == true
+    if val == :_get
+      return "mic: #{is_muted ? 'muted' : 'on'}"
+    end
+    target_mute = val.to_i == 0
+    JS.global.setMicMute(target_mute)
+    "mic: #{target_mute ? 'muted' : 'on'}"
+  end
+
+  def tab(val = :_get)
+    stream = JS.global[:tabStream]
+    is_active = stream.respond_to?(:typeof) ? stream.typeof.to_s != "undefined" && stream.typeof.to_s != "null" : !!stream
+    if val == :_get
+      return "tab: #{is_active ? 'on' : 'off'}"
+    end
+    JS.global.toggleTabCapture()
+    "tab: toggled"
+  end
+
   # --- Action Commands ---
 
   def burst(force = nil)

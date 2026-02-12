@@ -28,11 +28,15 @@ class DebugFormatter
   end
 
   def format_param_text
-    "Sensitivity: #{VisualizerPolicy.sensitivity.round(2)}x  |  MaxBrightness: #{VisualizerPolicy.max_brightness}  |  MaxLightness: #{VisualizerPolicy.max_lightness}"
+    mic_status = JS.global[:micMuted] == true ? "MIC:OFF" : "MIC:ON"
+    tab_val = JS.global[:tabStream]
+    tab_active = tab_val.respond_to?(:typeof) ? (tab_val.typeof.to_s != "undefined" && tab_val.typeof.to_s != "null") : !!tab_val
+    tab_status = tab_active ? "TAB:ON" : "TAB:OFF"
+    "#{mic_status}  #{tab_status}  |  Sensitivity: #{VisualizerPolicy.sensitivity.round(2)}x  |  MaxBrightness: #{VisualizerPolicy.max_brightness}  |  MaxLightness: #{VisualizerPolicy.max_lightness}"
   end
 
   def format_key_guide
-    "0-3: Color Mode  |  4/5: Hue Shift  |  6/7: Brightness ±5  |  8/9: Lightness ±5  |  +/-: Sensitivity  |  a/s: Cam X  |  w/x: Cam Y  |  q/z: Cam Z"
+    "m: Mic mute  |  t: Tab capture  |  0-3: Color Mode  |  4/5: Hue Shift  |  6/7: Brightness ±5  |  8/9: Lightness ±5  |  +/-: Sensitivity  |  a/s: Cam X  |  w/x: Cam Y  |  q/z: Cam Z"
   end
 
   private
