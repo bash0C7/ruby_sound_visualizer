@@ -84,9 +84,9 @@ class ParticleSystem
       dist = Math.sqrt(pos[0]**2 + pos[1]**2 + pos[2]**2)
       normalized_dist = [dist / 10.0, 1.0].min  # 0.0(中心)〜1.0(外縁)
       dist_color = ColorPalette.frequency_to_color_at_distance(analysis, normalized_dist)
-      # 最大輝度キャップ適用
-      max_c = VisualizerPolicy.max_brightness < 255 ? VisualizerPolicy.max_brightness / 255.0 : 1.0
-      particle[:color] = dist_color.map { |c| [[c * brightness, 0.0].max, max_c].min }
+      # Apply brightness and max brightness cap (via VisualizerPolicy)
+      color_with_brightness = dist_color.map { |c| [c * brightness, 0.0].max }
+      particle[:color] = VisualizerPolicy.cap_rgb(*color_with_brightness)
 
       # 位置更新
       particle[:position][0] += particle[:velocity][0]

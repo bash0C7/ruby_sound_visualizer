@@ -39,9 +39,8 @@ class ColorPalette
     # Soft-clipped value to prevent saturation at high volume
     value = 0.4 + Math.tanh(total * 0.5) * 0.3
 
-    # Max lightness cap
-    max_v = VisualizerPolicy.max_lightness / 255.0
-    value = [value, max_v].min if VisualizerPolicy.max_lightness < 255
+    # Max lightness cap (via VisualizerPolicy)
+    value = VisualizerPolicy.cap_value(value)
 
     # Grayscale mode
     if @hue_mode.nil?
@@ -76,8 +75,8 @@ class ColorPalette
 
     value = 0.4 + Math.tanh(total * 0.5) * 0.3
 
-    max_v = VisualizerPolicy.max_lightness / 255.0
-    value = [value, max_v].min if VisualizerPolicy.max_lightness < 255
+    # Max lightness cap (via VisualizerPolicy)
+    value = VisualizerPolicy.cap_value(value)
 
     return hsv_to_rgb(0, 0, value) if @hue_mode.nil?
 

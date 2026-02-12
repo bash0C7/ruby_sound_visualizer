@@ -13,7 +13,7 @@ class BloomController
     @strength = VisualizerPolicy::BLOOM_BASE_STRENGTH + Math.tanh(energy * 2.0) * 2.5
     # impulse フラッシュ（抑制付き）
     @strength += Math.tanh(imp_overall) * 1.5
-    @strength = [@strength, VisualizerPolicy::BLOOM_MAX_STRENGTH].min
+    @strength = VisualizerPolicy.cap_bloom(@strength)
 
     # Threshold adjusted for VRM emissiveIntensity range (0.3-1.5)
     # Low energy: threshold ~0.15, High energy: threshold ~BLOOM_MIN_THRESHOLD
