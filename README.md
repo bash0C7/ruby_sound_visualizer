@@ -39,9 +39,9 @@ You can adjust parameters in real-time using keyboard shortcuts.
 | Key | Function |
 |------|------|
 | `0` | Color Mode: Grayscale |
-| `1` | Color Mode: Red spectrum (240-120°) |
-| `2` | Color Mode: Green spectrum (0-240°) |
-| `3` | Color Mode: Blue spectrum (120-360°) |
+| `1` | Color Mode: Vivid Red (centered at 0°, ±70° range) |
+| `2` | Color Mode: Shocking Yellow (centered at 60°, ±70° range) |
+| `3` | Color Mode: Turquoise Blue (centered at 180°, ±70° range) |
 | `4` / `5` | Hue shift -5° / +5° |
 | `6` / `7` | Max brightness -5 / +5 (0-255) |
 | `8` / `9` | Max lightness -5 / +5 (0-255) |
@@ -67,7 +67,7 @@ http://localhost:8000/index.html?sensitivity=1.5&maxBrightness=200&maxLightness=
 
 The visualizer includes:
 
-- 10,000 particles that respond to sound intensity and frequency
+- 3,000 particles that respond to sound intensity and frequency
 - 3D torus that scales and rotates based on bass, mid, and treble frequencies
 - Bloom glow effect that increases in brightness with audio intensity
 - VRM avatar support for loading and animating 3D character models
@@ -92,15 +92,23 @@ ruby_sound_visualizer/
 ├── index.html                    # Main HTML file (loads all components)
 ├── src/ruby/                     # Ruby logic (loaded via ruby.wasm)
 │   ├── audio_analyzer.rb         # Frequency analysis and beat detection
-│   ├── particle_system.rb        # Particle physics and explosions
-│   ├── geometry_morpher.rb       # Torus scaling and rotation
-│   ├── color_palette.rb          # Color modes and HSV conversion
 │   ├── bloom_controller.rb       # Bloom glow effect parameters
+│   ├── bpm_estimator.rb          # BPM estimation from beat intervals
 │   ├── camera_controller.rb      # Camera shake and positioning
-│   ├── vrm_dancer.rb             # VRM character animation
-│   ├── vrm_material_controller.rb # VRM glow intensity control
+│   ├── color_palette.rb          # Color modes and HSV conversion
+│   ├── debug_formatter.rb        # Debug information formatting
 │   ├── effect_manager.rb         # Coordinates all visual effects
-│   └── main.rb                   # Entry point and main loop
+│   ├── frame_counter.rb          # FPS measurement and tracking
+│   ├── frequency_mapper.rb       # Frequency band mapping
+│   ├── geometry_morpher.rb       # Torus scaling and rotation
+│   ├── js_bridge.rb              # JavaScript-Ruby bridge layer
+│   ├── keyboard_handler.rb       # Keyboard input handling
+│   ├── main.rb                   # Entry point and main loop
+│   ├── math_helper.rb            # Mathematical utility functions
+│   ├── particle_system.rb        # Particle physics and explosions
+│   ├── visualizer_policy.rb      # Configuration and policy management
+│   ├── vrm_dancer.rb             # VRM character animation
+│   └── vrm_material_controller.rb # VRM glow intensity control
 ├── README.md                     # This file (user guide)
 ├── CLAUDE.md                     # Detailed technical documentation
 ├── Gemfile                       # Ruby dependency management
@@ -157,8 +165,11 @@ Ruby Logic - Edit files in `src/ruby/`:
 - `color_palette.rb` - Color mode calculations and HSV conversion
 - `geometry_morpher.rb` - Torus scaling and rotation parameters
 - `bloom_controller.rb` - Bloom glow strength and threshold settings
-- `vrm_material_controller.rb` - VRM character glow intensity (adjust `DEFAULT_BASE_EMISSIVE_INTENSITY` and `MAX_EMISSIVE_INTENSITY` here)
-- Other .rb files for additional effects
+- `visualizer_policy.rb` - Global configuration, brightness/lightness caps, and runtime settings
+- `keyboard_handler.rb` - Keyboard shortcuts and input handling
+- `bpm_estimator.rb` - BPM estimation algorithm and beat interval tracking
+- `vrm_material_controller.rb` - VRM character glow intensity control
+- Other .rb files for additional effects and utilities
 
 JavaScript/HTML - Edit `index.html`:
 - Web Audio API setup and microphone handling

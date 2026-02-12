@@ -2,28 +2,6 @@
 
 プロジェクトの進行状況を追跡するためのタスクリスト。
 
-## 📋 ドキュメント更新タスク (Documentation)
-
-- [ ] README.md のパーティクル数を修正 🌐
-  - 現在「10,000 particles」となっているが、実際は 3,000 particles
-  - Line 70: "10,000 particles" → "3,000 particles"
-
-- [ ] README.md の色モード説明を修正 🌐
-  - 現在の説明が実装と一致していない
-  - 実装: 1=Red(0°), 2=Yellow(60°), 3=Cyan(180°), 各±70°範囲
-  - Lines 42-44 の説明を実装に合わせて更新
-
-- [ ] README.md のファイル構造を更新 🌐
-  - 以下のファイルが記載漏れしている:
-    - visualizer_policy.rb (設定・ポリシー管理)
-    - keyboard_handler.rb (キーボード入力処理)
-    - debug_formatter.rb (デバッグ情報フォーマット)
-    - bpm_estimator.rb (BPM推定)
-    - frame_counter.rb (FPS計測)
-    - js_bridge.rb (JS-Ruby ブリッジ)
-    - math_helper.rb (数学ヘルパー)
-    - frequency_mapper.rb (周波数マッピング)
-
 ## 🏗️ 重量級タスク (Major Refactoring)
 
 - [ ] 画面上で Ruby で命令をかけるプロンプトエリアを実装 🌐
