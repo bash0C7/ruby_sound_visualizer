@@ -118,6 +118,104 @@ mcp__claude-in-chrome__javascript_tool(
 
 ## Common Error Patterns
 
+### VRM Model Not Animating (Bone Movements Missing)
+
+**Symptoms**:
+- VRM model displays correctly but remains static
+- No bone rotation/dance movements despite audio playing
+- Particles and effects work normally
+
+**Diagnosis Steps**:
+
+1. **Check window.currentVRM accessibility**:
+```javascript
+mcp__claude-in-chrome__javascript_tool(
+  tabId: XXX,
+  text: "typeof window.currentVRM"
+)
+```
+Expected: `"object"` (if VRM loaded) or `"undefined"` (if not loaded or inaccessible)
+
+2. **Verify VRM update logs**:
+```
+mcp__claude-in-chrome__read_console_messages(
+  tabId: XXX,
+  pattern: "VRM rot|Initialization complete",
+  limit: 10
+)
+```
+Expected: Logs like `"VRM rot: h=0.349 s=0.003 c=0.07 hY=0.0"` appearing every 60 frames
+
+3. **Capture bone movement evidence**:
+```
+# Take first screenshot
+mcp__claude-in-chrome__computer(action: "screenshot", tabId: XXX)
+
+# Wait 3-5 seconds
+mcp__claude-in-chrome__computer(action: "wait", duration: 3, tabId: XXX)
+
+# Take second screenshot
+mcp__claude-in-chrome__computer(action: "screenshot", tabId: XXX)
+```
+Compare VRM rot values in debug text - rotation values should change between screenshots
+
+**Root Cause**: `let`-scoped variables in JavaScript are not accessible via `window` object
+
+**Example Problem**:
+```javascript
+// index.html
+let currentVRM = null;  // ← Not accessible as window.currentVRM
+
+// Later in VRM load callback
+currentVRM = gltf.userData.vrm;  // ← Sets local variable only
+
+// Ruby side (main.rb)
+has_vrm = JS.global[:currentVRM].typeof.to_s != "undefined"  # ← Always "undefined"!
+```
+
+**Solution**: Explicitly expose to window object
+```javascript
+// After setting local variable
+currentVRM = gltf.userData.vrm;
+window.currentVRM = currentVRM;  // ← Add this line
+```
+
+### TypeError: Cannot set properties of undefined (setting 'aspect')
+
+**Symptoms**:
+- Mass error logs during page load
+- Error: `TypeError: Cannot set properties of undefined (setting 'aspect')`
+- Errors occur before Three.js initialization completes
+
+**Root Cause**: Window resize event fires before `camera` object is initialized
+
+**Diagnosis**:
+```
+mcp__claude-in-chrome__read_console_messages(
+  tabId: XXX,
+  pattern: "aspect|resize",
+  onlyErrors: true,
+  limit: 5
+)
+```
+
+**Solution**: Add initialization check to resize handler
+```javascript
+// Before fix
+window.addEventListener('resize', function() {
+  camera.aspect = width / height;  // ← Crashes if camera undefined
+  // ...
+});
+
+// After fix
+window.addEventListener('resize', function() {
+  if (!camera || !renderer || !composer) return;  // ← Add this check
+
+  camera.aspect = width / height;
+  // ...
+});
+```
+
 ### TypeError: Function.prototype.apply was called on undefined
 
 **Root Cause**: Bug in `JS::Object#call()` method (js gem 2.8.1)
