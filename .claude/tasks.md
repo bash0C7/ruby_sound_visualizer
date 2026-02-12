@@ -25,11 +25,12 @@
 
 ## 🎵 音源入力拡張タスク
 
-- [ ] 他のChromeタブからの音声キャプチャ機能 🌐
+- [x] 他のChromeタブからの音声キャプチャ機能 🌐
   - Screen Capture API (`getDisplayMedia`) を使った実装
   - ユーザーがタブ選択して音声を含める設定
   - マイク入力との切り替え UI 実装
   - 技術調査: Chrome Tab Capture API（拡張機能版）も検討
+  - Completed: PR #14 (6 commits, +74 tests, 309 total tests, 100% pass)
 
 ## 📝 Notes
 
