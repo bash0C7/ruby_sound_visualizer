@@ -8,6 +8,9 @@ class ParticleSystem
         color: [0.3, 0.3, 0.3]  # dim gray (グレースケール起動)
       }
     end
+    # Color cache for performance (recalculate every N frames)
+    @color_cache_counter = 0
+    @color_cache_interval = 3  # Recalculate colors every 3 frames
   end
 
   def update(analysis)
@@ -79,14 +82,17 @@ class ParticleSystem
         end
       end
 
-      # 色の適用（中心からの距離で円状グラデーション）
-      pos = particle[:position]
-      dist = Math.sqrt(pos[0]**2 + pos[1]**2 + pos[2]**2)
-      normalized_dist = [dist / 10.0, 1.0].min  # 0.0(中心)〜1.0(外縁)
-      dist_color = ColorPalette.frequency_to_color_at_distance(analysis, normalized_dist)
-      # Apply brightness and max brightness cap (via VisualizerPolicy)
-      color_with_brightness = dist_color.map { |c| [c * brightness, 0.0].max }
-      particle[:color] = VisualizerPolicy.cap_rgb(*color_with_brightness)
+      # 色の適用（キャッシュ: 3フレームごとに再計算でパフォーマンス向上）
+      if @color_cache_counter == 0
+        pos = particle[:position]
+        dist = Math.sqrt(pos[0]**2 + pos[1]**2 + pos[2]**2)
+        normalized_dist = [dist / 10.0, 1.0].min  # 0.0(中心)〜1.0(外縁)
+        dist_color = ColorPalette.frequency_to_color_at_distance(analysis, normalized_dist)
+        # Apply brightness and max brightness cap (via VisualizerPolicy)
+        color_with_brightness = dist_color.map { |c| [c * brightness, 0.0].max }
+        particle[:color] = VisualizerPolicy.cap_rgb(*color_with_brightness)
+      end
+      # Note: When cache_counter != 0, reuse the last calculated color
 
       # 位置更新
       particle[:position][0] += particle[:velocity][0]
@@ -107,6 +113,9 @@ class ParticleSystem
         end
       end
     end
+
+    # Update color cache counter (recalculate every N frames)
+    @color_cache_counter = (@color_cache_counter + 1) % @color_cache_interval
   end
 
   def get_data
