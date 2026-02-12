@@ -13,6 +13,9 @@ class BloomController
     @strength = VisualizerPolicy::BLOOM_BASE_STRENGTH + Math.tanh(energy * 2.0) * 2.5
     # impulse フラッシュ（抑制付き）
     @strength += Math.tanh(imp_overall) * 1.5
+    # VJPad flash boost
+    bloom_flash = analysis[:bloom_flash] || 0.0
+    @strength += bloom_flash * 2.0 if bloom_flash > 0.01
     @strength = VisualizerPolicy.cap_bloom(@strength)
 
     # Threshold adjusted for VRM emissiveIntensity range (0.3-1.5)

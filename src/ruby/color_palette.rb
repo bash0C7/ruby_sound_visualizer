@@ -20,6 +20,10 @@ class ColorPalette
     @hue_offset = 0.0  # reset offset on preset change
   end
 
+  def hue_offset=(val)
+    @hue_offset = val.to_f % 360.0
+  end
+
   def shift_hue_offset(delta)
     @hue_offset = (@hue_offset + delta) % 360.0
   end
@@ -113,6 +117,10 @@ class ColorPalette
 
   def self.get_hue_offset
     shared.hue_offset
+  end
+
+  def self.set_hue_offset(val)
+    shared.hue_offset = val
   end
 
   def self.shift_hue_offset(delta)

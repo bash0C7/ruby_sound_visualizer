@@ -9,6 +9,7 @@ $keyboard_handler = nil
 $debug_formatter = nil
 $bpm_estimator = nil
 $frame_counter = nil
+$vj_pad = nil
 $frame_count = 0  # Kept for JSBridge debug logging throttle
 
 # URL parameter parsing -> Config
@@ -37,7 +38,25 @@ begin
   $debug_formatter = DebugFormatter.new
   $bpm_estimator = BPMEstimator.new
   $frame_counter = FrameCounter.new
+  $vj_pad = VJPad.new
   VisualizerPolicy.register_devtool_callbacks
+
+  # VJ Pad prompt callback: receives command string from browser prompt UI
+  JS.global[:rubyExecPrompt] = lambda do |input|
+    begin
+      result = $vj_pad.exec(input.to_s)
+      if result[:ok]
+        JSBridge.log "VJPad: #{result[:msg]}" unless result[:msg].empty?
+        result[:msg]
+      else
+        JSBridge.error "VJPad: #{result[:msg]}"
+        "ERR: #{result[:msg]}"
+      end
+    rescue => e
+      JSBridge.error "VJPad error: #{e.message}"
+      "ERR: #{e.message}"
+    end
+  end
 
   # Main update callback: receives frequency data and timestamp from JS
   JS.global[:rubyUpdateVisuals] = lambda do |freq_array, timestamp|
@@ -45,6 +64,20 @@ begin
       unless $initialized
         JSBridge.log "First update received, initializing effect system..."
         $initialized = true
+      end
+
+      # Consume VJPad pending actions (burst/flash triggers)
+      if $vj_pad
+        $vj_pad.consume_actions.each do |action|
+          case action[:type]
+          when :burst
+            force = action[:force] || 1.0
+            $effect_manager.inject_impulse(bass: force, mid: force, high: force, overall: force)
+          when :flash
+            intensity = action[:intensity] || 1.0
+            $effect_manager.inject_bloom_flash(intensity)
+          end
+        end
       end
 
       analysis = $audio_analyzer.analyze(freq_array, VisualizerPolicy.sensitivity)

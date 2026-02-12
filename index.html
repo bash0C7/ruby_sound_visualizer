@@ -57,6 +57,38 @@
       font-size: 12px;
       color: #888;
     }
+    /* VJ Pad prompt overlay */
+    #vjPrompt {
+      display: none;
+      position: fixed;
+      bottom: 55px;
+      left: 20px;
+      right: 20px;
+      z-index: 60;
+      font-family: monospace;
+      font-size: 12px;
+    }
+    #vjPrompt.active { display: flex; align-items: center; gap: 6px; }
+    #vjPromptInput {
+      flex: 1;
+      background: rgba(0, 0, 0, 0.8);
+      color: #0f0;
+      border: 1px solid #0f0;
+      border-radius: 3px;
+      padding: 4px 8px;
+      font-family: monospace;
+      font-size: 12px;
+      outline: none;
+    }
+    #vjPromptInput::placeholder { color: #060; }
+    #vjPromptResult {
+      color: #0f0;
+      white-space: nowrap;
+      max-width: 40%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    #vjPromptResult.error { color: #f44; }
   </style>
 </head>
 <body>
@@ -69,6 +101,11 @@
       <button id="skipVrmBtn" class="vrm-upload-btn" style="margin-left: 10px;">Start without VRM</button>
       <div id="vrmFileName"></div>
     </div>
+  </div>
+  <div id="vjPrompt">
+    <span style="color: #0f0;">&gt;</span>
+    <input id="vjPromptInput" type="text" placeholder="c 1; s 2.0; bm 4.0" autocomplete="off" spellcheck="false">
+    <span id="vjPromptResult"></span>
   </div>
   <div id="status">
     <div style="line-height: 1.0;"><span id="fpsCounter">FPS: 0</span>  |  <span id="paramInfo"></span></div>
@@ -127,6 +164,7 @@
   <script type="text/ruby" src="src/ruby/bloom_controller.rb"></script>
   <script type="text/ruby" src="src/ruby/effect_manager.rb"></script>
   <script type="text/ruby" src="src/ruby/keyboard_handler.rb"></script>
+  <script type="text/ruby" src="src/ruby/vj_pad.rb"></script>
   <script type="text/ruby" src="src/ruby/debug_formatter.rb"></script>
   <script type="text/ruby" src="src/ruby/bpm_estimator.rb"></script>
   <script type="text/ruby" src="src/ruby/frame_counter.rb"></script>
@@ -788,9 +826,74 @@
       document.removeEventListener('click', resumeAudio);
     });
 
+    // VJ Pad prompt management
+    const vjPrompt = document.getElementById('vjPrompt');
+    const vjInput = document.getElementById('vjPromptInput');
+    const vjResult = document.getElementById('vjPromptResult');
+    const vjHistory = [];
+    let vjHistoryIdx = -1;
+    let vjPromptOpen = false;
+
+    function vjPromptToggle() {
+      vjPromptOpen = !vjPromptOpen;
+      if (vjPromptOpen) {
+        vjPrompt.classList.add('active');
+        vjInput.value = '';
+        vjResult.textContent = '';
+        vjResult.className = '';
+        vjHistoryIdx = -1;
+        vjInput.focus();
+      } else {
+        vjPrompt.classList.remove('active');
+        vjInput.blur();
+      }
+    }
+
+    function vjPromptExec() {
+      const cmd = vjInput.value.trim();
+      if (!cmd) return;
+      vjHistory.unshift(cmd);
+      if (vjHistory.length > 50) vjHistory.pop();
+      vjHistoryIdx = -1;
+      let result = '';
+      if (window.rubyExecPrompt) {
+        try { result = window.rubyExecPrompt(cmd); } catch (e) { result = 'ERR: ' + e.message; }
+      } else {
+        result = 'ERR: Ruby VM not ready';
+      }
+      const isErr = typeof result === 'string' && result.startsWith('ERR:');
+      vjResult.textContent = result || '';
+      vjResult.className = isErr ? 'error' : '';
+      vjInput.value = '';
+    }
+
+    // Prompt input key handling
+    vjInput.addEventListener('keydown', function(e) {
+      e.stopPropagation();
+      if (e.key === 'Enter') { vjPromptExec(); }
+      else if (e.key === 'Escape' || e.key === '`') { e.preventDefault(); vjPromptToggle(); }
+      else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (vjHistory.length > 0 && vjHistoryIdx < vjHistory.length - 1) {
+          vjHistoryIdx++;
+          vjInput.value = vjHistory[vjHistoryIdx];
+        }
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (vjHistoryIdx > 0) { vjHistoryIdx--; vjInput.value = vjHistory[vjHistoryIdx]; }
+        else { vjHistoryIdx = -1; vjInput.value = ''; }
+      }
+    });
+
     // Keyboard handler: Ruby handles config/color keys, JS handles camera (WebGL direct)
     window.addEventListener('keydown', function(event) {
+      // When prompt is open, all keys go to prompt input (handled above via stopPropagation)
+      if (vjPromptOpen) return;
+
       const key = event.key;
+
+      // Backtick toggles VJ Pad prompt
+      if (key === '`') { vjPromptToggle(); return; }
 
       // Camera position controls (must stay in JS - direct Three.js manipulation)
       if ('aswxqz'.includes(key) && camera) {
@@ -814,7 +917,7 @@
       }
     });
 
-    console.log('[JS] Keyboard: Ruby handles config keys, JS handles camera (a/s/w/x/q/z, d/f/e/c)');
+    console.log('[JS] Keyboard: Ruby handles config keys, JS handles camera (a/s/w/x/q/z, d/f/e/c), backtick(`) opens VJ Pad');
 
     // DevTool console interface for dynamic config changes
     // Usage: rubyConfig.set('sensitivity', 2.5) / .get('sensitivity') / .list() / .reset()

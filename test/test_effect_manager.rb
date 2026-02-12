@@ -41,6 +41,44 @@ class TestEffectManagerImpulseAccessors < Test::Unit::TestCase
       "Impulse should decay after beat ends"
   end
 
+  # --- inject_impulse (for VJPad burst) ---
+
+  def test_inject_impulse_sets_values
+    @manager.inject_impulse(bass: 1.0, mid: 0.5, high: 0.0, overall: 0.8)
+    assert_in_delta 1.0, @manager.impulse_bass, 0.001
+    assert_in_delta 0.5, @manager.impulse_mid, 0.001
+    assert_in_delta 0.0, @manager.impulse_high, 0.001
+    assert_in_delta 0.8, @manager.impulse_overall, 0.001
+  end
+
+  def test_inject_impulse_takes_max_with_existing
+    analysis_beat = make_analysis(beat_bass: true)
+    @manager.update(analysis_beat)
+    # impulse_bass should be > 0 from beat decay
+    existing = @manager.impulse_bass
+    @manager.inject_impulse(bass: 0.5)
+    # Should take whichever is greater
+    assert_in_delta [existing, 0.5].max, @manager.impulse_bass, 0.001
+  end
+
+  # --- inject_bloom_flash (for VJPad flash) ---
+
+  def test_inject_bloom_flash_sets_flash_impulse
+    @manager.inject_bloom_flash(2.0)
+    assert_in_delta 2.0, @manager.bloom_flash, 0.001
+  end
+
+  def test_bloom_flash_starts_at_zero
+    assert_in_delta 0.0, @manager.bloom_flash, 0.001
+  end
+
+  def test_bloom_flash_decays_after_update
+    @manager.inject_bloom_flash(1.0)
+    analysis = make_analysis
+    @manager.update(analysis)
+    assert_operator @manager.bloom_flash, :<, 1.0
+  end
+
   private
 
   def make_analysis(bass: 0.0, mid: 0.0, high: 0.0, energy: 0.0,
