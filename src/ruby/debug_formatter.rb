@@ -1,6 +1,10 @@
 # Formats debug and parameter information for on-screen display.
 # Extracted from main.rb to isolate display formatting concerns.
 class DebugFormatter
+  def initialize(audio_input_manager = nil)
+    @audio_input_manager = audio_input_manager
+  end
+
   def format_debug_text(analysis, beat, bpm: 0)
     energy = analysis[:overall_energy]
     volume_db = energy > 0.001 ? (20.0 * Math.log10(energy)).round(1) : -60.0
@@ -28,10 +32,17 @@ class DebugFormatter
   end
 
   def format_param_text
-    mic_status = JS.global[:micMuted] == true ? "MIC:OFF" : "MIC:ON"
-    tab_val = JS.global[:tabStream]
-    tab_active = tab_val.respond_to?(:typeof) ? (tab_val.typeof.to_s != "undefined" && tab_val.typeof.to_s != "null") : !!tab_val
-    tab_status = tab_active ? "TAB:ON" : "TAB:OFF"
+    if @audio_input_manager
+      # Use AudioInputManager for state management
+      mic_status = @audio_input_manager.mic_muted? ? "MIC:OFF" : "MIC:ON"
+      tab_status = @audio_input_manager.tab_capture? ? "TAB:ON" : "TAB:OFF"
+    else
+      # Fallback to JS.global for backward compatibility
+      mic_status = JS.global[:micMuted] == true ? "MIC:OFF" : "MIC:ON"
+      tab_val = JS.global[:tabStream]
+      tab_active = tab_val.respond_to?(:typeof) ? (tab_val.typeof.to_s != "undefined" && tab_val.typeof.to_s != "null") : !!tab_val
+      tab_status = tab_active ? "TAB:ON" : "TAB:OFF"
+    end
     "#{mic_status}  #{tab_status}  |  Sensitivity: #{VisualizerPolicy.sensitivity.round(2)}x  |  MaxBrightness: #{VisualizerPolicy.max_brightness}  |  MaxLightness: #{VisualizerPolicy.max_lightness}"
   end
 

@@ -37,10 +37,10 @@ begin
   $vrm_dancer = VRMDancer.new
   $vrm_material_controller = VRMMaterialController.new
   $keyboard_handler = KeyboardHandler.new($audio_input_manager)
-  $debug_formatter = DebugFormatter.new
+  $debug_formatter = DebugFormatter.new($audio_input_manager)
   $bpm_estimator = BPMEstimator.new
   $frame_counter = FrameCounter.new
-  $vj_pad = VJPad.new
+  $vj_pad = VJPad.new($audio_input_manager)
   VisualizerPolicy.register_devtool_callbacks
 
   # VJ Pad prompt callback: receives command string from browser prompt UI

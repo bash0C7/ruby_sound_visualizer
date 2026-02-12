@@ -12,7 +12,7 @@ class TestKeyboardHandler < Test::Unit::TestCase
   end
 
   def test_initialize_registers_callbacks
-    handler = KeyboardHandler.new
+    _handler = KeyboardHandler.new
     # After initialization, callbacks should be registered on JS.global
     assert_not_nil JS.global[:rubySetColorMode]
     assert_not_nil JS.global[:rubyAdjustSensitivity]
@@ -120,7 +120,7 @@ class TestKeyboardHandler < Test::Unit::TestCase
 
   # Master dispatch tests (rubyHandleKey)
   def test_master_dispatch_registers_callback
-    handler = KeyboardHandler.new
+    _handler = KeyboardHandler.new
     assert_not_nil JS.global[:rubyHandleKey]
   end
 

@@ -167,4 +167,47 @@ class TestDebugFormatter < Test::Unit::TestCase
     result = formatter.format_key_guide
     assert_match(/t: Tab/, result)
   end
+
+  # === AudioInputManager integration tests ===
+
+  def test_debug_formatter_accepts_audio_input_manager
+    manager = AudioInputManager.new
+    _formatter = DebugFormatter.new(manager)
+    # Should not raise
+  end
+
+  def test_format_param_text_reads_mic_state_from_audio_input_manager
+    manager = AudioInputManager.new
+    formatter = DebugFormatter.new(manager)
+
+    # Default: unmuted
+    result = formatter.format_param_text
+    assert_match(/MIC:ON/, result)
+
+    # After muting
+    manager.mute_mic
+    result = formatter.format_param_text
+    assert_match(/MIC:OFF/, result)
+  end
+
+  def test_format_param_text_reads_tab_state_from_audio_input_manager
+    manager = AudioInputManager.new
+    formatter = DebugFormatter.new(manager)
+
+    # Default: microphone (tab off)
+    result = formatter.format_param_text
+    assert_match(/TAB:OFF/, result)
+
+    # After switching to tab
+    manager.switch_to_tab
+    result = formatter.format_param_text
+    assert_match(/TAB:ON/, result)
+  end
+
+  def test_debug_formatter_backward_compatibility_without_audio_input_manager
+    formatter = DebugFormatter.new(nil)
+    # Should not raise
+    result = formatter.format_key_guide
+    assert_match(/Mic mute/, result)
+  end
 end
