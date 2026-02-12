@@ -28,7 +28,7 @@
       position: fixed;
       bottom: 20px;
       left: 20px;
-      color: #0f0;
+      color: #0cc;
       font-family: monospace;
       font-size: 10px;
       z-index: 50;
@@ -71,9 +71,9 @@
     #vjPrompt.active { display: flex; align-items: center; gap: 6px; }
     #vjPromptInput {
       flex: 1;
-      background: rgba(0, 0, 0, 0.8);
+      background: rgba(0, 0, 0, 0.25);
       color: #0f0;
-      border: 1px solid #0f0;
+      border: none;
       border-radius: 3px;
       padding: 4px 8px;
       font-family: monospace;
@@ -887,8 +887,13 @@
 
     // Keyboard handler: Ruby handles config/color keys, JS handles camera (WebGL direct)
     window.addEventListener('keydown', function(event) {
-      // When prompt is open, all keys go to prompt input (handled above via stopPropagation)
-      if (vjPromptOpen) return;
+      // When prompt is open, restore focus if lost, then let input handler process the key
+      if (vjPromptOpen) {
+        if (document.activeElement !== vjInput) {
+          vjInput.focus();
+        }
+        return;
+      }
 
       const key = event.key;
 
