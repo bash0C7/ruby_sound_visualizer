@@ -1,7 +1,7 @@
 {
   "name": "visualizer-test",
-  "version": "1.0.0",
-  "description": "Ruby WASM Sound Visualizer の動作確認を自動化",
-  "instructions": "このスキルは、Ruby WASM Sound Visualizer の各種機能を検証します。\n\n検証内容：\n1. ページの読み込みとRuby WASM初期化\n2. キー入力（0-9, +/-）の動作確認\n3. デバッグ情報の表示確認\n4. コンソールエラーチェック\n5. スクリーンショット撮影\n\n使用例：\n- /visualizer-test: 基本的な動作確認\n- /visualizer-test --full: 全機能の詳細テスト\n- /visualizer-test --quick: クイックチェック（初期化のみ）",
+  "version": "2.0.0",
+  "description": "Ruby WASM Sound Visualizer の動作確認を自動化（VJ Pad & VRM 対応）",
+  "instructions": "このスキルは、Ruby WASM Sound Visualizer の各種機能を検証します。\n\n検証内容：\n1. ページの読み込みとRuby WASM初期化\n2. VRM アップロード画面の処理（基本モードでは自動スキップ）\n3. キー入力（0-9, +/-）の動作確認\n4. VJ Pad（PR #13 新機能）: プロンプト開閉、コマンド実行\n5. デバッグ情報の表示確認\n6. コンソールエラーチェック\n7. スクリーンショット撮影\n\n使用例：\n- /visualizer-test: 基本的な動作確認（VRM なし）\n- /visualizer-test --full: 全機能の詳細テスト\n- /visualizer-test --quick: クイックチェック（初期化のみ）\n- /visualizer-test --vrm: VRM モデル検証（手動アップロード必要）",
   "entrypoint": "skill.md"
 }

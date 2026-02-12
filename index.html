@@ -893,7 +893,7 @@
       const key = event.key;
 
       // Backtick toggles VJ Pad prompt
-      if (key === '`') { vjPromptToggle(); return; }
+      if (key === '`') { event.preventDefault(); vjPromptToggle(); return; }
 
       // Camera position controls (must stay in JS - direct Three.js manipulation)
       if ('aswxqz'.includes(key) && camera) {
