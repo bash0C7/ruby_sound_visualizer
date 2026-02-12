@@ -58,10 +58,10 @@ class AudioAnalyzer
     @smoothed_high = lerp(@smoothed_high, high_energy, 1.0 - VisualizerPolicy::AUDIO_SMOOTHING_FACTOR)
 
     # Visual smoothing (slow response for smooth visuals, no sudden jumps)
-    @visual_bass = lerp(@visual_bass, bass_energy, 1.0 - VisualizerPolicy::VISUAL_SMOOTHING_FACTOR)
-    @visual_mid = lerp(@visual_mid, mid_energy, 1.0 - VisualizerPolicy::VISUAL_SMOOTHING_FACTOR)
-    @visual_high = lerp(@visual_high, high_energy, 1.0 - VisualizerPolicy::VISUAL_SMOOTHING_FACTOR)
-    @visual_overall = lerp(@visual_overall, overall_energy, 1.0 - VisualizerPolicy::VISUAL_SMOOTHING_FACTOR)
+    @visual_bass = lerp(@visual_bass, bass_energy, 1.0 - VisualizerPolicy.visual_smoothing)
+    @visual_mid = lerp(@visual_mid, mid_energy, 1.0 - VisualizerPolicy.visual_smoothing)
+    @visual_high = lerp(@visual_high, high_energy, 1.0 - VisualizerPolicy.visual_smoothing)
+    @visual_overall = lerp(@visual_overall, overall_energy, 1.0 - VisualizerPolicy.visual_smoothing)
 
     # Exponential decay for noise reduction (natural decay, no hard cut)
     @visual_bass = exponential_decay(@visual_bass)

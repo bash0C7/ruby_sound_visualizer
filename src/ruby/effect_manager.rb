@@ -62,11 +62,11 @@ class EffectManager
     @camera_data = @camera_controller.get_data
 
     # impulse decay per frame
-    @impulse_bass *= VisualizerPolicy::IMPULSE_DECAY_EFFECT
-    @impulse_mid *= VisualizerPolicy::IMPULSE_DECAY_EFFECT
-    @impulse_high *= VisualizerPolicy::IMPULSE_DECAY_EFFECT
-    @impulse_overall *= VisualizerPolicy::IMPULSE_DECAY_EFFECT
-    @bloom_flash *= VisualizerPolicy::IMPULSE_DECAY_EFFECT
+    @impulse_bass *= VisualizerPolicy.impulse_decay
+    @impulse_mid *= VisualizerPolicy.impulse_decay
+    @impulse_high *= VisualizerPolicy.impulse_decay
+    @impulse_overall *= VisualizerPolicy.impulse_decay
+    @bloom_flash *= VisualizerPolicy.impulse_decay
   end
 end
   
