@@ -149,6 +149,36 @@ class TestColorPalette < Test::Unit::TestCase
     end
   end
 
+  # --- set_hue_offset (absolute setter) ---
+
+  def test_set_hue_offset_absolute
+    @palette.hue_offset = 45.0
+    assert_in_delta 45.0, @palette.hue_offset, 0.001
+  end
+
+  def test_set_hue_offset_wraps_over_360
+    @palette.hue_offset = 400.0
+    assert_in_delta 40.0, @palette.hue_offset, 0.001
+  end
+
+  def test_set_hue_offset_negative_wraps
+    @palette.hue_offset = -10.0
+    assert_in_delta 350.0, @palette.hue_offset, 0.001
+  end
+
+  def test_set_hue_offset_zero
+    @palette.shift_hue_offset(30)
+    @palette.hue_offset = 0.0
+    assert_in_delta 0.0, @palette.hue_offset, 0.001
+  end
+
+  def test_class_level_set_hue_offset
+    ColorPalette.set_hue_offset(90.0)
+    assert_in_delta 90.0, ColorPalette.get_hue_offset, 0.001
+    # cleanup
+    ColorPalette.set_hue_offset(0.0)
+  end
+
   def test_distance_based_color_uses_same_base_range
     # frequency_to_color_at_distance should use same 140deg range
     @palette.hue_mode = 2  # Yellow center (60deg)

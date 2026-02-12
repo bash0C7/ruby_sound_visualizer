@@ -49,6 +49,48 @@ You can adjust parameters in real-time using keyboard shortcuts.
 
 Current settings and key guide are always displayed in the bottom-left corner of the screen.
 
+## VJ Pad (Real-time Command Interface)
+
+Press the backtick key (`) to open the VJ Pad prompt at the bottom of the screen. Type commands and press Enter to execute them. The VJ Pad allows real-time control of all visualizer parameters through a Ruby DSL.
+
+### Available Commands
+
+| Command | Description | Example |
+|---------|-------------|---------|
+| `c <mode>` | Set color mode (0=Gray, 1=Red, 2=Green, 3=Blue) | `c 1` |
+| `h <degrees>` | Set hue offset (0-360) | `h 180` |
+| `s <value>` | Set sensitivity | `s 1.5` |
+| `br <value>` | Set max brightness (0-255) | `br 200` |
+| `lt <value>` | Set max lightness (0-255) | `lt 180` |
+| `em <value>` | Set emissive intensity | `em 0.5` |
+| `bm <value>` | Set bloom strength | `bm 3.0` |
+| `burst` | Trigger particle burst effect | `burst` |
+| `flash` | Trigger bloom flash effect | `flash` |
+| `r` | Reset all parameters to defaults | `r` |
+
+### Command Features
+
+- Multiple commands: Separate commands with semicolons to execute sequentially
+  - Example: `c 1; s 2.0; flash`
+- Getters: Type command name without arguments to get current value
+  - Example: `s` returns current sensitivity
+- Symbol aliases: Color mode supports symbols (`:red`, `:r`, `:green`, `:g`, `:blue`, `:b`, `:gray`)
+  - Example: `c :red` is equivalent to `c 1`
+- History navigation: Use Up/Down arrow keys to navigate command history
+- Error feedback: Errors are displayed in red text in the prompt
+
+### Command Examples
+
+```
+c 3              # Switch to blue mode
+s 2.0            # Double sensitivity
+c 1; burst       # Switch to red and trigger burst
+h 90; flash      # Shift hue 90 degrees and flash
+c :blue; s 1.5   # Blue mode with 1.5x sensitivity
+```
+
+Press backtick (`) again or Escape to close the prompt.
+
 ## URL Parameters
 
 You can specify initial values using URL query parameters.
@@ -75,6 +117,7 @@ The visualizer includes:
 - Four color modes: grayscale, red spectrum, green spectrum, and blue spectrum
 - Camera shake triggered by bass frequencies
 - Real-time parameter adjustment via keyboard shortcuts
+- VJ Pad command interface for advanced real-time control via Ruby DSL
 - Live display of BPM and frequency levels
 
 ## Technology
@@ -106,6 +149,7 @@ ruby_sound_visualizer/
 │   ├── main.rb                   # Entry point and main loop
 │   ├── math_helper.rb            # Mathematical utility functions
 │   ├── particle_system.rb        # Particle physics and explosions
+│   ├── vj_pad.rb                 # VJ Pad command interface and DSL
 │   ├── visualizer_policy.rb      # Configuration and policy management
 │   ├── vrm_dancer.rb             # VRM character animation
 │   └── vrm_material_controller.rb # VRM glow intensity control

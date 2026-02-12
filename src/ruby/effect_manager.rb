@@ -1,17 +1,29 @@
 class EffectManager
   attr_reader :particle_data, :geometry_data, :bloom_data, :camera_data,
-              :impulse_overall, :impulse_bass, :impulse_mid, :impulse_high
+              :impulse_overall, :impulse_bass, :impulse_mid, :impulse_high,
+              :bloom_flash
 
   def initialize
     @particle_system = ParticleSystem.new
     @geometry_morpher = GeometryMorpher.new
     @bloom_controller = BloomController.new
     @camera_controller = CameraController.new
-    # 衝撃波（impulse）: 0.0〜1.0 の連続値
     @impulse_overall = 0.0
     @impulse_bass = 0.0
     @impulse_mid = 0.0
     @impulse_high = 0.0
+    @bloom_flash = 0.0
+  end
+
+  def inject_impulse(bass: 0.0, mid: 0.0, high: 0.0, overall: 0.0)
+    @impulse_bass = [@impulse_bass, bass].max
+    @impulse_mid = [@impulse_mid, mid].max
+    @impulse_high = [@impulse_high, high].max
+    @impulse_overall = [@impulse_overall, overall].max
+  end
+
+  def inject_bloom_flash(intensity)
+    @bloom_flash = intensity.to_f
   end
 
   def update(analysis, sensitivity = 1.0)
@@ -40,6 +52,7 @@ class EffectManager
 
     @particle_system.update(scaled_analysis)
     @geometry_morpher.update(scaled_analysis)
+    scaled_analysis[:bloom_flash] = @bloom_flash
     @bloom_controller.update(scaled_analysis)
     @camera_controller.update(scaled_analysis)
 
@@ -48,11 +61,12 @@ class EffectManager
     @bloom_data = @bloom_controller.get_data
     @camera_data = @camera_controller.get_data
 
-    # impulse を減衰（毎フレーム）
+    # impulse decay per frame
     @impulse_bass *= VisualizerPolicy::IMPULSE_DECAY_EFFECT
     @impulse_mid *= VisualizerPolicy::IMPULSE_DECAY_EFFECT
     @impulse_high *= VisualizerPolicy::IMPULSE_DECAY_EFFECT
     @impulse_overall *= VisualizerPolicy::IMPULSE_DECAY_EFFECT
+    @bloom_flash *= VisualizerPolicy::IMPULSE_DECAY_EFFECT
   end
 end
   
