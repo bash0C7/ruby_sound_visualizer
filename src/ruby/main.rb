@@ -2,6 +2,7 @@ require 'js'
 
 $initialized = false
 $audio_analyzer = nil
+$audio_input_manager = nil
 $effect_manager = nil
 $vrm_dancer = nil
 $vrm_material_controller = nil
@@ -31,6 +32,7 @@ begin
   JSBridge.log "Ruby VM started, initializing... (Sensitivity: #{VisualizerPolicy.sensitivity})"
 
   $audio_analyzer = AudioAnalyzer.new
+  $audio_input_manager = AudioInputManager.new
   $effect_manager = EffectManager.new
   $vrm_dancer = VRMDancer.new
   $vrm_material_controller = VRMMaterialController.new
