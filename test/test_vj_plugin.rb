@@ -151,7 +151,7 @@ class TestVJPlugin < Test::Unit::TestCase
       desc "Boom effect"
     end
     plugin = VJPlugin.find(:boom)
-    assert_equal "boom!", plugin.format_result([])
+    assert_equal "boom!", plugin.format_result({})
   end
 
   def test_format_result_with_args
@@ -159,7 +159,7 @@ class TestVJPlugin < Test::Unit::TestCase
       param :force, default: 1.0
     end
     plugin = VJPlugin.find(:boom2)
-    assert_equal "boom2: 2.0", plugin.format_result([2.0])
+    assert_equal "boom2: 2.0", plugin.format_result({force: 2.0})
   end
 
   def test_format_result_with_multiple_args
@@ -168,7 +168,16 @@ class TestVJPlugin < Test::Unit::TestCase
       param :spread, default: 0.5
     end
     plugin = VJPlugin.find(:multi_arg)
-    assert_equal "multi_arg: 2.0, 0.8", plugin.format_result([2.0, 0.8])
+    assert_equal "multi_arg: 2.0, 0.8", plugin.format_result({force: 2.0, spread: 0.8})
+  end
+
+  def test_format_result_shows_clamped_value
+    VJPlugin.define(:clamped_display) do
+      param :intensity, default: 1.0, range: 0.0..3.0
+      on_trigger { |p| { bloom_flash: p[:intensity] } }
+    end
+    plugin = VJPlugin.find(:clamped_display)
+    assert_equal "clamped_display: 3.0", plugin.format_result({intensity: 3.0})
   end
 
   # === Duplicate Registration ===

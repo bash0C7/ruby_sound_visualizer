@@ -252,8 +252,9 @@ class VJPad
       params[param_keys[i]] = arg if i < param_keys.length
     end
 
+    resolved = plugin.resolve_params(params)
     effects = plugin.execute(params)
     @pending_actions << { type: :plugin, name: plugin.name, effects: effects }
-    plugin.format_result(args)
+    plugin.format_result(args.empty? ? {} : resolved)
   end
 end

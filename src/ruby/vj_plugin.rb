@@ -59,15 +59,13 @@ class PluginDefinition
     @trigger_block.call(resolved)
   end
 
-  def format_result(args)
-    if args.empty?
+  def format_result(resolved = {})
+    if resolved.empty?
       "#{@name}!"
     else
-      "#{@name}: #{args.join(', ')}"
+      "#{@name}: #{resolved.values.map(&:to_s).join(', ')}"
     end
   end
-
-  private
 
   def resolve_params(args)
     resolved = {}

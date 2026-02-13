@@ -56,4 +56,11 @@ class TestVJShockwavePlugin < Test::Unit::TestCase
     assert_equal 1, actions.length
     assert_equal :shockwave, actions[0][:name]
   end
+
+  def test_display_shows_clamped_value
+    pad = VJPad.new
+    result = pad.exec("shockwave 10")
+    assert_equal true, result[:ok]
+    assert_equal "shockwave: 5.0", result[:msg]
+  end
 end
