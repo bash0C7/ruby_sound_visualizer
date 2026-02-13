@@ -34,6 +34,7 @@ begin
   $audio_analyzer = AudioAnalyzer.new
   $audio_input_manager = AudioInputManager.new
   $effect_manager = EffectManager.new
+  $effect_dispatcher = EffectDispatcher.new($effect_manager)
   $vrm_dancer = VRMDancer.new
   $vrm_material_controller = VRMMaterialController.new
   $keyboard_handler = KeyboardHandler.new($audio_input_manager)
@@ -68,17 +69,10 @@ begin
         $initialized = true
       end
 
-      # Consume VJPad pending actions (burst/flash triggers)
+      # Consume VJPad pending actions (plugin-dispatched effects)
       if $vj_pad
         $vj_pad.consume_actions.each do |action|
-          case action[:type]
-          when :burst
-            force = action[:force] || 1.0
-            $effect_manager.inject_impulse(bass: force, mid: force, high: force, overall: force)
-          when :flash
-            intensity = action[:intensity] || 1.0
-            $effect_manager.inject_bloom_flash(intensity)
-          end
+          $effect_dispatcher.dispatch(action[:effects]) if action[:effects]
         end
       end
 

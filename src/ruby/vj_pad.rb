@@ -164,17 +164,34 @@ class VJPad
     end
   end
 
-  # --- Action Commands ---
+  # --- Plugin Commands ---
+  # Plugin-defined commands (burst, flash, etc.) are resolved via method_missing.
+  # Plugins register themselves via VJPlugin.define(:name) { ... }.
 
-  def burst(force = nil)
-    f = force ? force.to_f : 1.0
-    @pending_actions << { type: :burst, force: f }
-    force ? "burst: #{f}" : "burst!"
+  def method_missing(name, *args, &block)
+    plugin = VJPlugin.find(name)
+    if plugin
+      execute_plugin(plugin, args)
+    else
+      super
+    end
   end
 
-  def flash(intensity = nil)
-    v = intensity ? intensity.to_f : 1.0
-    @pending_actions << { type: :flash, intensity: v }
-    intensity ? "flash: #{v}" : "flash!"
+  def respond_to_missing?(name, include_private = false)
+    VJPlugin.find(name) ? true : super
+  end
+
+  private
+
+  def execute_plugin(plugin, args)
+    param_keys = plugin.params.keys
+    params = {}
+    args.each_with_index do |arg, i|
+      params[param_keys[i]] = arg if i < param_keys.length
+    end
+
+    effects = plugin.execute(params)
+    @pending_actions << { type: :plugin, name: plugin.name, effects: effects }
+    plugin.format_result(args)
   end
 end

@@ -337,32 +337,38 @@ class TestVJPad < Test::Unit::TestCase
     assert_equal [], @pad.pending_actions
   end
 
-  def test_burst_queues_pending_action
+  def test_burst_queues_plugin_action
     @pad.burst
     actions = @pad.pending_actions
     assert_equal 1, actions.length
-    assert_equal :burst, actions[0][:type]
-    assert_in_delta 1.0, actions[0][:force], 0.001
+    assert_equal :plugin, actions[0][:type]
+    assert_equal :burst, actions[0][:name]
+    impulse = actions[0][:effects][:impulse]
+    assert_in_delta 1.0, impulse[:bass], 0.001
+    assert_in_delta 1.0, impulse[:overall], 0.001
   end
 
-  def test_burst_with_force_queues_correct_value
+  def test_burst_with_force_queues_correct_effects
     @pad.burst(2.5)
     actions = @pad.pending_actions
-    assert_in_delta 2.5, actions[0][:force], 0.001
+    impulse = actions[0][:effects][:impulse]
+    assert_in_delta 2.5, impulse[:bass], 0.001
+    assert_in_delta 2.5, impulse[:mid], 0.001
   end
 
-  def test_flash_queues_pending_action
+  def test_flash_queues_plugin_action
     @pad.flash
     actions = @pad.pending_actions
     assert_equal 1, actions.length
-    assert_equal :flash, actions[0][:type]
-    assert_in_delta 1.0, actions[0][:intensity], 0.001
+    assert_equal :plugin, actions[0][:type]
+    assert_equal :flash, actions[0][:name]
+    assert_in_delta 1.0, actions[0][:effects][:bloom_flash], 0.001
   end
 
-  def test_flash_with_intensity_queues_correct_value
+  def test_flash_with_intensity_queues_correct_effects
     @pad.flash(2.0)
     actions = @pad.pending_actions
-    assert_in_delta 2.0, actions[0][:intensity], 0.001
+    assert_in_delta 2.0, actions[0][:effects][:bloom_flash], 0.001
   end
 
   def test_consume_actions_returns_and_clears
@@ -370,8 +376,8 @@ class TestVJPad < Test::Unit::TestCase
     @pad.flash(2.0)
     consumed = @pad.consume_actions
     assert_equal 2, consumed.length
-    assert_equal :burst, consumed[0][:type]
-    assert_equal :flash, consumed[1][:type]
+    assert_equal :burst, consumed[0][:name]
+    assert_equal :flash, consumed[1][:name]
     # After consume, should be empty
     assert_equal [], @pad.pending_actions
   end
