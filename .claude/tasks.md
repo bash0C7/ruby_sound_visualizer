@@ -13,15 +13,19 @@
 
 ## 🎛️ VJ Pad 調整・改善タスク
 
+- [x] 音にあわせて発動する爆発的な輝きの度合いの調整 🌐
+  - Bloom 強度の音響連動パラメータ調整
+  - パーティクルバーストの音響感度調整
+  - 音量・周波数帯域別のエフェクト強度マッピング
+  - 9 mutable params in VisualizerPolicy (bloom, particles, audio)
+  - Control Panel UI with sliders (toggle: `p` key)
+  - 8 new VJ Pad DSL commands (bbs, bes, bis, pp, pf, fr, vs, id)
+  - Completed: 339 tests pass
+
 - [ ] コマンドの種類や発動するエフェクトの調整 🖥️
   - 既存コマンド（burst, flash）のパラメータ調整
   - 新しいエフェクトコマンドの追加検討
   - エフェクトの視覚的インパクトの最適化
-
-- [ ] 音にあわせて発動する爆発的な輝きの度合いの調整 🖥️
-  - Bloom 強度の音響連動パラメータ調整
-  - パーティクルバーストの音響感度調整
-  - 音量・周波数帯域別のエフェクト強度マッピング
 
 ## 🎵 音源入力拡張タスク
 

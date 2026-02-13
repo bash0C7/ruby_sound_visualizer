@@ -54,6 +54,31 @@ WebGL Rendering
 }
 ```
 
+## Runtime Mutable Parameters (Ruby)
+
+`VisualizerPolicy` provides 15 runtime-mutable parameters grouped into categories:
+
+**Master**: sensitivity, exclude_max
+**Bloom**: bloom_base_strength, max_bloom, bloom_energy_scale, bloom_impulse_scale
+**Particles**: particle_explosion_base_prob, particle_explosion_energy_scale, particle_explosion_force_scale, particle_friction
+**Rendering**: max_brightness, max_lightness, max_emissive
+**Audio**: visual_smoothing, impulse_decay
+
+These parameters can be adjusted via:
+- Control Panel UI (slider-based, toggle with `p` key)
+- VJ Pad DSL commands (bbs, bes, bis, pp, pf, fr, vs, id)
+- DevTools console (rubyConfigSet/rubyConfigGet/rubyConfigList/rubyConfigReset)
+
+All parameters have min/max bounds and can be reset to defaults with `r` (VJ Pad) or `rubyConfigReset()` (DevTools).
+
+## Control Panel UI
+
+HTML/CSS control panel overlaying the visualizer canvas:
+- Toggle visibility with `p` key
+- Sliders grouped by category (Bloom, Particles, Audio)
+- Real-time bidirectional sync with VisualizerPolicy
+- Preview-first startup flow (panel visible before audio starts)
+
 ## Particle System (Ruby)
 
 10,000個のパーティクルを管理：
@@ -128,6 +153,7 @@ PARTICLE_COUNT = 10000  # 5000 や 3000 に減らす
 HTML/CSS (lines 1-X)
   ├── Canvas と UI
   ├── Loading animation
+  ├── Control Panel (audio parameter sliders)
   └── Debug info display
 
 JavaScript (lines X-Y)
@@ -145,5 +171,9 @@ Ruby Code (lines Y-Z)
   ├── ParticleSystem
   ├── GeometryMorpher
   ├── EffectManager
+  ├── BloomController
+  ├── AudioInputManager
+  ├── VisualizerPolicy (constants + mutable params)
+  ├── VJPad (DSL commands)
   └── Main (initialization & main loop)
 ```
