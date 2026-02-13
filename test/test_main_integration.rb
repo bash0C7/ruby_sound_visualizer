@@ -158,25 +158,21 @@ class TestMainIntegration < Test::Unit::TestCase
 
   def test_vj_pad_burst_and_flash_integration
     effect_manager = EffectManager.new
+    dispatcher = EffectDispatcher.new(effect_manager)
     vj_pad = VJPad.new
 
     # Trigger burst via VJPad
     result = vj_pad.exec("burst 2.0")
     assert_equal "burst: 2.0", result[:msg]
 
-    # Consume actions and apply to effect manager
+    # Consume actions and dispatch via EffectDispatcher
     actions = vj_pad.consume_actions
     assert_equal 1, actions.length
-    assert_equal :burst, actions[0][:type]
-    assert_in_delta 2.0, actions[0][:force], 0.01
+    assert_equal :plugin, actions[0][:type]
+    assert_equal :burst, actions[0][:name]
 
-    # Inject impulse to effect manager
-    effect_manager.inject_impulse(
-      bass: actions[0][:force],
-      mid: actions[0][:force],
-      high: actions[0][:force],
-      overall: actions[0][:force]
-    )
+    # Dispatch effects to effect manager
+    actions.each { |action| dispatcher.dispatch(action[:effects]) }
 
     # Call update to generate particle_data
     dummy_analysis = {

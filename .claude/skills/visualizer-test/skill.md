@@ -7,7 +7,7 @@
 1. **初期化確認**
    - ローカルサーバーの起動確認（http://localhost:8000）
    - ページの読み込み
-   - Ruby WASM の初期化（30秒待機）
+   - Ruby WASM の初期化（30秒待機） ← Auto-start: Start Preview ボタンは不要
    - VRM アップロード画面の処理（基本モードでは "Start without VRM" を自動クリック）
    - 初期画面のスクリーンショット
 
@@ -18,7 +18,15 @@
    - **8/9キー**: 最大明度調整（-5/+5）
    - **+/-キー**: 感度調整（±0.05）
 
-3. **VJ Pad テスト（PR #13 新機能）**
+3. **新UX機能テスト（Auto-start / Color Wheel / Camera Controls）**
+   - **Auto-start**: ページ読み込み後に自動でビジュアライザー起動（Start Preview ボタン不要）
+   - **Hue Wheel**: Controls パネルの色相ホイールをクリックして色相変更確認
+     - `window.rubyExecPrompt('h')` で現在のhue取得
+     - ホイールクリック後に hue 値が変わることを確認
+   - **Camera Sliders**: Controls パネルの Distance/H.Rotation/V.Rotation スライダー操作確認
+     - `window.rubyExecPrompt` は使わず、JS 変数 `cameraRadius`, `cameraTheta`, `cameraPhi` が変わることを確認
+
+4. **VJ Pad テスト（PR #13 新機能）**
    - **バッククォートキー**: プロンプト開閉
    - **色モード変更**: `c 0` (Gray), `c 1` (Red), `c 2` (Green), `c 3` (Blue)
    - **感度調整**: `s 1.5` (感度を1.5に設定)
@@ -97,7 +105,7 @@
 2. 既存のVisualizerタブがあればそれを使用、なければ tabs_create_mcp で新規作成
 3. mcp__claude-in-chrome__navigate でページに移動
    URL: http://localhost:8000/index.html?nocache=[現在のタイムスタンプ]
-4. Bash tool で `sleep 30` を実行（Ruby WASM初期化を待機）
+4. Bash tool で `sleep 15` を実行（Ruby WASM初期化を待機）
 5. mcp__claude-in-chrome__find で "Start without VRM" ボタンを探す
    query: "Start without VRM button"
 6. mcp__claude-in-chrome__computer で left_click アクションを実行してボタンをクリック
@@ -253,8 +261,8 @@ bundle exec ruby -run -ehttpd . -p8000
 
 ### Ruby WASM初期化が遅い場合
 
-- 初回読み込みはCDNからのダウンロードがあるため40-60秒かかることがあります
-- `sleep 30` を `sleep 45` に変更してください
+- 通常は15秒以内に完了。初回読み込みはCDNダウンロードがあるため遅くなる場合あり
+- `sleep 15` を `sleep 30` に変更してください
 
 ### マイク許可が必要な場合
 

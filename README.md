@@ -64,8 +64,12 @@ Press the backtick key (`) to open the VJ Pad prompt at the bottom of the screen
 | `lt <value>` | Set max lightness (0-255) | `lt 180` |
 | `em <value>` | Set emissive intensity | `em 0.5` |
 | `bm <value>` | Set bloom strength | `bm 3.0` |
-| `burst` | Trigger particle burst effect | `burst` |
-| `flash` | Trigger bloom flash effect | `flash` |
+| `burst [force]` | Trigger particle burst effect (plugin) | `burst 2.0` |
+| `flash [intensity]` | Trigger bloom flash effect (plugin) | `flash 1.5` |
+| `shockwave [force]` | Bass-heavy impulse with bloom flash (plugin) | `shockwave 2.0` |
+| `strobe [intensity]` | Quick bloom strobe flash (plugin) | `strobe 3.0` |
+| `rave [level]` | Max energy preset with param boost (plugin) | `rave 1.5` |
+| `plugins` | List all available plugin commands | `plugins` |
 | `r` | Reset all parameters to defaults | `r` |
 
 ### Command Features
@@ -90,6 +94,32 @@ c :blue; s 1.5   # Blue mode with 1.5x sensitivity
 ```
 
 Press backtick (`) again or Escape to close the prompt.
+
+### Plugin System
+
+Effect commands are implemented as plugins. Built-in plugins include burst, flash, shockwave, strobe, and rave. Each plugin is a standalone Ruby file in `src/ruby/plugins/` that defines a VJ Pad command and its visual effects.
+
+To add a custom effect, create a plugin file:
+
+```ruby
+# src/ruby/plugins/vj_nova.rb
+VJPlugin.define(:nova) do
+  desc "Combined impulse and bloom nova"
+  param :force, default: 1.0, range: 0.0..3.0
+  param :glow, default: 2.0, range: 0.0..5.0
+
+  on_trigger do |params|
+    f = params[:force]
+    g = params[:glow]
+    {
+      impulse: { bass: f, mid: f, high: f, overall: f },
+      bloom_flash: g
+    }
+  end
+end
+```
+
+Then add a script tag in `index.html` to load it. The command becomes available in VJ Pad immediately. See CLAUDE.md for the full plugin development guide.
 
 ## URL Parameters
 
@@ -118,6 +148,7 @@ The visualizer includes:
 - Camera shake triggered by bass frequencies
 - Real-time parameter adjustment via keyboard shortcuts
 - VJ Pad command interface for advanced real-time control via Ruby DSL
+- Plugin system for adding custom VJ Pad effect commands
 - Live display of BPM and frequency levels
 
 ## Technology
@@ -134,25 +165,29 @@ The visualizer includes:
 ruby_sound_visualizer/
 ├── index.html                    # Main HTML file (loads all components)
 ├── src/ruby/                     # Ruby logic (loaded via ruby.wasm)
-│   ├── audio_analyzer.rb         # Frequency analysis and beat detection
-│   ├── bloom_controller.rb       # Bloom glow effect parameters
-│   ├── bpm_estimator.rb          # BPM estimation from beat intervals
-│   ├── camera_controller.rb      # Camera shake and positioning
-│   ├── color_palette.rb          # Color modes and HSV conversion
-│   ├── debug_formatter.rb        # Debug information formatting
+│   ├── plugins/                  # VJ Pad plugin commands
+│   │   ├── vj_burst.rb           #   Burst effect (impulse injection)
+│   │   ├── vj_flash.rb           #   Flash effect (bloom flash)
+│   │   ├── vj_shockwave.rb       #   Shockwave effect (bass impulse + bloom)
+│   │   ├── vj_strobe.rb          #   Strobe effect (quick bloom flash)
+│   │   └── vj_rave.rb            #   Rave preset (max energy + param boost)
+│   ├── vj_plugin.rb              # Plugin system core (registry and DSL)
+│   ├── effect_dispatcher.rb      # Plugin effects to EffectManager translator
+│   ├── vj_pad.rb                 # VJ Pad command interface (delegates to plugins)
 │   ├── effect_manager.rb         # Coordinates all visual effects
-│   ├── frame_counter.rb          # FPS measurement and tracking
-│   ├── frequency_mapper.rb       # Frequency band mapping
-│   ├── geometry_morpher.rb       # Torus scaling and rotation
-│   ├── js_bridge.rb              # JavaScript-Ruby bridge layer
-│   ├── keyboard_handler.rb       # Keyboard input handling
-│   ├── main.rb                   # Entry point and main loop
-│   ├── math_helper.rb            # Mathematical utility functions
+│   ├── audio_analyzer.rb         # Frequency analysis and beat detection
 │   ├── particle_system.rb        # Particle physics and explosions
-│   ├── vj_pad.rb                 # VJ Pad command interface and DSL
-│   ├── visualizer_policy.rb      # Configuration and policy management
-│   ├── vrm_dancer.rb             # VRM character animation
-│   └── vrm_material_controller.rb # VRM glow intensity control
+│   ├── geometry_morpher.rb       # Torus scaling and rotation
+│   ├── bloom_controller.rb       # Bloom glow effect parameters
+│   ├── camera_controller.rb      # Camera shake and positioning
+│   ├── js_bridge.rb              # JavaScript-Ruby bridge layer
+│   ├── main.rb                   # Entry point and main loop
+│   └── ...                       # Other core modules
+├── test/                         # Unit and integration tests
+│   ├── test_vj_plugin.rb         # Plugin system tests
+│   ├── test_effect_dispatcher.rb # Effect dispatcher tests
+│   ├── test_vj_pad.rb            # VJ Pad tests (including plugin delegation)
+│   └── ...                       # Other test files
 ├── README.md                     # This file (user guide)
 ├── CLAUDE.md                     # Detailed technical documentation
 ├── Gemfile                       # Ruby dependency management

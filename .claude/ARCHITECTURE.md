@@ -54,6 +54,31 @@ WebGL Rendering
 }
 ```
 
+## Runtime Mutable Parameters (Ruby)
+
+`VisualizerPolicy` provides 15 runtime-mutable parameters grouped into categories:
+
+**Master**: sensitivity, exclude_max
+**Bloom**: bloom_base_strength, max_bloom, bloom_energy_scale, bloom_impulse_scale
+**Particles**: particle_explosion_base_prob, particle_explosion_energy_scale, particle_explosion_force_scale, particle_friction
+**Rendering**: max_brightness, max_lightness, max_emissive
+**Audio**: visual_smoothing, impulse_decay
+
+These parameters can be adjusted via:
+- Control Panel UI (slider-based, toggle with `p` key)
+- VJ Pad DSL commands (bbs, bes, bis, pp, pf, fr, vs, id)
+- DevTools console (rubyConfigSet/rubyConfigGet/rubyConfigList/rubyConfigReset)
+
+All parameters have min/max bounds and can be reset to defaults with `r` (VJ Pad) or `rubyConfigReset()` (DevTools).
+
+## Control Panel UI
+
+HTML/CSS control panel overlaying the visualizer canvas:
+- Toggle visibility with `p` key
+- Sliders grouped by category (Bloom, Particles, Audio)
+- Real-time bidirectional sync with VisualizerPolicy
+- Preview-first startup flow (panel visible before audio starts)
+
 ## Particle System (Ruby)
 
 10,000個のパーティクルを管理：
@@ -89,6 +114,54 @@ color = BASS_COLOR * bass_weight +
 # エネルギーで明度を制御
 brightness = 0.3 + sqrt(energy) * 1.7
 ```
+
+## Plugin System
+
+VJ Pad commands are implemented as plugins, decoupled from the core system.
+
+### Components
+
+- **VJPlugin** (`vj_plugin.rb`): Plugin registry and DSL for defining commands
+- **PluginDefinition**: Stores name, description, parameters, and trigger logic
+- **EffectDispatcher** (`effect_dispatcher.rb`): Translates plugin effect hashes into EffectManager calls
+
+### Data Flow
+
+```
+VJPad.exec("burst 2.0")
+  ↓ method_missing → VJPlugin.find(:burst)
+PluginDefinition#execute({ force: 2.0 })
+  ↓ returns effect hash
+{ impulse: { bass: 2.0, mid: 2.0, high: 2.0, overall: 2.0 } }
+  ↓ queued as pending_action
+EffectDispatcher#dispatch(effects)
+  ↓
+EffectManager#inject_impulse(bass: 2.0, ...)
+```
+
+### Plugin Definition
+
+```ruby
+# src/ruby/plugins/vj_burst.rb
+VJPlugin.define(:burst) do
+  desc "Inject impulse across all frequency bands"
+  param :force, default: 1.0
+  on_trigger do |params|
+    f = params[:force]
+    { impulse: { bass: f, mid: f, high: f, overall: f } }
+  end
+end
+```
+
+### Available Effect Types
+
+| Key | Target | Description |
+|-----|--------|-------------|
+| `impulse:` | ParticleSystem, GeometryMorpher, CameraController | Frequency band energy injection |
+| `bloom_flash:` | BloomController | Bloom glow flash |
+| `set_param:` | VisualizerPolicy | Runtime parameter updates |
+
+See [Plugin Development Guide](guides/plugin-development.md) for details.
 
 ## Performance Optimization
 
@@ -128,6 +201,7 @@ PARTICLE_COUNT = 10000  # 5000 や 3000 に減らす
 HTML/CSS (lines 1-X)
   ├── Canvas と UI
   ├── Loading animation
+  ├── Control Panel (audio parameter sliders)
   └── Debug info display
 
 JavaScript (lines X-Y)
@@ -145,5 +219,9 @@ Ruby Code (lines Y-Z)
   ├── ParticleSystem
   ├── GeometryMorpher
   ├── EffectManager
+  ├── BloomController
+  ├── AudioInputManager
+  ├── VisualizerPolicy (constants + mutable params)
+  ├── VJPad (DSL commands)
   └── Main (initialization & main loop)
 ```

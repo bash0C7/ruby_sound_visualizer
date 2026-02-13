@@ -89,6 +89,136 @@
       text-overflow: ellipsis;
     }
     #vjPromptResult.error { color: #f44; }
+    /* Control Panel overlay */
+    #controlPanel {
+      display: none;
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: 300px;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.85);
+      color: #ccc;
+      font-family: monospace;
+      font-size: 11px;
+      z-index: 80;
+      overflow-y: auto;
+      border-left: 1px solid #333;
+      padding: 8px 12px;
+      box-sizing: border-box;
+    }
+    #controlPanel.active { display: block; }
+    #controlPanel .cp-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #444;
+    }
+    #controlPanel .cp-header h3 {
+      margin: 0;
+      color: #0f0;
+      font-size: 13px;
+    }
+    #controlPanel .cp-close {
+      background: none;
+      border: 1px solid #666;
+      color: #999;
+      cursor: pointer;
+      padding: 2px 8px;
+      font-family: monospace;
+      font-size: 11px;
+      border-radius: 3px;
+    }
+    #controlPanel .cp-close:hover { color: #fff; border-color: #fff; }
+    #controlPanel .cp-group {
+      margin-bottom: 10px;
+    }
+    #controlPanel .cp-group-title {
+      color: #0cc;
+      font-size: 11px;
+      margin: 0 0 4px 0;
+      cursor: pointer;
+      user-select: none;
+    }
+    #controlPanel .cp-group-title:hover { color: #0ff; }
+    #controlPanel .cp-slider-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-bottom: 3px;
+    }
+    #controlPanel .cp-label {
+      width: 100px;
+      flex-shrink: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: #aaa;
+    }
+    #controlPanel .cp-value {
+      width: 42px;
+      flex-shrink: 0;
+      text-align: right;
+      color: #0f0;
+      font-size: 10px;
+    }
+    #controlPanel input[type="range"] {
+      flex: 1;
+      height: 14px;
+      -webkit-appearance: none;
+      appearance: none;
+      background: #333;
+      border-radius: 2px;
+      outline: none;
+    }
+    #controlPanel input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 10px;
+      height: 14px;
+      background: #0f0;
+      border-radius: 2px;
+      cursor: pointer;
+    }
+    #controlPanel .cp-actions {
+      display: flex;
+      gap: 6px;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid #444;
+    }
+    #controlPanel .cp-btn {
+      flex: 1;
+      padding: 6px;
+      background: #222;
+      color: #0f0;
+      border: 1px solid #0f0;
+      border-radius: 3px;
+      cursor: pointer;
+      font-family: monospace;
+      font-size: 11px;
+      text-align: center;
+    }
+    #controlPanel .cp-btn:hover { background: #0f0; color: #000; }
+    /* VRM choice bar (overlaid on preview) */
+    #vrmChoiceBar {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 90;
+      text-align: center;
+    }
+    #vrmChoiceBar.active { display: block; }
+    #vrmChoiceBar .vrm-title {
+      color: #fff;
+      font-family: monospace;
+      font-size: 16px;
+      margin-bottom: 16px;
+    }
   </style>
 </head>
 <body>
@@ -101,12 +231,50 @@
   <div id="loading">
     <div id="loadingTitle">Loading Ruby WASM Sound Visualizer...</div>
     <div id="loadingStatus" style="font-size: 12px; margin-top: 20px;"></div>
-    <div id="vrmUpload" style="display: none;">
-      <label for="vrmFileInput" class="vrm-upload-btn">Upload VRM File</label>
-      <input type="file" id="vrmFileInput" accept=".vrm" style="display: none;">
-      <button id="skipVrmBtn" class="vrm-upload-btn" style="margin-left: 10px;">Start without VRM</button>
-      <button id="captureTabBtn" class="vrm-upload-btn" style="margin-left: 10px;">Capture Tab</button>
-      <div id="vrmFileName"></div>
+  </div>
+  <!-- VRM choice bar (shown after preview starts, overlaid on preview) -->
+  <div id="vrmChoiceBar">
+    <div class="vrm-title">Choose VRM or continue without</div>
+    <label for="vrmFileInput" class="vrm-upload-btn">Upload VRM File</label>
+    <input type="file" id="vrmFileInput" accept=".vrm" style="display: none;">
+    <button id="skipVrmBtn" class="vrm-upload-btn" style="margin-left: 10px;">Start without VRM</button>
+    <button id="captureTabBtn" class="vrm-upload-btn" style="margin-left: 10px;">Capture Tab</button>
+    <div id="vrmFileName" style="margin-top: 10px; font-size: 12px; color: #888;"></div>
+  </div>
+  <!-- Control Panel (right side overlay) -->
+  <div id="controlPanel">
+    <div class="cp-header">
+      <h3>Controls</h3>
+      <button class="cp-close" id="cpCloseBtn" title="Close (p)">X</button>
+    </div>
+    <div class="cp-group" id="cpColorGroup">
+      <div class="cp-group-title">Color</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+        <canvas id="hueWheel" width="120" height="120"
+                style="cursor:crosshair;flex-shrink:0;"></canvas>
+        <div>
+          <div style="color:#aaa;font-size:10px;">Hue</div>
+          <span id="hueValueDisplay" style="color:#0f0;font-size:11px;">0.0°</span>
+          <div style="margin-top:6px;">
+            <div style="color:#aaa;font-size:10px;margin-bottom:3px;">Mode</div>
+            <div id="colorModeButtons" style="display:flex;gap:3px;flex-wrap:wrap;"></div>
+          </div>
+        </div>
+      </div>
+      <div class="cp-slider-row">
+        <span class="cp-label" title="max_brightness">Brightness</span>
+        <input type="range" id="cpSlider_max_brightness" min="0" max="255" step="1" value="255">
+        <span class="cp-value" id="cpVal_max_brightness">255</span>
+      </div>
+      <div class="cp-slider-row">
+        <span class="cp-label" title="max_saturation">Saturation</span>
+        <input type="range" id="cpSlider_max_saturation" min="0" max="100" step="1" value="100">
+        <span class="cp-value" id="cpVal_max_saturation">100</span>
+      </div>
+    </div>
+    <div id="cpSliders"></div>
+    <div class="cp-actions">
+      <button class="cp-btn" id="cpResetBtn">Reset All</button>
     </div>
   </div>
   <div id="vjPrompt">
@@ -170,9 +338,18 @@
   <script type="text/ruby" src="src/ruby/camera_controller.rb"></script>
   <script type="text/ruby" src="src/ruby/bloom_controller.rb"></script>
   <script type="text/ruby" src="src/ruby/effect_manager.rb"></script>
+  <script type="text/ruby" src="src/ruby/effect_dispatcher.rb"></script>
   <script type="text/ruby" src="src/ruby/audio_input_manager.rb"></script>
   <script type="text/ruby" src="src/ruby/keyboard_handler.rb"></script>
+  <script type="text/ruby" src="src/ruby/vj_plugin.rb"></script>
   <script type="text/ruby" src="src/ruby/vj_pad.rb"></script>
+
+  <!-- VJ Pad Plugins (src/ruby/plugins/vj_*.rb) -->
+  <script type="text/ruby" src="src/ruby/plugins/vj_burst.rb"></script>
+  <script type="text/ruby" src="src/ruby/plugins/vj_flash.rb"></script>
+  <script type="text/ruby" src="src/ruby/plugins/vj_shockwave.rb"></script>
+  <script type="text/ruby" src="src/ruby/plugins/vj_strobe.rb"></script>
+  <script type="text/ruby" src="src/ruby/plugins/vj_rave.rb"></script>
   <script type="text/ruby" src="src/ruby/debug_formatter.rb"></script>
   <script type="text/ruby" src="src/ruby/bpm_estimator.rb"></script>
   <script type="text/ruby" src="src/ruby/frame_counter.rb"></script>
@@ -555,8 +732,8 @@
       console.log('[JS] Camera controls initialized (d/f: rotate left/right, e/c: rotate up/down)');
     }
 
-    // VRM file upload promise (or skip)
-    function waitForVRMFile() {
+    // VRM file upload promise (or skip) - shown after preview is running
+    function waitForVRMChoice() {
       return new Promise((resolve) => {
         const input = document.getElementById('vrmFileInput');
         const skipBtn = document.getElementById('skipVrmBtn');
@@ -574,22 +751,14 @@
           resolve(null);  // No VRM file, start without it
         });
 
-        // Tab capture can be started during startup (independent of VRM choice)
+        // Tab capture (independent of VRM choice, audio already initialized)
         captureBtn.addEventListener('click', async () => {
           try {
-            // Need AudioContext before tab capture for audio routing
-            if (!audioContext) {
-              audioContext = new AudioContext();
-              analyser = audioContext.createAnalyser();
-              analyser.fftSize = 2048;
-              analyser.smoothingTimeConstant = 0.5;
-              dataArray = new Uint8Array(analyser.frequencyBinCount);
-            }
             await startTabCapture();
             captureBtn.textContent = 'Tab Captured!';
             captureBtn.disabled = true;
           } catch (error) {
-            console.error('[JS] Tab capture during startup error:', error);
+            console.error('[JS] Tab capture error:', error);
           }
         });
       });
@@ -933,37 +1102,56 @@
       console.log('[JS] ' + message);
     }
 
-    // Initialize everything
+    // Wait for Ruby WASM to finish loading (polls for rubyUpdateVisuals)
+    function waitForRubyReady() {
+      return new Promise(resolve => {
+        (function check() {
+          window.rubyUpdateVisuals ? resolve() : setTimeout(check, 100);
+        })();
+      });
+    }
+
+    // Initialize everything (auto-start flow)
     async function init() {
       try {
-        // Always show VRM upload UI
-        document.getElementById('vrmUpload').style.display = 'block';
-        updateLoadingStatus('Upload a VRM file or start without it...');
+        // Phase 1: Wait for Ruby WASM to finish loading
+        updateLoadingStatus('Loading Ruby WASM...');
+        await waitForRubyReady();
+        console.log('[JS] Ruby WASM ready');
 
-        const vrmFile = await waitForVRMFile();
-        document.getElementById('vrmUpload').style.display = 'none';
-
-        updateLoadingStatus('Initializing Web Audio API...');
-        await initAudio();
-
+        // Phase 2: Initialize Three.js and start animation immediately
         updateLoadingStatus('Initializing Three.js...');
         initThree();
 
+        updateLoadingStatus('Starting preview...');
+        animate();
+
+        // Phase 3: Hide loading, show VRM choice bar + control panel overlaid on preview
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('vrmChoiceBar').classList.add('active');
+        buildControlPanel();
+        document.getElementById('controlPanel').classList.add('active');
+        controlPanelOpen = true;
+
+        console.log('[JS] Preview started with control panel');
+
+        // Phase 4: Start audio and wait for VRM choice in parallel
+        const [vrmFile] = await Promise.all([
+          waitForVRMChoice(),
+          initAudio().catch(error => {
+            console.warn('[JS] Audio init failed (will retry on user click):', error.message);
+          })
+        ]);
+        document.getElementById('vrmChoiceBar').classList.remove('active');
+
         // Load VRM if file was provided
         if (vrmFile) {
-          updateLoadingStatus('Loading VRM model...');
           await loadVRMFile(vrmFile);
-          // Adjust camera for VRM viewing
           camera.position.z = 1.5;
-          console.log('[JS] Initialization complete with VRM!');
+          console.log('[JS] VRM loaded into preview');
         } else {
-          console.log('[JS] Initialization complete without VRM!');
+          console.log('[JS] Continuing without VRM');
         }
-
-        updateLoadingStatus('Ready!');
-        document.getElementById('loading').style.display = 'none';
-
-        animate();
       } catch (error) {
         console.error('[JS] Initialization error:', error);
         updateLoadingStatus('Error: ' + error.message);
@@ -1054,6 +1242,9 @@
       // Backtick toggles VJ Pad prompt
       if (key === '`') { event.preventDefault(); vjPromptToggle(); return; }
 
+      // Control panel toggle
+      if (key === 'p') { toggleControlPanel(); return; }
+
       // Audio input controls (must stay in JS - direct Web Audio manipulation)
       if (key === 'm') { toggleMic(); return; }
       if (key === 't') { toggleTabCapture(); return; }
@@ -1091,6 +1282,329 @@
       reset: () => window.rubyConfigReset?.() ?? 'Ruby VM not ready',
       help: () => console.log('Usage: rubyConfig.set(key, value) | .get(key) | .list() | .reset()')
     };
+
+    // === Control Panel ===
+    let controlPanelOpen = false;
+
+    // Slider definitions (mirrors VisualizerPolicy::MUTABLE_KEYS)
+    const SLIDER_GROUPS = {
+      'Master': [
+        { key: 'sensitivity', label: 'Sensitivity', min: 0.05, max: 10.0, step: 0.05, default: 1.0 },
+      ],
+      'Bloom': [
+        { key: 'bloom_base_strength', label: 'Base Strength', min: 0.0, max: 5.0, step: 0.1, default: 1.5 },
+        { key: 'max_bloom', label: 'Max (Cap)', min: 0.0, max: 10.0, step: 0.1, default: 4.5 },
+        { key: 'bloom_energy_scale', label: 'Energy Scale', min: 0.0, max: 5.0, step: 0.1, default: 2.5 },
+        { key: 'bloom_impulse_scale', label: 'Impulse Scale', min: 0.0, max: 3.0, step: 0.1, default: 1.5 },
+      ],
+      'Particles': [
+        { key: 'particle_explosion_base_prob', label: 'Explosion Prob.', min: 0.0, max: 1.0, step: 0.01, default: 0.20 },
+        { key: 'particle_explosion_energy_scale', label: 'Energy Scale', min: 0.0, max: 2.0, step: 0.01, default: 0.50 },
+        { key: 'particle_explosion_force_scale', label: 'Force Scale', min: 0.0, max: 2.0, step: 0.01, default: 0.55 },
+        { key: 'particle_friction', label: 'Friction', min: 0.50, max: 0.99, step: 0.01, default: 0.86 },
+      ],
+      'Rendering': [
+        { key: 'max_lightness', label: 'Max Lightness', min: 0, max: 255, step: 1, default: 255 },
+        { key: 'max_emissive', label: 'Max Emissive', min: 0.0, max: 10.0, step: 0.1, default: 2.0 },
+      ],
+      'Audio': [
+        { key: 'visual_smoothing', label: 'Visual Smoothing', min: 0.0, max: 0.99, step: 0.01, default: 0.70 },
+        { key: 'impulse_decay', label: 'Impulse Decay', min: 0.50, max: 0.99, step: 0.01, default: 0.82 },
+      ],
+      'Camera': [
+        { key: 'camera_radius', label: 'Distance', min: 1, max: 20, step: 0.1, default: 5,
+          setter: v => { cameraRadius = v; if (cameraTarget) updateCameraPosition(); },
+          getter: () => parseFloat(cameraRadius.toFixed(1)) },
+        { key: 'camera_theta', label: 'H.Rotation', min: -180, max: 180, step: 5, default: 0,
+          setter: v => { cameraTheta = v * Math.PI / 180; if (cameraTarget) updateCameraPosition(); },
+          getter: () => Math.round(cameraTheta * 180 / Math.PI) },
+        { key: 'camera_phi', label: 'V.Rotation', min: -80, max: 80, step: 5, default: 0,
+          setter: v => { cameraPhi = v * Math.PI / 180; if (cameraTarget) updateCameraPosition(); },
+          getter: () => Math.round(cameraPhi * 180 / Math.PI) },
+      ],
+    };
+
+    function initHueWheel() {
+      const canvas = document.getElementById('hueWheel');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const cx = canvas.width / 2;
+      const cy = canvas.height / 2;
+      const outerR = 56;
+      const innerR = 34;
+
+      function drawWheel(currentHue) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // Draw hue ring
+        for (let deg = 0; deg < 360; deg++) {
+          const startAngle = (deg - 90) * Math.PI / 180;
+          const endAngle = (deg - 89) * Math.PI / 180;
+          ctx.beginPath();
+          ctx.arc(cx, cy, (outerR + innerR) / 2, startAngle, endAngle);
+          ctx.lineWidth = outerR - innerR;
+          ctx.strokeStyle = `hsl(${deg},100%,50%)`;
+          ctx.stroke();
+        }
+        // Draw indicator dot at current hue
+        const angle = (currentHue - 90) * Math.PI / 180;
+        const dotR = (outerR + innerR) / 2;
+        const dx = cx + dotR * Math.cos(angle);
+        const dy = cy + dotR * Math.sin(angle);
+        ctx.beginPath();
+        ctx.arc(dx, dy, 5, 0, Math.PI * 2);
+        ctx.fillStyle = '#fff';
+        ctx.fill();
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+
+      // Get current hue from Ruby and draw
+      function getCurrentHue() {
+        if (!window.rubyExecPrompt) return 0;
+        try {
+          const result = window.rubyExecPrompt('h');
+          const match = String(result).match(/[\d.]+/);
+          return match ? parseFloat(match[0]) : 0;
+        } catch (e) { return 0; }
+      }
+
+      let currentHue = getCurrentHue();
+      drawWheel(currentHue);
+      document.getElementById('hueValueDisplay').textContent = currentHue.toFixed(1) + '°';
+
+      // Helper: update hue wheel display to given value
+      function syncWheelTo(hue) {
+        currentHue = hue;
+        drawWheel(currentHue);
+        document.getElementById('hueValueDisplay').textContent = hue.toFixed(1) + '°';
+      }
+
+      // Helper: restore saturation from 0 when switching to color mode
+      function restoreSatIfZero() {
+        const curSat = window.rubyConfigGet?.('max_saturation') || 0;
+        if (curSat === 0) {
+          if (window.rubyConfigSet) window.rubyConfigSet('max_saturation', 100);
+          const s = document.getElementById('cpSlider_max_saturation');
+          const v = document.getElementById('cpVal_max_saturation');
+          if (s) s.value = 100;
+          if (v) v.textContent = '100';
+        }
+      }
+
+      // Click handler: calculate angle from click position
+      canvas.addEventListener('click', function(e) {
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left - cx;
+        const y = e.clientY - rect.top - cy;
+        const dist = Math.sqrt(x * x + y * y);
+        if (dist < innerR || dist > outerR) return;  // Only respond in ring area
+        let angle = Math.atan2(y, x) * 180 / Math.PI + 90;
+        if (angle < 0) angle += 360;
+        if (angle >= 360) angle -= 360;
+        const hue = Math.round(angle);
+        if (window.rubyExecPrompt) {
+          // If in Gray mode, auto-switch to Red (user is picking a color)
+          const modeResult = String(window.rubyExecPrompt('c'));
+          if (modeResult.includes('gray')) {
+            window.rubyExecPrompt('c 1');
+            restoreSatIfZero();
+          }
+          window.rubyExecPrompt('h ' + hue);
+        }
+        syncWheelTo(hue);
+      });
+
+      // Brightness and Saturation sliders (wired to rubyConfigSet/Get)
+      const colorSliderDefs = [
+        { id: 'max_brightness', decimals: 0 },
+        { id: 'max_saturation', decimals: 0 },
+      ];
+      colorSliderDefs.forEach(({ id, decimals }) => {
+        const slider = document.getElementById('cpSlider_' + id);
+        const valueEl = document.getElementById('cpVal_' + id);
+        if (!slider || !valueEl) return;
+        // Sync initial value from Ruby
+        const cur = window.rubyConfigGet?.(id);
+        if (cur !== undefined && typeof cur === 'number') {
+          slider.value = cur;
+          valueEl.textContent = cur.toFixed(decimals);
+        }
+        slider.addEventListener('input', function() {
+          const v = Number(this.value);
+          valueEl.textContent = v.toFixed(decimals);
+          if (window.rubyConfigSet) window.rubyConfigSet(id, v);
+          // Saturation = 0: auto-switch to Gray mode + sync wheel to 0°
+          if (id === 'max_saturation' && v === 0 && window.rubyExecPrompt) {
+            window.rubyExecPrompt('c 0');
+            syncWheelTo(0);
+          }
+        });
+        slider.addEventListener('keydown', function(e) { e.stopPropagation(); });
+      });
+
+      // Mode buttons (c 0/1/2/3) with Saturation slider sync
+      const modes = [
+        { label: 'Gray', cmd: 'c 0', isGray: true },
+        { label: 'Red',  cmd: 'c 1', isGray: false },
+        { label: 'Green', cmd: 'c 2', isGray: false },
+        { label: 'Blue', cmd: 'c 3', isGray: false },
+      ];
+      const modeContainer = document.getElementById('colorModeButtons');
+      if (modeContainer) {
+        modes.forEach(m => {
+          const btn = document.createElement('button');
+          btn.className = 'cp-btn';
+          btn.textContent = m.label;
+          btn.style.flex = '0 0 auto';
+          btn.style.padding = '3px 6px';
+          btn.style.fontSize = '10px';
+          btn.addEventListener('click', () => {
+            if (window.rubyExecPrompt) window.rubyExecPrompt(m.cmd);
+            const satSlider = document.getElementById('cpSlider_max_saturation');
+            const satVal = document.getElementById('cpVal_max_saturation');
+            if (m.isGray) {
+              // Gray: set saturation to 0 + sync wheel to 0°
+              if (window.rubyConfigSet) window.rubyConfigSet('max_saturation', 0);
+              if (satSlider) satSlider.value = 0;
+              if (satVal) satVal.textContent = '0';
+              syncWheelTo(0);
+            } else {
+              // Color mode: restore saturation if 0, sync wheel to 0° (mode resets offset)
+              restoreSatIfZero();
+              syncWheelTo(0);
+            }
+          });
+          modeContainer.appendChild(btn);
+        });
+      }
+    }
+
+    function buildControlPanel() {
+      const container = document.getElementById('cpSliders');
+      container.innerHTML = '';
+
+      for (const [groupName, sliders] of Object.entries(SLIDER_GROUPS)) {
+        const group = document.createElement('div');
+        group.className = 'cp-group';
+
+        const title = document.createElement('div');
+        title.className = 'cp-group-title';
+        title.textContent = groupName;
+        group.appendChild(title);
+
+        const content = document.createElement('div');
+        content.className = 'cp-group-content';
+
+        for (const def of sliders) {
+          const row = document.createElement('div');
+          row.className = 'cp-slider-row';
+
+          const label = document.createElement('span');
+          label.className = 'cp-label';
+          label.textContent = def.label;
+          label.title = def.key;
+
+          const value = document.createElement('span');
+          value.className = 'cp-value';
+          value.id = 'cpVal_' + def.key;
+
+          const input = document.createElement('input');
+          input.type = 'range';
+          input.min = def.min;
+          input.max = def.max;
+          input.step = def.step;
+          input.value = def.default;
+          input.id = 'cpSlider_' + def.key;
+
+          // Read current value (JS getter or Ruby)
+          const currentVal = def.getter ? def.getter() : window.rubyConfigGet?.(def.key);
+          if (currentVal !== undefined && typeof currentVal === 'number') {
+            input.value = currentVal;
+          }
+          value.textContent = Number(input.value).toFixed(def.step < 1 ? 2 : 0);
+
+          input.addEventListener('input', function() {
+            const v = Number(this.value);
+            value.textContent = v.toFixed(def.step < 1 ? 2 : 0);
+            if (def.setter) {
+              def.setter(v);
+            } else if (window.rubyConfigSet) {
+              window.rubyConfigSet(def.key, v);
+            }
+          });
+
+          // Prevent keyboard events from propagating (avoid camera/color controls)
+          input.addEventListener('keydown', function(e) { e.stopPropagation(); });
+
+          row.appendChild(label);
+          row.appendChild(input);
+          row.appendChild(value);
+          content.appendChild(row);
+        }
+
+        group.appendChild(content);
+        container.appendChild(group);
+      }
+
+      // Wire close and reset buttons
+      document.getElementById('cpCloseBtn').addEventListener('click', toggleControlPanel);
+      document.getElementById('cpResetBtn').addEventListener('click', function() {
+        if (window.rubyConfigReset) window.rubyConfigReset();
+        // Reset JS-side sliders (Camera) to defaults
+        for (const sliders of Object.values(SLIDER_GROUPS)) {
+          for (const def of sliders) {
+            if (def.setter) def.setter(def.default);
+          }
+        }
+        syncControlPanelValues();
+      });
+
+      // Initialize hue wheel
+      initHueWheel();
+    }
+
+    function syncControlPanelValues() {
+      for (const sliders of Object.values(SLIDER_GROUPS)) {
+        for (const def of sliders) {
+          const slider = document.getElementById('cpSlider_' + def.key);
+          const valueEl = document.getElementById('cpVal_' + def.key);
+          if (slider && valueEl) {
+            const currentVal = def.getter ? def.getter() : window.rubyConfigGet?.(def.key);
+            if (currentVal !== undefined && typeof currentVal === 'number') {
+              slider.value = currentVal;
+              valueEl.textContent = currentVal.toFixed(def.step < 1 ? 2 : 0);
+            } else {
+              slider.value = def.default;
+              valueEl.textContent = Number(def.default).toFixed(def.step < 1 ? 2 : 0);
+            }
+          }
+        }
+      }
+      // Sync Color group sliders (brightness/saturation) from Ruby
+      ['max_brightness', 'max_saturation'].forEach(id => {
+        const slider = document.getElementById('cpSlider_' + id);
+        const valueEl = document.getElementById('cpVal_' + id);
+        if (slider && valueEl) {
+          const v = window.rubyConfigGet?.(id);
+          if (v !== undefined && typeof v === 'number') {
+            slider.value = v;
+            valueEl.textContent = Math.round(v);
+          }
+        }
+      });
+    }
+
+    function toggleControlPanel() {
+      controlPanelOpen = !controlPanelOpen;
+      const panel = document.getElementById('controlPanel');
+      if (controlPanelOpen) {
+        panel.classList.add('active');
+        syncControlPanelValues();
+      } else {
+        panel.classList.remove('active');
+      }
+    }
 
     // Handle window resize
     window.addEventListener('resize', function() {

@@ -3,12 +3,7 @@ require_relative 'test_helper'
 class TestVJPad < Test::Unit::TestCase
   def setup
     JS.reset_global!
-    VisualizerPolicy.sensitivity = 1.0
-    VisualizerPolicy.max_brightness = 255
-    VisualizerPolicy.max_lightness = 255
-    VisualizerPolicy.max_emissive = 2.0
-    VisualizerPolicy.max_bloom = 4.5
-    VisualizerPolicy.exclude_max = false
+    VisualizerPolicy.reset_runtime
     ColorPalette.set_hue_mode(nil)
     ColorPalette.set_hue_offset(0.0)
     @pad = VJPad.new
@@ -337,32 +332,38 @@ class TestVJPad < Test::Unit::TestCase
     assert_equal [], @pad.pending_actions
   end
 
-  def test_burst_queues_pending_action
+  def test_burst_queues_plugin_action
     @pad.burst
     actions = @pad.pending_actions
     assert_equal 1, actions.length
-    assert_equal :burst, actions[0][:type]
-    assert_in_delta 1.0, actions[0][:force], 0.001
+    assert_equal :plugin, actions[0][:type]
+    assert_equal :burst, actions[0][:name]
+    impulse = actions[0][:effects][:impulse]
+    assert_in_delta 1.0, impulse[:bass], 0.001
+    assert_in_delta 1.0, impulse[:overall], 0.001
   end
 
-  def test_burst_with_force_queues_correct_value
+  def test_burst_with_force_queues_correct_effects
     @pad.burst(2.5)
     actions = @pad.pending_actions
-    assert_in_delta 2.5, actions[0][:force], 0.001
+    impulse = actions[0][:effects][:impulse]
+    assert_in_delta 2.5, impulse[:bass], 0.001
+    assert_in_delta 2.5, impulse[:mid], 0.001
   end
 
-  def test_flash_queues_pending_action
+  def test_flash_queues_plugin_action
     @pad.flash
     actions = @pad.pending_actions
     assert_equal 1, actions.length
-    assert_equal :flash, actions[0][:type]
-    assert_in_delta 1.0, actions[0][:intensity], 0.001
+    assert_equal :plugin, actions[0][:type]
+    assert_equal :flash, actions[0][:name]
+    assert_in_delta 1.0, actions[0][:effects][:bloom_flash], 0.001
   end
 
-  def test_flash_with_intensity_queues_correct_value
+  def test_flash_with_intensity_queues_correct_effects
     @pad.flash(2.0)
     actions = @pad.pending_actions
-    assert_in_delta 2.0, actions[0][:intensity], 0.001
+    assert_in_delta 2.0, actions[0][:effects][:bloom_flash], 0.001
   end
 
   def test_consume_actions_returns_and_clears
@@ -370,8 +371,8 @@ class TestVJPad < Test::Unit::TestCase
     @pad.flash(2.0)
     consumed = @pad.consume_actions
     assert_equal 2, consumed.length
-    assert_equal :burst, consumed[0][:type]
-    assert_equal :flash, consumed[1][:type]
+    assert_equal :burst, consumed[0][:name]
+    assert_equal :flash, consumed[1][:name]
     # After consume, should be empty
     assert_equal [], @pad.pending_actions
   end
@@ -387,6 +388,37 @@ class TestVJPad < Test::Unit::TestCase
     result = @pad.exec("flash 2.0")
     assert_equal true, result[:ok]
     assert_equal "flash: 2.0", result[:msg]
+  end
+
+  # === Plugin delegation edge cases ===
+
+  def test_unknown_command_returns_error
+    result = @pad.exec("nonexistent_plugin_xyz")
+    assert_equal false, result[:ok]
+  end
+
+  def test_plugin_responds_to
+    assert @pad.respond_to?(:burst)
+    assert @pad.respond_to?(:flash)
+    assert_equal false, @pad.respond_to?(:nonexistent_plugin_xyz)
+  end
+
+  def test_multiple_plugin_actions_queued
+    @pad.burst(1.0)
+    @pad.flash(2.0)
+    @pad.burst(0.5)
+    actions = @pad.pending_actions
+    assert_equal 3, actions.length
+    assert_equal :burst, actions[0][:name]
+    assert_equal :flash, actions[1][:name]
+    assert_equal :burst, actions[2][:name]
+  end
+
+  def test_mixed_commands_and_plugins_via_exec
+    result = @pad.exec("c 1; burst; flash 2.0")
+    assert_equal true, result[:ok]
+    assert_equal 1, ColorPalette.get_hue_mode
+    assert_equal 2, @pad.pending_actions.length
   end
 
   # === i (info) reflects changed state ===
@@ -512,5 +544,124 @@ class TestVJPad < Test::Unit::TestCase
     # Should not raise on other commands
     result = pad.c(1)
     assert_equal "color: red", result
+  end
+
+  # === New audio-reactive parameter commands ===
+
+  def test_bbs_getter_default
+    result = @pad.bbs
+    assert_equal "bloom_base: 1.5", result
+  end
+
+  def test_bbs_setter
+    result = @pad.bbs(3.0)
+    assert_equal "bloom_base: 3.0", result
+    assert_in_delta 3.0, VisualizerPolicy.bloom_base_strength, 0.001
+  end
+
+  def test_bes_getter_default
+    result = @pad.bes
+    assert_equal "bloom_energy: 2.5", result
+  end
+
+  def test_bes_setter
+    result = @pad.bes(4.0)
+    assert_equal "bloom_energy: 4.0", result
+    assert_in_delta 4.0, VisualizerPolicy.bloom_energy_scale, 0.001
+  end
+
+  def test_bis_getter_default
+    result = @pad.bis
+    assert_equal "bloom_impulse: 1.5", result
+  end
+
+  def test_bis_setter
+    result = @pad.bis(2.5)
+    assert_equal "bloom_impulse: 2.5", result
+    assert_in_delta 2.5, VisualizerPolicy.bloom_impulse_scale, 0.001
+  end
+
+  def test_pp_getter_default
+    result = @pad.pp
+    assert_equal "particle_prob: 0.2", result
+  end
+
+  def test_pp_setter
+    result = @pad.pp(0.5)
+    assert_equal "particle_prob: 0.5", result
+    assert_in_delta 0.5, VisualizerPolicy.particle_explosion_base_prob, 0.001
+  end
+
+  def test_pf_getter_default
+    result = @pad.pf
+    assert_equal "particle_force: 0.55", result
+  end
+
+  def test_pf_setter
+    result = @pad.pf(1.0)
+    assert_equal "particle_force: 1.0", result
+    assert_in_delta 1.0, VisualizerPolicy.particle_explosion_force_scale, 0.001
+  end
+
+  def test_fr_getter_default
+    result = @pad.fr
+    assert_equal "friction: 0.86", result
+  end
+
+  def test_fr_setter
+    result = @pad.fr(0.75)
+    assert_equal "friction: 0.75", result
+    assert_in_delta 0.75, VisualizerPolicy.particle_friction, 0.001
+  end
+
+  def test_vs_getter_default
+    result = @pad.vs
+    assert_equal "smoothing: 0.7", result
+  end
+
+  def test_vs_setter
+    result = @pad.vs(0.85)
+    assert_equal "smoothing: 0.85", result
+    assert_in_delta 0.85, VisualizerPolicy.visual_smoothing, 0.001
+  end
+
+  def test_id_getter_default
+    result = @pad.id
+    assert_equal "impulse_decay: 0.82", result
+  end
+
+  def test_id_setter
+    result = @pad.id(0.90)
+    assert_equal "impulse_decay: 0.9", result
+    assert_in_delta 0.90, VisualizerPolicy.impulse_decay, 0.001
+  end
+
+  def test_new_commands_via_exec
+    result = @pad.exec("bbs 2.0; bes 3.0; pp 0.4")
+    assert_equal true, result[:ok]
+    assert_in_delta 2.0, VisualizerPolicy.bloom_base_strength, 0.001
+    assert_in_delta 3.0, VisualizerPolicy.bloom_energy_scale, 0.001
+    assert_in_delta 0.4, VisualizerPolicy.particle_explosion_base_prob, 0.001
+  end
+
+  # === plugins command ===
+
+  def test_plugins_lists_registered_plugins
+    result = @pad.exec("plugins")
+    assert_equal true, result[:ok]
+    assert_match(/burst/, result[:msg])
+    assert_match(/flash/, result[:msg])
+  end
+
+  def test_plugins_shows_descriptions
+    result = @pad.plugins
+    assert_match(/impulse/, result.downcase)
+    assert_match(/bloom/, result.downcase)
+  end
+
+  def test_plugins_shows_param_info
+    result = @pad.plugins
+    assert_match(/force/, result)
+    assert_match(/intensity/, result)
   end
 end

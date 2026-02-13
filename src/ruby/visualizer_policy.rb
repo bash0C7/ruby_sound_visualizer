@@ -46,13 +46,25 @@ module VisualizerPolicy
   BLOOM_MAX_STRENGTH = 1.5     # Maximum bloom strength
   BLOOM_MIN_THRESHOLD = 0.1    # Minimum bloom threshold (lower = more glow)
 
-  # Runtime mutable config (set by URL params / keyboard / DevTool)
+  # Runtime mutable config (set by URL params / keyboard / DevTool / Control Panel)
   @@sensitivity = 1.0
   @@max_brightness = 255
   @@max_lightness = 255
+  @@max_saturation = 100
   @@max_emissive = 2.0
   @@max_bloom = 4.5
   @@exclude_max = false  # When true, bypass all max caps
+
+  # Audio-reactive mutable parameters (adjustable via Control Panel / VJ Pad)
+  @@bloom_base_strength = BLOOM_BASE_STRENGTH
+  @@bloom_energy_scale = 2.5
+  @@bloom_impulse_scale = 1.5
+  @@particle_explosion_base_prob = PARTICLE_EXPLOSION_BASE_PROB
+  @@particle_explosion_energy_scale = PARTICLE_EXPLOSION_ENERGY_SCALE
+  @@particle_explosion_force_scale = PARTICLE_EXPLOSION_FORCE_SCALE
+  @@particle_friction = PARTICLE_FRICTION
+  @@visual_smoothing = VISUAL_SMOOTHING_FACTOR
+  @@impulse_decay = IMPULSE_DECAY_EFFECT
 
   def self.sensitivity
     @@sensitivity
@@ -76,6 +88,14 @@ module VisualizerPolicy
 
   def self.max_lightness=(v)
     @@max_lightness = [[v, 0].max, 255].min
+  end
+
+  def self.max_saturation
+    @@max_saturation
+  end
+
+  def self.max_saturation=(v)
+    @@max_saturation = [[v.to_i, 0].max, 100].min
   end
 
   def self.max_emissive
@@ -102,6 +122,35 @@ module VisualizerPolicy
     @@exclude_max = !!v  # Convert to boolean
   end
 
+  # === Audio-reactive mutable parameter accessors ===
+
+  def self.bloom_base_strength; @@bloom_base_strength; end
+  def self.bloom_base_strength=(v); @@bloom_base_strength = [v.to_f, 0.0].max; end
+
+  def self.bloom_energy_scale; @@bloom_energy_scale; end
+  def self.bloom_energy_scale=(v); @@bloom_energy_scale = [v.to_f, 0.0].max; end
+
+  def self.bloom_impulse_scale; @@bloom_impulse_scale; end
+  def self.bloom_impulse_scale=(v); @@bloom_impulse_scale = [v.to_f, 0.0].max; end
+
+  def self.particle_explosion_base_prob; @@particle_explosion_base_prob; end
+  def self.particle_explosion_base_prob=(v); @@particle_explosion_base_prob = [[v.to_f, 0.0].max, 1.0].min; end
+
+  def self.particle_explosion_energy_scale; @@particle_explosion_energy_scale; end
+  def self.particle_explosion_energy_scale=(v); @@particle_explosion_energy_scale = [v.to_f, 0.0].max; end
+
+  def self.particle_explosion_force_scale; @@particle_explosion_force_scale; end
+  def self.particle_explosion_force_scale=(v); @@particle_explosion_force_scale = [v.to_f, 0.0].max; end
+
+  def self.particle_friction; @@particle_friction; end
+  def self.particle_friction=(v); @@particle_friction = [[v.to_f, 0.50].max, 0.99].min; end
+
+  def self.visual_smoothing; @@visual_smoothing; end
+  def self.visual_smoothing=(v); @@visual_smoothing = [[v.to_f, 0.0].max, 0.99].min; end
+
+  def self.impulse_decay; @@impulse_decay; end
+  def self.impulse_decay=(v); @@impulse_decay = [[v.to_f, 0.50].max, 0.99].min; end
+
   # === Rendering Policy Cap Methods ===
   # Centralized capping to prevent configuration oversights
 
@@ -115,6 +164,10 @@ module VisualizerPolicy
     return v if @@exclude_max
     max_v = @@max_lightness / 255.0
     [v, max_v].min
+  end
+
+  def self.cap_saturation(sat)
+    sat * (@@max_saturation / 100.0)
   end
 
   def self.cap_emissive(intensity)
@@ -131,12 +184,22 @@ module VisualizerPolicy
   # Allows dynamic config changes from Chrome DevTools via rubyVisualizerPolicy.set/get/list/reset
 
   MUTABLE_KEYS = {
-    'sensitivity' => { min: 0.05, max: 10.0, type: :float, default: 1.0 },
-    'max_brightness' => { min: 0, max: 255, type: :int, default: 255 },
-    'max_lightness' => { min: 0, max: 255, type: :int, default: 255 },
-    'max_emissive' => { min: 0.0, max: 10.0, type: :float, default: 2.0 },
-    'max_bloom' => { min: 0.0, max: 10.0, type: :float, default: 4.5 },
-    'exclude_max' => { min: 0, max: 1, type: :bool, default: false }
+    'sensitivity' => { min: 0.05, max: 10.0, type: :float, default: 1.0, group: 'Master', step: 0.05 },
+    'bloom_base_strength' => { min: 0.0, max: 5.0, type: :float, default: 1.5, group: 'Bloom', step: 0.1 },
+    'max_bloom' => { min: 0.0, max: 10.0, type: :float, default: 4.5, group: 'Bloom', step: 0.1 },
+    'bloom_energy_scale' => { min: 0.0, max: 5.0, type: :float, default: 2.5, group: 'Bloom', step: 0.1 },
+    'bloom_impulse_scale' => { min: 0.0, max: 3.0, type: :float, default: 1.5, group: 'Bloom', step: 0.1 },
+    'particle_explosion_base_prob' => { min: 0.0, max: 1.0, type: :float, default: 0.20, group: 'Particles', step: 0.01 },
+    'particle_explosion_energy_scale' => { min: 0.0, max: 2.0, type: :float, default: 0.50, group: 'Particles', step: 0.01 },
+    'particle_explosion_force_scale' => { min: 0.0, max: 2.0, type: :float, default: 0.55, group: 'Particles', step: 0.01 },
+    'particle_friction' => { min: 0.50, max: 0.99, type: :float, default: 0.86, group: 'Particles', step: 0.01 },
+    'max_brightness' => { min: 0, max: 255, type: :int, default: 255, group: 'Rendering', step: 1 },
+    'max_lightness' => { min: 0, max: 255, type: :int, default: 255, group: 'Rendering', step: 1 },
+    'max_saturation' => { min: 0, max: 100, type: :int, default: 100, group: 'Color', step: 1 },
+    'max_emissive' => { min: 0.0, max: 10.0, type: :float, default: 2.0, group: 'Rendering', step: 0.1 },
+    'visual_smoothing' => { min: 0.0, max: 0.99, type: :float, default: 0.70, group: 'Audio', step: 0.01 },
+    'impulse_decay' => { min: 0.50, max: 0.99, type: :float, default: 0.82, group: 'Audio', step: 0.01 },
+    'exclude_max' => { min: 0, max: 1, type: :bool, default: false, group: 'Master', step: 1 }
   }.freeze
 
   def self.set_by_key(key, value)
@@ -156,9 +219,19 @@ module VisualizerPolicy
     when 'sensitivity' then self.sensitivity = val
     when 'max_brightness' then self.max_brightness = val
     when 'max_lightness' then self.max_lightness = val
+    when 'max_saturation' then self.max_saturation = val
     when 'max_emissive' then self.max_emissive = val
     when 'max_bloom' then self.max_bloom = val
     when 'exclude_max' then self.exclude_max = val
+    when 'bloom_base_strength' then self.bloom_base_strength = val
+    when 'bloom_energy_scale' then self.bloom_energy_scale = val
+    when 'bloom_impulse_scale' then self.bloom_impulse_scale = val
+    when 'particle_explosion_base_prob' then self.particle_explosion_base_prob = val
+    when 'particle_explosion_energy_scale' then self.particle_explosion_energy_scale = val
+    when 'particle_explosion_force_scale' then self.particle_explosion_force_scale = val
+    when 'particle_friction' then self.particle_friction = val
+    when 'visual_smoothing' then self.visual_smoothing = val
+    when 'impulse_decay' then self.impulse_decay = val
     end
 
     "#{key_str} = #{val}"
@@ -169,9 +242,19 @@ module VisualizerPolicy
     when 'sensitivity' then sensitivity
     when 'max_brightness' then max_brightness
     when 'max_lightness' then max_lightness
+    when 'max_saturation' then max_saturation
     when 'max_emissive' then max_emissive
     when 'max_bloom' then max_bloom
     when 'exclude_max' then exclude_max
+    when 'bloom_base_strength' then bloom_base_strength
+    when 'bloom_energy_scale' then bloom_energy_scale
+    when 'bloom_impulse_scale' then bloom_impulse_scale
+    when 'particle_explosion_base_prob' then particle_explosion_base_prob
+    when 'particle_explosion_energy_scale' then particle_explosion_energy_scale
+    when 'particle_explosion_force_scale' then particle_explosion_force_scale
+    when 'particle_friction' then particle_friction
+    when 'visual_smoothing' then visual_smoothing
+    when 'impulse_decay' then impulse_decay
     else "Unknown key: #{key}"
     end
   end
@@ -187,9 +270,19 @@ module VisualizerPolicy
     self.sensitivity = 1.0
     self.max_brightness = 255
     self.max_lightness = 255
+    self.max_saturation = 100
     self.max_emissive = 2.0
     self.max_bloom = 4.5
     self.exclude_max = false
+    self.bloom_base_strength = BLOOM_BASE_STRENGTH
+    self.bloom_energy_scale = 2.5
+    self.bloom_impulse_scale = 1.5
+    self.particle_explosion_base_prob = PARTICLE_EXPLOSION_BASE_PROB
+    self.particle_explosion_energy_scale = PARTICLE_EXPLOSION_ENERGY_SCALE
+    self.particle_explosion_force_scale = PARTICLE_EXPLOSION_FORCE_SCALE
+    self.particle_friction = PARTICLE_FRICTION
+    self.visual_smoothing = VISUAL_SMOOTHING_FACTOR
+    self.impulse_decay = IMPULSE_DECAY_EFFECT
     "All runtime values reset to defaults"
   end
 

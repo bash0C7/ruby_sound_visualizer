@@ -85,6 +85,18 @@ See [.claude/ARCHITECTURE.md](.claude/ARCHITECTURE.md) for detailed architecture
 
 ```
 index.html              # Single file containing all code (Ruby + JavaScript + HTML)
+src/ruby/               # Ruby source files
+├── plugins/            # VJ Pad plugin commands
+│   ├── vj_burst.rb           # Burst effect (impulse injection)
+│   ├── vj_flash.rb           # Flash effect (bloom flash)
+│   ├── vj_shockwave.rb       # Shockwave effect (bass impulse + bloom)
+│   ├── vj_strobe.rb          # Strobe effect (quick bloom flash)
+│   └── vj_rave.rb            # Rave preset (max energy + param boost)
+├── vj_plugin.rb              # Plugin system core (VJPlugin + PluginDefinition)
+├── effect_dispatcher.rb      # Plugin effects → EffectManager translator
+├── vj_pad.rb                 # VJ Pad DSL (delegates to plugins)
+├── effect_manager.rb         # Coordinates all visual effects
+└── ...                       # Other core modules
 .claude/                # Project-specific configuration & documentation
 ├── ARCHITECTURE.md     # Architecture details
 ├── INVESTIGATION-PROTOCOL.md  # Investigation protocol
@@ -92,6 +104,7 @@ index.html              # Single file containing all code (Ruby + JavaScript + H
 ├── SETUP.md            # Setup & execution instructions
 ├── tasks.md            # Project task list
 ├── guides/             # Technical reference guides
+│   ├── plugin-development.md  # VJ Pad plugin development guide
 │   ├── 3d-basics.md          # Three.js 3D fundamentals
 │   ├── 3d-glossary.md        # 3D programming & shader glossary
 │   ├── shader-operations.md  # Post-processing & shader guide
@@ -99,6 +112,7 @@ index.html              # Single file containing all code (Ruby + JavaScript + H
 │   ├── js-ruby-wasm-interop.md  # JS-Ruby interop patterns
 │   └── ruby-wasm-technical.md   # ruby.wasm platform guide
 └── skills/             # Project-local skills
+    ├── create-plugin/  # Scaffold new VJ Pad plugin
     ├── debug-browser/  # Browser debugging procedures
     └── troubleshoot/   # Basic troubleshooting
 ```
@@ -108,6 +122,7 @@ index.html              # Single file containing all code (Ruby + JavaScript + H
 This project defines local skills in `.claude/skills/`. Use skills via Skill tool (e.g., `/debug-browser`).
 
 Available skills:
+- **create-plugin**: Scaffold a new VJ Pad plugin with test file and registration
 - **debug-browser**: Detailed browser debugging procedure for ruby.wasm app using Chrome MCP tools
 - **browser-clean-session**: Open visualizer in clean browser session with full cache clear
 - **troubleshoot**: Basic troubleshooting guide
@@ -147,6 +162,7 @@ Open `http://localhost:8000/index.html` in browser.
 
 Reference guides for technologies used in this project (located in `.claude/guides/`):
 
+- [Plugin Development](.claude/guides/plugin-development.md) - VJ Pad plugin system DSL and effect API
 - [3D Basics](.claude/guides/3d-basics.md) - Three.js scene, camera, geometry, animation
 - [3D Glossary](.claude/guides/3d-glossary.md) - 3D programming, modeling & shader terminology
 - [Shader Operations](.claude/guides/shader-operations.md) - Post-processing, bloom, materials

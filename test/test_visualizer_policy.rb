@@ -3,10 +3,7 @@ require_relative 'test_helper'
 class TestVisualizerPolicy < Test::Unit::TestCase
   def setup
     # Reset runtime config to defaults before each test
-    VisualizerPolicy.sensitivity = 1.0
-    VisualizerPolicy.max_brightness = 255
-    VisualizerPolicy.max_lightness = 255
-    VisualizerPolicy.exclude_max = false
+    VisualizerPolicy.reset_runtime
   end
 
   # Test Audio Analysis constants
@@ -233,5 +230,183 @@ class TestVisualizerPolicy < Test::Unit::TestCase
   def test_max_bloom_accessor
     VisualizerPolicy.max_bloom = 3.5
     assert_equal 3.5, VisualizerPolicy.max_bloom
+  end
+
+  # === New mutable audio-reactive parameters ===
+
+  def test_bloom_base_strength_accessor
+    assert_equal 1.5, VisualizerPolicy.bloom_base_strength
+    VisualizerPolicy.bloom_base_strength = 3.0
+    assert_equal 3.0, VisualizerPolicy.bloom_base_strength
+    # Clamp to min 0.0
+    VisualizerPolicy.bloom_base_strength = -1.0
+    assert_equal 0.0, VisualizerPolicy.bloom_base_strength
+  end
+
+  def test_bloom_energy_scale_accessor
+    assert_equal 2.5, VisualizerPolicy.bloom_energy_scale
+    VisualizerPolicy.bloom_energy_scale = 4.0
+    assert_equal 4.0, VisualizerPolicy.bloom_energy_scale
+  end
+
+  def test_bloom_impulse_scale_accessor
+    assert_equal 1.5, VisualizerPolicy.bloom_impulse_scale
+    VisualizerPolicy.bloom_impulse_scale = 2.0
+    assert_equal 2.0, VisualizerPolicy.bloom_impulse_scale
+  end
+
+  def test_particle_explosion_base_prob_accessor
+    assert_equal 0.20, VisualizerPolicy.particle_explosion_base_prob
+    VisualizerPolicy.particle_explosion_base_prob = 0.5
+    assert_equal 0.5, VisualizerPolicy.particle_explosion_base_prob
+    # Clamp to max 1.0
+    VisualizerPolicy.particle_explosion_base_prob = 1.5
+    assert_equal 1.0, VisualizerPolicy.particle_explosion_base_prob
+  end
+
+  def test_particle_explosion_energy_scale_accessor
+    assert_equal 0.50, VisualizerPolicy.particle_explosion_energy_scale
+    VisualizerPolicy.particle_explosion_energy_scale = 1.2
+    assert_equal 1.2, VisualizerPolicy.particle_explosion_energy_scale
+  end
+
+  def test_particle_explosion_force_scale_accessor
+    assert_equal 0.55, VisualizerPolicy.particle_explosion_force_scale
+    VisualizerPolicy.particle_explosion_force_scale = 1.0
+    assert_equal 1.0, VisualizerPolicy.particle_explosion_force_scale
+  end
+
+  def test_particle_friction_accessor
+    assert_equal 0.86, VisualizerPolicy.particle_friction
+    VisualizerPolicy.particle_friction = 0.75
+    assert_equal 0.75, VisualizerPolicy.particle_friction
+    # Clamp to range 0.50-0.99
+    VisualizerPolicy.particle_friction = 0.3
+    assert_equal 0.50, VisualizerPolicy.particle_friction
+    VisualizerPolicy.particle_friction = 1.0
+    assert_equal 0.99, VisualizerPolicy.particle_friction
+  end
+
+  def test_visual_smoothing_accessor
+    assert_equal 0.70, VisualizerPolicy.visual_smoothing
+    VisualizerPolicy.visual_smoothing = 0.85
+    assert_equal 0.85, VisualizerPolicy.visual_smoothing
+    # Clamp to range 0.0-0.99
+    VisualizerPolicy.visual_smoothing = -0.1
+    assert_equal 0.0, VisualizerPolicy.visual_smoothing
+    VisualizerPolicy.visual_smoothing = 1.5
+    assert_equal 0.99, VisualizerPolicy.visual_smoothing
+  end
+
+  def test_impulse_decay_accessor
+    assert_equal 0.82, VisualizerPolicy.impulse_decay
+    VisualizerPolicy.impulse_decay = 0.90
+    assert_equal 0.90, VisualizerPolicy.impulse_decay
+    # Clamp to range 0.50-0.99
+    VisualizerPolicy.impulse_decay = 0.2
+    assert_equal 0.50, VisualizerPolicy.impulse_decay
+  end
+
+  def test_new_mutable_keys_in_mutable_keys
+    %w[
+      bloom_base_strength bloom_energy_scale bloom_impulse_scale
+      particle_explosion_base_prob particle_explosion_energy_scale
+      particle_explosion_force_scale particle_friction
+      visual_smoothing impulse_decay
+    ].each do |key|
+      assert VisualizerPolicy::MUTABLE_KEYS.key?(key), "MUTABLE_KEYS should contain '#{key}'"
+    end
+  end
+
+  def test_set_by_key_new_params
+    VisualizerPolicy.set_by_key('bloom_base_strength', 2.0)
+    assert_equal 2.0, VisualizerPolicy.bloom_base_strength
+
+    VisualizerPolicy.set_by_key('particle_friction', 0.75)
+    assert_equal 0.75, VisualizerPolicy.particle_friction
+
+    VisualizerPolicy.set_by_key('visual_smoothing', 0.85)
+    assert_equal 0.85, VisualizerPolicy.visual_smoothing
+  end
+
+  def test_get_by_key_new_params
+    VisualizerPolicy.bloom_base_strength = 3.0
+    assert_equal 3.0, VisualizerPolicy.get_by_key('bloom_base_strength')
+
+    VisualizerPolicy.particle_friction = 0.75
+    assert_equal 0.75, VisualizerPolicy.get_by_key('particle_friction')
+  end
+
+  def test_reset_runtime_resets_new_params
+    VisualizerPolicy.bloom_base_strength = 3.0
+    VisualizerPolicy.particle_friction = 0.75
+    VisualizerPolicy.visual_smoothing = 0.85
+    VisualizerPolicy.impulse_decay = 0.90
+
+    VisualizerPolicy.reset_runtime
+
+    assert_equal 1.5, VisualizerPolicy.bloom_base_strength
+    assert_equal 0.86, VisualizerPolicy.particle_friction
+    assert_equal 0.70, VisualizerPolicy.visual_smoothing
+    assert_equal 0.82, VisualizerPolicy.impulse_decay
+  end
+
+  # max_saturation tests
+  def test_max_saturation_default
+    assert_equal 100, VisualizerPolicy.max_saturation
+  end
+
+  def test_max_saturation_accessor
+    VisualizerPolicy.max_saturation = 50
+    assert_equal 50, VisualizerPolicy.max_saturation
+
+    VisualizerPolicy.max_saturation = 150
+    assert_equal 100, VisualizerPolicy.max_saturation, "max_saturation should be clamped to 100"
+
+    VisualizerPolicy.max_saturation = -10
+    assert_equal 0, VisualizerPolicy.max_saturation, "max_saturation should be clamped to 0"
+  end
+
+  def test_max_saturation_in_mutable_keys
+    assert VisualizerPolicy::MUTABLE_KEYS.key?('max_saturation')
+  end
+
+  def test_set_by_key_max_saturation
+    VisualizerPolicy.set_by_key('max_saturation', 70)
+    assert_equal 70, VisualizerPolicy.max_saturation
+  end
+
+  def test_get_by_key_max_saturation
+    VisualizerPolicy.max_saturation = 80
+    assert_equal 80, VisualizerPolicy.get_by_key('max_saturation')
+  end
+
+  def test_cap_saturation_applies_scale
+    VisualizerPolicy.max_saturation = 50
+    result = VisualizerPolicy.cap_saturation(1.0)
+    assert_in_delta 0.5, result, 0.001
+  end
+
+  def test_cap_saturation_full_scale
+    VisualizerPolicy.max_saturation = 100
+    result = VisualizerPolicy.cap_saturation(0.8)
+    assert_in_delta 0.8, result, 0.001
+  end
+
+  def test_cap_saturation_zero_desaturates
+    VisualizerPolicy.max_saturation = 0
+    result = VisualizerPolicy.cap_saturation(0.8)
+    assert_in_delta 0.0, result, 0.001
+  end
+
+  def test_reset_runtime_resets_max_saturation
+    VisualizerPolicy.max_saturation = 50
+    VisualizerPolicy.reset_runtime
+    assert_equal 100, VisualizerPolicy.max_saturation
+  end
+
+  def test_list_keys_includes_max_saturation
+    result = VisualizerPolicy.list_keys
+    assert_match(/max_saturation/, result)
   end
 end

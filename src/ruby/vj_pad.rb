@@ -111,6 +111,56 @@ class VJPad
     "c:#{cn} h:#{ho} | s:#{se} br:#{b} lt:#{l} | em:#{e} bm:#{bl} x:#{ex}"
   end
 
+  # --- Audio-reactive Parameter Commands ---
+
+  def bbs(val = :_get)
+    return "bloom_base: #{VisualizerPolicy.bloom_base_strength}" if val == :_get
+    VisualizerPolicy.bloom_base_strength = val.to_f
+    "bloom_base: #{VisualizerPolicy.bloom_base_strength}"
+  end
+
+  def bes(val = :_get)
+    return "bloom_energy: #{VisualizerPolicy.bloom_energy_scale}" if val == :_get
+    VisualizerPolicy.bloom_energy_scale = val.to_f
+    "bloom_energy: #{VisualizerPolicy.bloom_energy_scale}"
+  end
+
+  def bis(val = :_get)
+    return "bloom_impulse: #{VisualizerPolicy.bloom_impulse_scale}" if val == :_get
+    VisualizerPolicy.bloom_impulse_scale = val.to_f
+    "bloom_impulse: #{VisualizerPolicy.bloom_impulse_scale}"
+  end
+
+  def pp(val = :_get)
+    return "particle_prob: #{VisualizerPolicy.particle_explosion_base_prob}" if val == :_get
+    VisualizerPolicy.particle_explosion_base_prob = val.to_f
+    "particle_prob: #{VisualizerPolicy.particle_explosion_base_prob}"
+  end
+
+  def pf(val = :_get)
+    return "particle_force: #{VisualizerPolicy.particle_explosion_force_scale}" if val == :_get
+    VisualizerPolicy.particle_explosion_force_scale = val.to_f
+    "particle_force: #{VisualizerPolicy.particle_explosion_force_scale}"
+  end
+
+  def fr(val = :_get)
+    return "friction: #{VisualizerPolicy.particle_friction}" if val == :_get
+    VisualizerPolicy.particle_friction = val.to_f
+    "friction: #{VisualizerPolicy.particle_friction}"
+  end
+
+  def vs(val = :_get)
+    return "smoothing: #{VisualizerPolicy.visual_smoothing}" if val == :_get
+    VisualizerPolicy.visual_smoothing = val.to_f
+    "smoothing: #{VisualizerPolicy.visual_smoothing}"
+  end
+
+  def id(val = :_get)
+    return "impulse_decay: #{VisualizerPolicy.impulse_decay}" if val == :_get
+    VisualizerPolicy.impulse_decay = val.to_f
+    "impulse_decay: #{VisualizerPolicy.impulse_decay}"
+  end
+
   # --- Audio Input Commands ---
 
   def mic(val = :_get)
@@ -164,17 +214,47 @@ class VJPad
     end
   end
 
-  # --- Action Commands ---
+  # --- Plugin Discovery ---
 
-  def burst(force = nil)
-    f = force ? force.to_f : 1.0
-    @pending_actions << { type: :burst, force: f }
-    force ? "burst: #{f}" : "burst!"
+  def plugins
+    VJPlugin.all.map { |p|
+      params_str = p.params.map { |k, cfg|
+        range = cfg[:range] ? " (#{cfg[:range]})" : ""
+        "#{k}=#{cfg[:default]}#{range}"
+      }.join(", ")
+      "#{p.name}: #{p.description} [#{params_str}]"
+    }.join("\n")
   end
 
-  def flash(intensity = nil)
-    v = intensity ? intensity.to_f : 1.0
-    @pending_actions << { type: :flash, intensity: v }
-    intensity ? "flash: #{v}" : "flash!"
+  # --- Plugin Commands ---
+  # Plugin-defined commands (burst, flash, etc.) are resolved via method_missing.
+  # Plugins register themselves via VJPlugin.define(:name) { ... }.
+
+  def method_missing(name, *args, &block)
+    plugin = VJPlugin.find(name)
+    if plugin
+      execute_plugin(plugin, args)
+    else
+      super
+    end
+  end
+
+  def respond_to_missing?(name, include_private = false)
+    VJPlugin.find(name) ? true : super
+  end
+
+  private
+
+  def execute_plugin(plugin, args)
+    param_keys = plugin.params.keys
+    params = {}
+    args.each_with_index do |arg, i|
+      params[param_keys[i]] = arg if i < param_keys.length
+    end
+
+    resolved = plugin.resolve_params(params)
+    effects = plugin.execute(params)
+    @pending_actions << { type: :plugin, name: plugin.name, effects: effects }
+    plugin.format_result(args.empty? ? {} : resolved)
   end
 end
