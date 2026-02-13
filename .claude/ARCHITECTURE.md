@@ -90,6 +90,53 @@ color = BASS_COLOR * bass_weight +
 brightness = 0.3 + sqrt(energy) * 1.7
 ```
 
+## Plugin System
+
+VJ Pad commands are implemented as plugins, decoupled from the core system.
+
+### Components
+
+- **VJPlugin** (`vj_plugin.rb`): Plugin registry and DSL for defining commands
+- **PluginDefinition**: Stores name, description, parameters, and trigger logic
+- **EffectDispatcher** (`effect_dispatcher.rb`): Translates plugin effect hashes into EffectManager calls
+
+### Data Flow
+
+```
+VJPad.exec("burst 2.0")
+  ↓ method_missing → VJPlugin.find(:burst)
+PluginDefinition#execute({ force: 2.0 })
+  ↓ returns effect hash
+{ impulse: { bass: 2.0, mid: 2.0, high: 2.0, overall: 2.0 } }
+  ↓ queued as pending_action
+EffectDispatcher#dispatch(effects)
+  ↓
+EffectManager#inject_impulse(bass: 2.0, ...)
+```
+
+### Plugin Definition
+
+```ruby
+# src/ruby/plugins/vj_burst.rb
+VJPlugin.define(:burst) do
+  desc "Inject impulse across all frequency bands"
+  param :force, default: 1.0
+  on_trigger do |params|
+    f = params[:force]
+    { impulse: { bass: f, mid: f, high: f, overall: f } }
+  end
+end
+```
+
+### Available Effect Types
+
+| Key | Target | Description |
+|-----|--------|-------------|
+| `impulse:` | ParticleSystem, GeometryMorpher, CameraController | Frequency band energy injection |
+| `bloom_flash:` | BloomController | Bloom glow flash |
+
+See [Plugin Development Guide](guides/plugin-development.md) for details.
+
 ## Performance Optimization
 
 ### Particle Count Adjustment

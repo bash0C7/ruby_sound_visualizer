@@ -395,6 +395,37 @@ class TestVJPad < Test::Unit::TestCase
     assert_equal "flash: 2.0", result[:msg]
   end
 
+  # === Plugin delegation edge cases ===
+
+  def test_unknown_command_returns_error
+    result = @pad.exec("nonexistent_plugin_xyz")
+    assert_equal false, result[:ok]
+  end
+
+  def test_plugin_responds_to
+    assert @pad.respond_to?(:burst)
+    assert @pad.respond_to?(:flash)
+    assert_equal false, @pad.respond_to?(:nonexistent_plugin_xyz)
+  end
+
+  def test_multiple_plugin_actions_queued
+    @pad.burst(1.0)
+    @pad.flash(2.0)
+    @pad.burst(0.5)
+    actions = @pad.pending_actions
+    assert_equal 3, actions.length
+    assert_equal :burst, actions[0][:name]
+    assert_equal :flash, actions[1][:name]
+    assert_equal :burst, actions[2][:name]
+  end
+
+  def test_mixed_commands_and_plugins_via_exec
+    result = @pad.exec("c 1; burst; flash 2.0")
+    assert_equal true, result[:ok]
+    assert_equal 1, ColorPalette.get_hue_mode
+    assert_equal 2, @pad.pending_actions.length
+  end
+
   # === i (info) reflects changed state ===
 
   def test_i_after_changes
