@@ -157,6 +157,21 @@ Triggers a bloom (glow) flash effect. The value controls peak brightness.
 { bloom_flash: 2.0 }  # Intensity (0.0-5.0)
 ```
 
+### `set_param:`
+
+Updates runtime-mutable VisualizerPolicy parameters. Useful for preset commands that modify global behavior.
+
+```ruby
+{
+  set_param: {
+    "bloom_base_strength" => 3.0,
+    "particle_explosion_base_prob" => 0.5
+  }
+}
+```
+
+All keys are optional. Invalid keys are silently ignored. Available parameter keys match `VisualizerPolicy::MUTABLE_KEYS` (see `VisualizerPolicy.list_keys` for full list).
+
 ### Combining Effects
 
 Multiple effect types can be combined in a single hash:

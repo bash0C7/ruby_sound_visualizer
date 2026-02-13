@@ -66,6 +66,10 @@ Press the backtick key (`) to open the VJ Pad prompt at the bottom of the screen
 | `bm <value>` | Set bloom strength | `bm 3.0` |
 | `burst [force]` | Trigger particle burst effect (plugin) | `burst 2.0` |
 | `flash [intensity]` | Trigger bloom flash effect (plugin) | `flash 1.5` |
+| `shockwave [force]` | Bass-heavy impulse with bloom flash (plugin) | `shockwave 2.0` |
+| `strobe [intensity]` | Quick bloom strobe flash (plugin) | `strobe 3.0` |
+| `rave [level]` | Max energy preset with param boost (plugin) | `rave 1.5` |
+| `plugins` | List all available plugin commands | `plugins` |
 | `r` | Reset all parameters to defaults | `r` |
 
 ### Command Features
@@ -93,21 +97,23 @@ Press backtick (`) again or Escape to close the prompt.
 
 ### Plugin System
 
-Effect commands like `burst` and `flash` are implemented as plugins. Each plugin is a standalone Ruby file in `src/ruby/plugins/` that defines a VJ Pad command and its visual effects.
+Effect commands are implemented as plugins. Built-in plugins include burst, flash, shockwave, strobe, and rave. Each plugin is a standalone Ruby file in `src/ruby/plugins/` that defines a VJ Pad command and its visual effects.
 
 To add a custom effect, create a plugin file:
 
 ```ruby
-# src/ruby/plugins/vj_shockwave.rb
-VJPlugin.define(:shockwave) do
-  desc "Combined impulse and bloom shockwave"
-  param :force, default: 1.0, range: 0.0..5.0
+# src/ruby/plugins/vj_nova.rb
+VJPlugin.define(:nova) do
+  desc "Combined impulse and bloom nova"
+  param :force, default: 1.0, range: 0.0..3.0
+  param :glow, default: 2.0, range: 0.0..5.0
 
   on_trigger do |params|
     f = params[:force]
+    g = params[:glow]
     {
-      impulse: { bass: f, mid: f * 0.5, high: f * 0.3, overall: f },
-      bloom_flash: f * 0.8
+      impulse: { bass: f, mid: f, high: f, overall: f },
+      bloom_flash: g
     }
   end
 end
@@ -161,7 +167,10 @@ ruby_sound_visualizer/
 ├── src/ruby/                     # Ruby logic (loaded via ruby.wasm)
 │   ├── plugins/                  # VJ Pad plugin commands
 │   │   ├── vj_burst.rb           #   Burst effect (impulse injection)
-│   │   └── vj_flash.rb           #   Flash effect (bloom flash)
+│   │   ├── vj_flash.rb           #   Flash effect (bloom flash)
+│   │   ├── vj_shockwave.rb       #   Shockwave effect (bass impulse + bloom)
+│   │   ├── vj_strobe.rb          #   Strobe effect (quick bloom flash)
+│   │   └── vj_rave.rb            #   Rave preset (max energy + param boost)
 │   ├── vj_plugin.rb              # Plugin system core (registry and DSL)
 │   ├── effect_dispatcher.rb      # Plugin effects to EffectManager translator
 │   ├── vj_pad.rb                 # VJ Pad command interface (delegates to plugins)

@@ -159,6 +159,7 @@ end
 |-----|--------|-------------|
 | `impulse:` | ParticleSystem, GeometryMorpher, CameraController | Frequency band energy injection |
 | `bloom_flash:` | BloomController | Bloom glow flash |
+| `set_param:` | VisualizerPolicy | Runtime parameter updates |
 
 See [Plugin Development Guide](guides/plugin-development.md) for details.
 
