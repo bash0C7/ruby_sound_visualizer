@@ -50,6 +50,7 @@ module VisualizerPolicy
   @@sensitivity = 1.0
   @@max_brightness = 255
   @@max_lightness = 255
+  @@max_saturation = 100
   @@max_emissive = 2.0
   @@max_bloom = 4.5
   @@exclude_max = false  # When true, bypass all max caps
@@ -87,6 +88,14 @@ module VisualizerPolicy
 
   def self.max_lightness=(v)
     @@max_lightness = [[v, 0].max, 255].min
+  end
+
+  def self.max_saturation
+    @@max_saturation
+  end
+
+  def self.max_saturation=(v)
+    @@max_saturation = [[v.to_i, 0].max, 100].min
   end
 
   def self.max_emissive
@@ -157,6 +166,10 @@ module VisualizerPolicy
     [v, max_v].min
   end
 
+  def self.cap_saturation(sat)
+    sat * (@@max_saturation / 100.0)
+  end
+
   def self.cap_emissive(intensity)
     return intensity if @@exclude_max
     [intensity, @@max_emissive].min
@@ -182,6 +195,7 @@ module VisualizerPolicy
     'particle_friction' => { min: 0.50, max: 0.99, type: :float, default: 0.86, group: 'Particles', step: 0.01 },
     'max_brightness' => { min: 0, max: 255, type: :int, default: 255, group: 'Rendering', step: 1 },
     'max_lightness' => { min: 0, max: 255, type: :int, default: 255, group: 'Rendering', step: 1 },
+    'max_saturation' => { min: 0, max: 100, type: :int, default: 100, group: 'Color', step: 1 },
     'max_emissive' => { min: 0.0, max: 10.0, type: :float, default: 2.0, group: 'Rendering', step: 0.1 },
     'visual_smoothing' => { min: 0.0, max: 0.99, type: :float, default: 0.70, group: 'Audio', step: 0.01 },
     'impulse_decay' => { min: 0.50, max: 0.99, type: :float, default: 0.82, group: 'Audio', step: 0.01 },
@@ -205,6 +219,7 @@ module VisualizerPolicy
     when 'sensitivity' then self.sensitivity = val
     when 'max_brightness' then self.max_brightness = val
     when 'max_lightness' then self.max_lightness = val
+    when 'max_saturation' then self.max_saturation = val
     when 'max_emissive' then self.max_emissive = val
     when 'max_bloom' then self.max_bloom = val
     when 'exclude_max' then self.exclude_max = val
@@ -227,6 +242,7 @@ module VisualizerPolicy
     when 'sensitivity' then sensitivity
     when 'max_brightness' then max_brightness
     when 'max_lightness' then max_lightness
+    when 'max_saturation' then max_saturation
     when 'max_emissive' then max_emissive
     when 'max_bloom' then max_bloom
     when 'exclude_max' then exclude_max
@@ -254,6 +270,7 @@ module VisualizerPolicy
     self.sensitivity = 1.0
     self.max_brightness = 255
     self.max_lightness = 255
+    self.max_saturation = 100
     self.max_emissive = 2.0
     self.max_bloom = 4.5
     self.exclude_max = false

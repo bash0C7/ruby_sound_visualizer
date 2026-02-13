@@ -231,9 +231,6 @@
   <div id="loading">
     <div id="loadingTitle">Loading Ruby WASM Sound Visualizer...</div>
     <div id="loadingStatus" style="font-size: 12px; margin-top: 20px;"></div>
-    <div id="startPreviewArea" style="display: none; margin-top: 20px;">
-      <button id="startPreviewBtn" class="vrm-upload-btn" style="font-size: 16px; padding: 14px 32px;">Start Preview</button>
-    </div>
   </div>
   <!-- VRM choice bar (shown after preview starts, overlaid on preview) -->
   <div id="vrmChoiceBar">
@@ -249,6 +246,31 @@
     <div class="cp-header">
       <h3>Controls</h3>
       <button class="cp-close" id="cpCloseBtn" title="Close (p)">X</button>
+    </div>
+    <div class="cp-group" id="cpColorGroup">
+      <div class="cp-group-title">Color</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+        <canvas id="hueWheel" width="120" height="120"
+                style="cursor:crosshair;flex-shrink:0;"></canvas>
+        <div>
+          <div style="color:#aaa;font-size:10px;">Hue</div>
+          <span id="hueValueDisplay" style="color:#0f0;font-size:11px;">0.0°</span>
+          <div style="margin-top:6px;">
+            <div style="color:#aaa;font-size:10px;margin-bottom:3px;">Mode</div>
+            <div id="colorModeButtons" style="display:flex;gap:3px;flex-wrap:wrap;"></div>
+          </div>
+        </div>
+      </div>
+      <div class="cp-slider-row">
+        <span class="cp-label" title="max_brightness">Brightness</span>
+        <input type="range" id="cpSlider_max_brightness" min="0" max="255" step="1" value="255">
+        <span class="cp-value" id="cpVal_max_brightness">255</span>
+      </div>
+      <div class="cp-slider-row">
+        <span class="cp-label" title="max_saturation">Saturation</span>
+        <input type="range" id="cpSlider_max_saturation" min="0" max="100" step="1" value="100">
+        <span class="cp-value" id="cpVal_max_saturation">100</span>
+      </div>
     </div>
     <div id="cpSliders"></div>
     <div class="cp-actions">
@@ -1080,24 +1102,24 @@
       console.log('[JS] ' + message);
     }
 
-    // Initialize everything (preview-first flow)
+    // Wait for Ruby WASM to finish loading (polls for rubyUpdateVisuals)
+    function waitForRubyReady() {
+      return new Promise(resolve => {
+        (function check() {
+          window.rubyUpdateVisuals ? resolve() : setTimeout(check, 100);
+        })();
+      });
+    }
+
+    // Initialize everything (auto-start flow)
     async function init() {
       try {
-        // Phase 1: Show "Start Preview" button (needs user click for AudioContext)
-        document.getElementById('startPreviewArea').style.display = 'block';
-        updateLoadingStatus('Click to start preview with microphone...');
+        // Phase 1: Wait for Ruby WASM to finish loading
+        updateLoadingStatus('Loading Ruby WASM...');
+        await waitForRubyReady();
+        console.log('[JS] Ruby WASM ready');
 
-        // Wait for user to click Start Preview
-        await new Promise((resolve) => {
-          document.getElementById('startPreviewBtn').addEventListener('click', resolve);
-        });
-
-        document.getElementById('startPreviewArea').style.display = 'none';
-
-        // Phase 2: Initialize Audio + Three.js and start preview animation
-        updateLoadingStatus('Initializing Web Audio API...');
-        await initAudio();
-
+        // Phase 2: Initialize Three.js and start animation immediately
         updateLoadingStatus('Initializing Three.js...');
         initThree();
 
@@ -1113,8 +1135,13 @@
 
         console.log('[JS] Preview started with control panel');
 
-        // Phase 4: Wait for VRM choice (upload or skip)
-        const vrmFile = await waitForVRMChoice();
+        // Phase 4: Start audio and wait for VRM choice in parallel
+        const [vrmFile] = await Promise.all([
+          waitForVRMChoice(),
+          initAudio().catch(error => {
+            console.warn('[JS] Audio init failed (will retry on user click):', error.message);
+          })
+        ]);
         document.getElementById('vrmChoiceBar').classList.remove('active');
 
         // Load VRM if file was provided
@@ -1277,7 +1304,6 @@
         { key: 'particle_friction', label: 'Friction', min: 0.50, max: 0.99, step: 0.01, default: 0.86 },
       ],
       'Rendering': [
-        { key: 'max_brightness', label: 'Max Brightness', min: 0, max: 255, step: 1, default: 255 },
         { key: 'max_lightness', label: 'Max Lightness', min: 0, max: 255, step: 1, default: 255 },
         { key: 'max_emissive', label: 'Max Emissive', min: 0.0, max: 10.0, step: 0.1, default: 2.0 },
       ],
@@ -1285,7 +1311,174 @@
         { key: 'visual_smoothing', label: 'Visual Smoothing', min: 0.0, max: 0.99, step: 0.01, default: 0.70 },
         { key: 'impulse_decay', label: 'Impulse Decay', min: 0.50, max: 0.99, step: 0.01, default: 0.82 },
       ],
+      'Camera': [
+        { key: 'camera_radius', label: 'Distance', min: 1, max: 20, step: 0.1, default: 5,
+          setter: v => { cameraRadius = v; if (cameraTarget) updateCameraPosition(); },
+          getter: () => parseFloat(cameraRadius.toFixed(1)) },
+        { key: 'camera_theta', label: 'H.Rotation', min: -180, max: 180, step: 5, default: 0,
+          setter: v => { cameraTheta = v * Math.PI / 180; if (cameraTarget) updateCameraPosition(); },
+          getter: () => Math.round(cameraTheta * 180 / Math.PI) },
+        { key: 'camera_phi', label: 'V.Rotation', min: -80, max: 80, step: 5, default: 0,
+          setter: v => { cameraPhi = v * Math.PI / 180; if (cameraTarget) updateCameraPosition(); },
+          getter: () => Math.round(cameraPhi * 180 / Math.PI) },
+      ],
     };
+
+    function initHueWheel() {
+      const canvas = document.getElementById('hueWheel');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const cx = canvas.width / 2;
+      const cy = canvas.height / 2;
+      const outerR = 56;
+      const innerR = 34;
+
+      function drawWheel(currentHue) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // Draw hue ring
+        for (let deg = 0; deg < 360; deg++) {
+          const startAngle = (deg - 90) * Math.PI / 180;
+          const endAngle = (deg - 89) * Math.PI / 180;
+          ctx.beginPath();
+          ctx.arc(cx, cy, (outerR + innerR) / 2, startAngle, endAngle);
+          ctx.lineWidth = outerR - innerR;
+          ctx.strokeStyle = `hsl(${deg},100%,50%)`;
+          ctx.stroke();
+        }
+        // Draw indicator dot at current hue
+        const angle = (currentHue - 90) * Math.PI / 180;
+        const dotR = (outerR + innerR) / 2;
+        const dx = cx + dotR * Math.cos(angle);
+        const dy = cy + dotR * Math.sin(angle);
+        ctx.beginPath();
+        ctx.arc(dx, dy, 5, 0, Math.PI * 2);
+        ctx.fillStyle = '#fff';
+        ctx.fill();
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+
+      // Get current hue from Ruby and draw
+      function getCurrentHue() {
+        if (!window.rubyExecPrompt) return 0;
+        try {
+          const result = window.rubyExecPrompt('h');
+          const match = String(result).match(/[\d.]+/);
+          return match ? parseFloat(match[0]) : 0;
+        } catch (e) { return 0; }
+      }
+
+      let currentHue = getCurrentHue();
+      drawWheel(currentHue);
+      document.getElementById('hueValueDisplay').textContent = currentHue.toFixed(1) + '°';
+
+      // Helper: update hue wheel display to given value
+      function syncWheelTo(hue) {
+        currentHue = hue;
+        drawWheel(currentHue);
+        document.getElementById('hueValueDisplay').textContent = hue.toFixed(1) + '°';
+      }
+
+      // Helper: restore saturation from 0 when switching to color mode
+      function restoreSatIfZero() {
+        const curSat = window.rubyConfigGet?.('max_saturation') || 0;
+        if (curSat === 0) {
+          if (window.rubyConfigSet) window.rubyConfigSet('max_saturation', 100);
+          const s = document.getElementById('cpSlider_max_saturation');
+          const v = document.getElementById('cpVal_max_saturation');
+          if (s) s.value = 100;
+          if (v) v.textContent = '100';
+        }
+      }
+
+      // Click handler: calculate angle from click position
+      canvas.addEventListener('click', function(e) {
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left - cx;
+        const y = e.clientY - rect.top - cy;
+        const dist = Math.sqrt(x * x + y * y);
+        if (dist < innerR || dist > outerR) return;  // Only respond in ring area
+        let angle = Math.atan2(y, x) * 180 / Math.PI + 90;
+        if (angle < 0) angle += 360;
+        if (angle >= 360) angle -= 360;
+        const hue = Math.round(angle);
+        if (window.rubyExecPrompt) {
+          // If in Gray mode, auto-switch to Red (user is picking a color)
+          const modeResult = String(window.rubyExecPrompt('c'));
+          if (modeResult.includes('gray')) {
+            window.rubyExecPrompt('c 1');
+            restoreSatIfZero();
+          }
+          window.rubyExecPrompt('h ' + hue);
+        }
+        syncWheelTo(hue);
+      });
+
+      // Brightness and Saturation sliders (wired to rubyConfigSet/Get)
+      const colorSliderDefs = [
+        { id: 'max_brightness', decimals: 0 },
+        { id: 'max_saturation', decimals: 0 },
+      ];
+      colorSliderDefs.forEach(({ id, decimals }) => {
+        const slider = document.getElementById('cpSlider_' + id);
+        const valueEl = document.getElementById('cpVal_' + id);
+        if (!slider || !valueEl) return;
+        // Sync initial value from Ruby
+        const cur = window.rubyConfigGet?.(id);
+        if (cur !== undefined && typeof cur === 'number') {
+          slider.value = cur;
+          valueEl.textContent = cur.toFixed(decimals);
+        }
+        slider.addEventListener('input', function() {
+          const v = Number(this.value);
+          valueEl.textContent = v.toFixed(decimals);
+          if (window.rubyConfigSet) window.rubyConfigSet(id, v);
+          // Saturation = 0: auto-switch to Gray mode + sync wheel to 0°
+          if (id === 'max_saturation' && v === 0 && window.rubyExecPrompt) {
+            window.rubyExecPrompt('c 0');
+            syncWheelTo(0);
+          }
+        });
+        slider.addEventListener('keydown', function(e) { e.stopPropagation(); });
+      });
+
+      // Mode buttons (c 0/1/2/3) with Saturation slider sync
+      const modes = [
+        { label: 'Gray', cmd: 'c 0', isGray: true },
+        { label: 'Red',  cmd: 'c 1', isGray: false },
+        { label: 'Green', cmd: 'c 2', isGray: false },
+        { label: 'Blue', cmd: 'c 3', isGray: false },
+      ];
+      const modeContainer = document.getElementById('colorModeButtons');
+      if (modeContainer) {
+        modes.forEach(m => {
+          const btn = document.createElement('button');
+          btn.className = 'cp-btn';
+          btn.textContent = m.label;
+          btn.style.flex = '0 0 auto';
+          btn.style.padding = '3px 6px';
+          btn.style.fontSize = '10px';
+          btn.addEventListener('click', () => {
+            if (window.rubyExecPrompt) window.rubyExecPrompt(m.cmd);
+            const satSlider = document.getElementById('cpSlider_max_saturation');
+            const satVal = document.getElementById('cpVal_max_saturation');
+            if (m.isGray) {
+              // Gray: set saturation to 0 + sync wheel to 0°
+              if (window.rubyConfigSet) window.rubyConfigSet('max_saturation', 0);
+              if (satSlider) satSlider.value = 0;
+              if (satVal) satVal.textContent = '0';
+              syncWheelTo(0);
+            } else {
+              // Color mode: restore saturation if 0, sync wheel to 0° (mode resets offset)
+              restoreSatIfZero();
+              syncWheelTo(0);
+            }
+          });
+          modeContainer.appendChild(btn);
+        });
+      }
+    }
 
     function buildControlPanel() {
       const container = document.getElementById('cpSliders');
@@ -1324,8 +1517,8 @@
           input.value = def.default;
           input.id = 'cpSlider_' + def.key;
 
-          // Read current value from Ruby if available
-          const currentVal = window.rubyConfigGet?.(def.key);
+          // Read current value (JS getter or Ruby)
+          const currentVal = def.getter ? def.getter() : window.rubyConfigGet?.(def.key);
           if (currentVal !== undefined && typeof currentVal === 'number') {
             input.value = currentVal;
           }
@@ -1334,7 +1527,9 @@
           input.addEventListener('input', function() {
             const v = Number(this.value);
             value.textContent = v.toFixed(def.step < 1 ? 2 : 0);
-            if (window.rubyConfigSet) {
+            if (def.setter) {
+              def.setter(v);
+            } else if (window.rubyConfigSet) {
               window.rubyConfigSet(def.key, v);
             }
           });
@@ -1356,8 +1551,17 @@
       document.getElementById('cpCloseBtn').addEventListener('click', toggleControlPanel);
       document.getElementById('cpResetBtn').addEventListener('click', function() {
         if (window.rubyConfigReset) window.rubyConfigReset();
+        // Reset JS-side sliders (Camera) to defaults
+        for (const sliders of Object.values(SLIDER_GROUPS)) {
+          for (const def of sliders) {
+            if (def.setter) def.setter(def.default);
+          }
+        }
         syncControlPanelValues();
       });
+
+      // Initialize hue wheel
+      initHueWheel();
     }
 
     function syncControlPanelValues() {
@@ -1366,7 +1570,7 @@
           const slider = document.getElementById('cpSlider_' + def.key);
           const valueEl = document.getElementById('cpVal_' + def.key);
           if (slider && valueEl) {
-            const currentVal = window.rubyConfigGet?.(def.key);
+            const currentVal = def.getter ? def.getter() : window.rubyConfigGet?.(def.key);
             if (currentVal !== undefined && typeof currentVal === 'number') {
               slider.value = currentVal;
               valueEl.textContent = currentVal.toFixed(def.step < 1 ? 2 : 0);
@@ -1377,6 +1581,18 @@
           }
         }
       }
+      // Sync Color group sliders (brightness/saturation) from Ruby
+      ['max_brightness', 'max_saturation'].forEach(id => {
+        const slider = document.getElementById('cpSlider_' + id);
+        const valueEl = document.getElementById('cpVal_' + id);
+        if (slider && valueEl) {
+          const v = window.rubyConfigGet?.(id);
+          if (v !== undefined && typeof v === 'number') {
+            slider.value = v;
+            valueEl.textContent = Math.round(v);
+          }
+        }
+      });
     }
 
     function toggleControlPanel() {

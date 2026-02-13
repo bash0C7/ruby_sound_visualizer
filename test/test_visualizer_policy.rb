@@ -350,4 +350,63 @@ class TestVisualizerPolicy < Test::Unit::TestCase
     assert_equal 0.70, VisualizerPolicy.visual_smoothing
     assert_equal 0.82, VisualizerPolicy.impulse_decay
   end
+
+  # max_saturation tests
+  def test_max_saturation_default
+    assert_equal 100, VisualizerPolicy.max_saturation
+  end
+
+  def test_max_saturation_accessor
+    VisualizerPolicy.max_saturation = 50
+    assert_equal 50, VisualizerPolicy.max_saturation
+
+    VisualizerPolicy.max_saturation = 150
+    assert_equal 100, VisualizerPolicy.max_saturation, "max_saturation should be clamped to 100"
+
+    VisualizerPolicy.max_saturation = -10
+    assert_equal 0, VisualizerPolicy.max_saturation, "max_saturation should be clamped to 0"
+  end
+
+  def test_max_saturation_in_mutable_keys
+    assert VisualizerPolicy::MUTABLE_KEYS.key?('max_saturation')
+  end
+
+  def test_set_by_key_max_saturation
+    VisualizerPolicy.set_by_key('max_saturation', 70)
+    assert_equal 70, VisualizerPolicy.max_saturation
+  end
+
+  def test_get_by_key_max_saturation
+    VisualizerPolicy.max_saturation = 80
+    assert_equal 80, VisualizerPolicy.get_by_key('max_saturation')
+  end
+
+  def test_cap_saturation_applies_scale
+    VisualizerPolicy.max_saturation = 50
+    result = VisualizerPolicy.cap_saturation(1.0)
+    assert_in_delta 0.5, result, 0.001
+  end
+
+  def test_cap_saturation_full_scale
+    VisualizerPolicy.max_saturation = 100
+    result = VisualizerPolicy.cap_saturation(0.8)
+    assert_in_delta 0.8, result, 0.001
+  end
+
+  def test_cap_saturation_zero_desaturates
+    VisualizerPolicy.max_saturation = 0
+    result = VisualizerPolicy.cap_saturation(0.8)
+    assert_in_delta 0.0, result, 0.001
+  end
+
+  def test_reset_runtime_resets_max_saturation
+    VisualizerPolicy.max_saturation = 50
+    VisualizerPolicy.reset_runtime
+    assert_equal 100, VisualizerPolicy.max_saturation
+  end
+
+  def test_list_keys_includes_max_saturation
+    result = VisualizerPolicy.list_keys
+    assert_match(/max_saturation/, result)
+  end
 end

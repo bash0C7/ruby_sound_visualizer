@@ -193,4 +193,29 @@ class TestColorPalette < Test::Unit::TestCase
     assert_equal 3, color_low.length
     assert_equal 3, color_high.length
   end
+
+  def test_saturation_reduced_when_max_saturation_low
+    VisualizerPolicy.max_saturation = 0
+    @palette.hue_mode = 1
+    analysis = { bass: 0.5, mid: 0.3, high: 0.2 }
+    color = @palette.frequency_to_color(analysis)
+    # With saturation 0, all RGB channels should be equal (grayscale)
+    assert_in_delta color[0], color[1], 0.05
+    assert_in_delta color[1], color[2], 0.05
+  end
+
+  def test_saturation_full_when_max_saturation_100
+    VisualizerPolicy.max_saturation = 100
+    @palette.hue_mode = 1
+    analysis = { bass: 0.5, mid: 0.3, high: 0.2 }
+    color_full = @palette.frequency_to_color(analysis)
+
+    VisualizerPolicy.max_saturation = 50
+    color_half = @palette.frequency_to_color(analysis)
+
+    # Full saturation should produce more vivid colors (higher max channel difference)
+    full_range = color_full.max - color_full.min
+    half_range = color_half.max - color_half.min
+    assert full_range > half_range, "Full saturation should have wider color range"
+  end
 end

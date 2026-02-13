@@ -61,8 +61,8 @@ class ColorPalette
     hue_deg = (base_hue + hue_offset_deg + @hue_offset) % 360.0
     hue = hue_deg / 360.0
 
-    # Saturation: soft-clipped
-    saturation = 0.65 + Math.tanh(total * 0.5) * 0.15
+    # Saturation: soft-clipped, then capped by VisualizerPolicy
+    saturation = VisualizerPolicy.cap_saturation(0.65 + Math.tanh(total * 0.5) * 0.15)
 
     @last_hsv = [hue, saturation, value]
     hsv_to_rgb(hue, saturation, value)
@@ -90,7 +90,7 @@ class ColorPalette
     hue_deg = (base_hue + hue_offset_deg + @hue_offset) % 360.0
     hue = hue_deg / 360.0
 
-    saturation = 0.65 + Math.tanh(total * 0.5) * 0.15
+    saturation = VisualizerPolicy.cap_saturation(0.65 + Math.tanh(total * 0.5) * 0.15)
 
     hsv_to_rgb(hue, saturation, value)
   end
