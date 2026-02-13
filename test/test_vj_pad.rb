@@ -643,4 +643,25 @@ class TestVJPad < Test::Unit::TestCase
     assert_in_delta 3.0, VisualizerPolicy.bloom_energy_scale, 0.001
     assert_in_delta 0.4, VisualizerPolicy.particle_explosion_base_prob, 0.001
   end
+
+  # === plugins command ===
+
+  def test_plugins_lists_registered_plugins
+    result = @pad.exec("plugins")
+    assert_equal true, result[:ok]
+    assert_match(/burst/, result[:msg])
+    assert_match(/flash/, result[:msg])
+  end
+
+  def test_plugins_shows_descriptions
+    result = @pad.plugins
+    assert_match(/impulse/, result.downcase)
+    assert_match(/bloom/, result.downcase)
+  end
+
+  def test_plugins_shows_param_info
+    result = @pad.plugins
+    assert_match(/force/, result)
+    assert_match(/intensity/, result)
+  end
 end

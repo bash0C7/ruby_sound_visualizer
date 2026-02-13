@@ -10,6 +10,7 @@ class EffectDispatcher
 
     dispatch_impulse(effects[:impulse]) if effects[:impulse]
     dispatch_bloom_flash(effects[:bloom_flash]) if effects[:bloom_flash]
+    dispatch_set_param(effects[:set_param]) if effects[:set_param]
   end
 
   private
@@ -25,5 +26,11 @@ class EffectDispatcher
 
   def dispatch_bloom_flash(intensity)
     @effect_manager.inject_bloom_flash(intensity)
+  end
+
+  def dispatch_set_param(params)
+    params.each do |key, value|
+      VisualizerPolicy.set_by_key(key, value)
+    end
   end
 end

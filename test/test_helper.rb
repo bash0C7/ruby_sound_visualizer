@@ -103,3 +103,6 @@ require_relative '../src/ruby/frame_counter'
 # Load plugins (same order as index.html)
 require_relative '../src/ruby/plugins/vj_burst'
 require_relative '../src/ruby/plugins/vj_flash'
+require_relative '../src/ruby/plugins/vj_shockwave'
+require_relative '../src/ruby/plugins/vj_strobe'
+require_relative '../src/ruby/plugins/vj_rave'

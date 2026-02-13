@@ -214,6 +214,18 @@ class VJPad
     end
   end
 
+  # --- Plugin Discovery ---
+
+  def plugins
+    VJPlugin.all.map { |p|
+      params_str = p.params.map { |k, cfg|
+        range = cfg[:range] ? " (#{cfg[:range]})" : ""
+        "#{k}=#{cfg[:default]}#{range}"
+      }.join(", ")
+      "#{p.name}: #{p.description} [#{params_str}]"
+    }.join("\n")
+  end
+
   # --- Plugin Commands ---
   # Plugin-defined commands (burst, flash, etc.) are resolved via method_missing.
   # Plugins register themselves via VJPlugin.define(:name) { ... }.

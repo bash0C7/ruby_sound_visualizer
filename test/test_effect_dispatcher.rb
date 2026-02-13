@@ -91,6 +91,40 @@ class TestEffectDispatcher < Test::Unit::TestCase
     assert_in_delta 0.8, @effect_manager.impulse_bass, 0.001
   end
 
+  # === set_param dispatching ===
+
+  def test_dispatch_set_param_adjusts_policy
+    VisualizerPolicy.reset_runtime
+    effects = { set_param: { "bloom_base_strength" => 3.5 } }
+    @dispatcher.dispatch(effects)
+    assert_in_delta 3.5, VisualizerPolicy.bloom_base_strength, 0.001
+  end
+
+  def test_dispatch_set_param_multiple_keys
+    VisualizerPolicy.reset_runtime
+    effects = { set_param: { "bloom_base_strength" => 4.0, "particle_friction" => 0.92 } }
+    @dispatcher.dispatch(effects)
+    assert_in_delta 4.0, VisualizerPolicy.bloom_base_strength, 0.001
+    assert_in_delta 0.92, VisualizerPolicy.particle_friction, 0.001
+  end
+
+  def test_dispatch_set_param_ignores_unknown_keys
+    effects = { set_param: { "nonexistent_key" => 99.9 } }
+    # Should not raise
+    @dispatcher.dispatch(effects)
+  end
+
+  def test_dispatch_set_param_combined_with_impulse
+    VisualizerPolicy.reset_runtime
+    effects = {
+      impulse: { bass: 1.0, mid: 1.0, high: 1.0, overall: 1.0 },
+      set_param: { "bloom_base_strength" => 3.0 }
+    }
+    @dispatcher.dispatch(effects)
+    assert_in_delta 1.0, @effect_manager.impulse_bass, 0.001
+    assert_in_delta 3.0, VisualizerPolicy.bloom_base_strength, 0.001
+  end
+
   # === Full pipeline: VJPad -> EffectDispatcher -> EffectManager ===
 
   def test_full_pipeline_burst_and_flash

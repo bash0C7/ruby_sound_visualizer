@@ -22,10 +22,14 @@
   - 8 new VJ Pad DSL commands (bbs, bes, bis, pp, pf, fr, vs, id)
   - Completed: 339 tests pass
 
-- [ ] コマンドの種類や発動するエフェクトの調整 🖥️
-  - 既存コマンド（burst, flash）のパラメータ調整
-  - 新しいエフェクトコマンドの追加検討
-  - エフェクトの視覚的インパクトの最適化
+- [x] コマンドの種類や発動するエフェクトの調整 🌐
+  - Plugin system: VJPlugin DSL + EffectDispatcher architecture
+  - Existing commands (burst, flash) refactored to plugins
+  - 3 new effect plugins: shockwave, strobe, rave
+  - EffectDispatcher supports set_param for runtime policy changes
+  - `plugins` VJPad command for discoverability
+  - Plugin development guide + create-plugin skill
+  - Completed: 400 tests pass (merged audio-controls + plugin-system branches)
 
 ## 🎵 音源入力拡張タスク
 

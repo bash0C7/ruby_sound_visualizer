@@ -88,7 +88,10 @@ index.html              # Single file containing all code (Ruby + JavaScript + H
 src/ruby/               # Ruby source files
 ├── plugins/            # VJ Pad plugin commands
 │   ├── vj_burst.rb           # Burst effect (impulse injection)
-│   └── vj_flash.rb           # Flash effect (bloom flash)
+│   ├── vj_flash.rb           # Flash effect (bloom flash)
+│   ├── vj_shockwave.rb       # Shockwave effect (bass impulse + bloom)
+│   ├── vj_strobe.rb          # Strobe effect (quick bloom flash)
+│   └── vj_rave.rb            # Rave preset (max energy + param boost)
 ├── vj_plugin.rb              # Plugin system core (VJPlugin + PluginDefinition)
 ├── effect_dispatcher.rb      # Plugin effects → EffectManager translator
 ├── vj_pad.rb                 # VJ Pad DSL (delegates to plugins)
