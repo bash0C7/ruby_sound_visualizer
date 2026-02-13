@@ -111,6 +111,56 @@ class VJPad
     "c:#{cn} h:#{ho} | s:#{se} br:#{b} lt:#{l} | em:#{e} bm:#{bl} x:#{ex}"
   end
 
+  # --- Audio-reactive Parameter Commands ---
+
+  def bbs(val = :_get)
+    return "bloom_base: #{VisualizerPolicy.bloom_base_strength}" if val == :_get
+    VisualizerPolicy.bloom_base_strength = val.to_f
+    "bloom_base: #{VisualizerPolicy.bloom_base_strength}"
+  end
+
+  def bes(val = :_get)
+    return "bloom_energy: #{VisualizerPolicy.bloom_energy_scale}" if val == :_get
+    VisualizerPolicy.bloom_energy_scale = val.to_f
+    "bloom_energy: #{VisualizerPolicy.bloom_energy_scale}"
+  end
+
+  def bis(val = :_get)
+    return "bloom_impulse: #{VisualizerPolicy.bloom_impulse_scale}" if val == :_get
+    VisualizerPolicy.bloom_impulse_scale = val.to_f
+    "bloom_impulse: #{VisualizerPolicy.bloom_impulse_scale}"
+  end
+
+  def pp(val = :_get)
+    return "particle_prob: #{VisualizerPolicy.particle_explosion_base_prob}" if val == :_get
+    VisualizerPolicy.particle_explosion_base_prob = val.to_f
+    "particle_prob: #{VisualizerPolicy.particle_explosion_base_prob}"
+  end
+
+  def pf(val = :_get)
+    return "particle_force: #{VisualizerPolicy.particle_explosion_force_scale}" if val == :_get
+    VisualizerPolicy.particle_explosion_force_scale = val.to_f
+    "particle_force: #{VisualizerPolicy.particle_explosion_force_scale}"
+  end
+
+  def fr(val = :_get)
+    return "friction: #{VisualizerPolicy.particle_friction}" if val == :_get
+    VisualizerPolicy.particle_friction = val.to_f
+    "friction: #{VisualizerPolicy.particle_friction}"
+  end
+
+  def vs(val = :_get)
+    return "smoothing: #{VisualizerPolicy.visual_smoothing}" if val == :_get
+    VisualizerPolicy.visual_smoothing = val.to_f
+    "smoothing: #{VisualizerPolicy.visual_smoothing}"
+  end
+
+  def id(val = :_get)
+    return "impulse_decay: #{VisualizerPolicy.impulse_decay}" if val == :_get
+    VisualizerPolicy.impulse_decay = val.to_f
+    "impulse_decay: #{VisualizerPolicy.impulse_decay}"
+  end
+
   # --- Audio Input Commands ---
 
   def mic(val = :_get)

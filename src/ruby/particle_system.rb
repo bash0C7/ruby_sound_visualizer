@@ -34,9 +34,9 @@ class ParticleSystem
     brightness = [brightness, 1.5].min
 
     # 動的爆発確率（20-70%、エネルギーに応じて変化）
-    explosion_probability = VisualizerPolicy::PARTICLE_EXPLOSION_BASE_PROB + energy * VisualizerPolicy::PARTICLE_EXPLOSION_ENERGY_SCALE
+    explosion_probability = VisualizerPolicy.particle_explosion_base_prob + energy * VisualizerPolicy.particle_explosion_energy_scale
     # 爆発力を強化（パーティクル数減で個別の動きを大きく）
-    explosion_force = energy * VisualizerPolicy::PARTICLE_EXPLOSION_FORCE_SCALE
+    explosion_force = energy * VisualizerPolicy.particle_explosion_force_scale
 
     # impulse で爆発確率と爆発力をブースト（連続的に減衰）
     explosion_probability = [explosion_probability + 0.3 * imp_overall, 0.9].min
@@ -100,9 +100,9 @@ class ParticleSystem
       particle[:position][2] += particle[:velocity][2]
 
       # 摩擦（高速フェードアウトでビート感を出す）
-      particle[:velocity][0] *= VisualizerPolicy::PARTICLE_FRICTION
-      particle[:velocity][1] *= VisualizerPolicy::PARTICLE_FRICTION
-      particle[:velocity][2] *= VisualizerPolicy::PARTICLE_FRICTION
+      particle[:velocity][0] *= VisualizerPolicy.particle_friction
+      particle[:velocity][1] *= VisualizerPolicy.particle_friction
+      particle[:velocity][2] *= VisualizerPolicy.particle_friction
 
       # 境界処理
       3.times do |i|

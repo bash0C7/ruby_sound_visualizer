@@ -89,6 +89,136 @@
       text-overflow: ellipsis;
     }
     #vjPromptResult.error { color: #f44; }
+    /* Control Panel overlay */
+    #controlPanel {
+      display: none;
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: 300px;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.85);
+      color: #ccc;
+      font-family: monospace;
+      font-size: 11px;
+      z-index: 80;
+      overflow-y: auto;
+      border-left: 1px solid #333;
+      padding: 8px 12px;
+      box-sizing: border-box;
+    }
+    #controlPanel.active { display: block; }
+    #controlPanel .cp-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #444;
+    }
+    #controlPanel .cp-header h3 {
+      margin: 0;
+      color: #0f0;
+      font-size: 13px;
+    }
+    #controlPanel .cp-close {
+      background: none;
+      border: 1px solid #666;
+      color: #999;
+      cursor: pointer;
+      padding: 2px 8px;
+      font-family: monospace;
+      font-size: 11px;
+      border-radius: 3px;
+    }
+    #controlPanel .cp-close:hover { color: #fff; border-color: #fff; }
+    #controlPanel .cp-group {
+      margin-bottom: 10px;
+    }
+    #controlPanel .cp-group-title {
+      color: #0cc;
+      font-size: 11px;
+      margin: 0 0 4px 0;
+      cursor: pointer;
+      user-select: none;
+    }
+    #controlPanel .cp-group-title:hover { color: #0ff; }
+    #controlPanel .cp-slider-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-bottom: 3px;
+    }
+    #controlPanel .cp-label {
+      width: 100px;
+      flex-shrink: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: #aaa;
+    }
+    #controlPanel .cp-value {
+      width: 42px;
+      flex-shrink: 0;
+      text-align: right;
+      color: #0f0;
+      font-size: 10px;
+    }
+    #controlPanel input[type="range"] {
+      flex: 1;
+      height: 14px;
+      -webkit-appearance: none;
+      appearance: none;
+      background: #333;
+      border-radius: 2px;
+      outline: none;
+    }
+    #controlPanel input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 10px;
+      height: 14px;
+      background: #0f0;
+      border-radius: 2px;
+      cursor: pointer;
+    }
+    #controlPanel .cp-actions {
+      display: flex;
+      gap: 6px;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid #444;
+    }
+    #controlPanel .cp-btn {
+      flex: 1;
+      padding: 6px;
+      background: #222;
+      color: #0f0;
+      border: 1px solid #0f0;
+      border-radius: 3px;
+      cursor: pointer;
+      font-family: monospace;
+      font-size: 11px;
+      text-align: center;
+    }
+    #controlPanel .cp-btn:hover { background: #0f0; color: #000; }
+    /* VRM choice bar (overlaid on preview) */
+    #vrmChoiceBar {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 90;
+      text-align: center;
+    }
+    #vrmChoiceBar.active { display: block; }
+    #vrmChoiceBar .vrm-title {
+      color: #fff;
+      font-family: monospace;
+      font-size: 16px;
+      margin-bottom: 16px;
+    }
   </style>
 </head>
 <body>
@@ -101,12 +231,28 @@
   <div id="loading">
     <div id="loadingTitle">Loading Ruby WASM Sound Visualizer...</div>
     <div id="loadingStatus" style="font-size: 12px; margin-top: 20px;"></div>
-    <div id="vrmUpload" style="display: none;">
-      <label for="vrmFileInput" class="vrm-upload-btn">Upload VRM File</label>
-      <input type="file" id="vrmFileInput" accept=".vrm" style="display: none;">
-      <button id="skipVrmBtn" class="vrm-upload-btn" style="margin-left: 10px;">Start without VRM</button>
-      <button id="captureTabBtn" class="vrm-upload-btn" style="margin-left: 10px;">Capture Tab</button>
-      <div id="vrmFileName"></div>
+    <div id="startPreviewArea" style="display: none; margin-top: 20px;">
+      <button id="startPreviewBtn" class="vrm-upload-btn" style="font-size: 16px; padding: 14px 32px;">Start Preview</button>
+    </div>
+  </div>
+  <!-- VRM choice bar (shown after preview starts, overlaid on preview) -->
+  <div id="vrmChoiceBar">
+    <div class="vrm-title">Choose VRM or continue without</div>
+    <label for="vrmFileInput" class="vrm-upload-btn">Upload VRM File</label>
+    <input type="file" id="vrmFileInput" accept=".vrm" style="display: none;">
+    <button id="skipVrmBtn" class="vrm-upload-btn" style="margin-left: 10px;">Start without VRM</button>
+    <button id="captureTabBtn" class="vrm-upload-btn" style="margin-left: 10px;">Capture Tab</button>
+    <div id="vrmFileName" style="margin-top: 10px; font-size: 12px; color: #888;"></div>
+  </div>
+  <!-- Control Panel (right side overlay) -->
+  <div id="controlPanel">
+    <div class="cp-header">
+      <h3>Controls</h3>
+      <button class="cp-close" id="cpCloseBtn" title="Close (p)">X</button>
+    </div>
+    <div id="cpSliders"></div>
+    <div class="cp-actions">
+      <button class="cp-btn" id="cpResetBtn">Reset All</button>
     </div>
   </div>
   <div id="vjPrompt">
@@ -561,8 +707,8 @@
       console.log('[JS] Camera controls initialized (d/f: rotate left/right, e/c: rotate up/down)');
     }
 
-    // VRM file upload promise (or skip)
-    function waitForVRMFile() {
+    // VRM file upload promise (or skip) - shown after preview is running
+    function waitForVRMChoice() {
       return new Promise((resolve) => {
         const input = document.getElementById('vrmFileInput');
         const skipBtn = document.getElementById('skipVrmBtn');
@@ -580,22 +726,14 @@
           resolve(null);  // No VRM file, start without it
         });
 
-        // Tab capture can be started during startup (independent of VRM choice)
+        // Tab capture (independent of VRM choice, audio already initialized)
         captureBtn.addEventListener('click', async () => {
           try {
-            // Need AudioContext before tab capture for audio routing
-            if (!audioContext) {
-              audioContext = new AudioContext();
-              analyser = audioContext.createAnalyser();
-              analyser.fftSize = 2048;
-              analyser.smoothingTimeConstant = 0.5;
-              dataArray = new Uint8Array(analyser.frequencyBinCount);
-            }
             await startTabCapture();
             captureBtn.textContent = 'Tab Captured!';
             captureBtn.disabled = true;
           } catch (error) {
-            console.error('[JS] Tab capture during startup error:', error);
+            console.error('[JS] Tab capture error:', error);
           }
         });
       });
@@ -939,37 +1077,51 @@
       console.log('[JS] ' + message);
     }
 
-    // Initialize everything
+    // Initialize everything (preview-first flow)
     async function init() {
       try {
-        // Always show VRM upload UI
-        document.getElementById('vrmUpload').style.display = 'block';
-        updateLoadingStatus('Upload a VRM file or start without it...');
+        // Phase 1: Show "Start Preview" button (needs user click for AudioContext)
+        document.getElementById('startPreviewArea').style.display = 'block';
+        updateLoadingStatus('Click to start preview with microphone...');
 
-        const vrmFile = await waitForVRMFile();
-        document.getElementById('vrmUpload').style.display = 'none';
+        // Wait for user to click Start Preview
+        await new Promise((resolve) => {
+          document.getElementById('startPreviewBtn').addEventListener('click', resolve);
+        });
 
+        document.getElementById('startPreviewArea').style.display = 'none';
+
+        // Phase 2: Initialize Audio + Three.js and start preview animation
         updateLoadingStatus('Initializing Web Audio API...');
         await initAudio();
 
         updateLoadingStatus('Initializing Three.js...');
         initThree();
 
+        updateLoadingStatus('Starting preview...');
+        animate();
+
+        // Phase 3: Hide loading, show VRM choice bar + control panel overlaid on preview
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('vrmChoiceBar').classList.add('active');
+        buildControlPanel();
+        document.getElementById('controlPanel').classList.add('active');
+        controlPanelOpen = true;
+
+        console.log('[JS] Preview started with control panel');
+
+        // Phase 4: Wait for VRM choice (upload or skip)
+        const vrmFile = await waitForVRMChoice();
+        document.getElementById('vrmChoiceBar').classList.remove('active');
+
         // Load VRM if file was provided
         if (vrmFile) {
-          updateLoadingStatus('Loading VRM model...');
           await loadVRMFile(vrmFile);
-          // Adjust camera for VRM viewing
           camera.position.z = 1.5;
-          console.log('[JS] Initialization complete with VRM!');
+          console.log('[JS] VRM loaded into preview');
         } else {
-          console.log('[JS] Initialization complete without VRM!');
+          console.log('[JS] Continuing without VRM');
         }
-
-        updateLoadingStatus('Ready!');
-        document.getElementById('loading').style.display = 'none';
-
-        animate();
       } catch (error) {
         console.error('[JS] Initialization error:', error);
         updateLoadingStatus('Error: ' + error.message);
@@ -1060,6 +1212,9 @@
       // Backtick toggles VJ Pad prompt
       if (key === '`') { event.preventDefault(); vjPromptToggle(); return; }
 
+      // Control panel toggle
+      if (key === 'p') { toggleControlPanel(); return; }
+
       // Audio input controls (must stay in JS - direct Web Audio manipulation)
       if (key === 'm') { toggleMic(); return; }
       if (key === 't') { toggleTabCapture(); return; }
@@ -1097,6 +1252,140 @@
       reset: () => window.rubyConfigReset?.() ?? 'Ruby VM not ready',
       help: () => console.log('Usage: rubyConfig.set(key, value) | .get(key) | .list() | .reset()')
     };
+
+    // === Control Panel ===
+    let controlPanelOpen = false;
+
+    // Slider definitions (mirrors VisualizerPolicy::MUTABLE_KEYS)
+    const SLIDER_GROUPS = {
+      'Master': [
+        { key: 'sensitivity', label: 'Sensitivity', min: 0.05, max: 10.0, step: 0.05, default: 1.0 },
+      ],
+      'Bloom': [
+        { key: 'bloom_base_strength', label: 'Base Strength', min: 0.0, max: 5.0, step: 0.1, default: 1.5 },
+        { key: 'max_bloom', label: 'Max (Cap)', min: 0.0, max: 10.0, step: 0.1, default: 4.5 },
+        { key: 'bloom_energy_scale', label: 'Energy Scale', min: 0.0, max: 5.0, step: 0.1, default: 2.5 },
+        { key: 'bloom_impulse_scale', label: 'Impulse Scale', min: 0.0, max: 3.0, step: 0.1, default: 1.5 },
+      ],
+      'Particles': [
+        { key: 'particle_explosion_base_prob', label: 'Explosion Prob.', min: 0.0, max: 1.0, step: 0.01, default: 0.20 },
+        { key: 'particle_explosion_energy_scale', label: 'Energy Scale', min: 0.0, max: 2.0, step: 0.01, default: 0.50 },
+        { key: 'particle_explosion_force_scale', label: 'Force Scale', min: 0.0, max: 2.0, step: 0.01, default: 0.55 },
+        { key: 'particle_friction', label: 'Friction', min: 0.50, max: 0.99, step: 0.01, default: 0.86 },
+      ],
+      'Rendering': [
+        { key: 'max_brightness', label: 'Max Brightness', min: 0, max: 255, step: 1, default: 255 },
+        { key: 'max_lightness', label: 'Max Lightness', min: 0, max: 255, step: 1, default: 255 },
+        { key: 'max_emissive', label: 'Max Emissive', min: 0.0, max: 10.0, step: 0.1, default: 2.0 },
+      ],
+      'Audio': [
+        { key: 'visual_smoothing', label: 'Visual Smoothing', min: 0.0, max: 0.99, step: 0.01, default: 0.70 },
+        { key: 'impulse_decay', label: 'Impulse Decay', min: 0.50, max: 0.99, step: 0.01, default: 0.82 },
+      ],
+    };
+
+    function buildControlPanel() {
+      const container = document.getElementById('cpSliders');
+      container.innerHTML = '';
+
+      for (const [groupName, sliders] of Object.entries(SLIDER_GROUPS)) {
+        const group = document.createElement('div');
+        group.className = 'cp-group';
+
+        const title = document.createElement('div');
+        title.className = 'cp-group-title';
+        title.textContent = groupName;
+        group.appendChild(title);
+
+        const content = document.createElement('div');
+        content.className = 'cp-group-content';
+
+        for (const def of sliders) {
+          const row = document.createElement('div');
+          row.className = 'cp-slider-row';
+
+          const label = document.createElement('span');
+          label.className = 'cp-label';
+          label.textContent = def.label;
+          label.title = def.key;
+
+          const value = document.createElement('span');
+          value.className = 'cp-value';
+          value.id = 'cpVal_' + def.key;
+
+          const input = document.createElement('input');
+          input.type = 'range';
+          input.min = def.min;
+          input.max = def.max;
+          input.step = def.step;
+          input.value = def.default;
+          input.id = 'cpSlider_' + def.key;
+
+          // Read current value from Ruby if available
+          const currentVal = window.rubyConfigGet?.(def.key);
+          if (currentVal !== undefined && typeof currentVal === 'number') {
+            input.value = currentVal;
+          }
+          value.textContent = Number(input.value).toFixed(def.step < 1 ? 2 : 0);
+
+          input.addEventListener('input', function() {
+            const v = Number(this.value);
+            value.textContent = v.toFixed(def.step < 1 ? 2 : 0);
+            if (window.rubyConfigSet) {
+              window.rubyConfigSet(def.key, v);
+            }
+          });
+
+          // Prevent keyboard events from propagating (avoid camera/color controls)
+          input.addEventListener('keydown', function(e) { e.stopPropagation(); });
+
+          row.appendChild(label);
+          row.appendChild(input);
+          row.appendChild(value);
+          content.appendChild(row);
+        }
+
+        group.appendChild(content);
+        container.appendChild(group);
+      }
+
+      // Wire close and reset buttons
+      document.getElementById('cpCloseBtn').addEventListener('click', toggleControlPanel);
+      document.getElementById('cpResetBtn').addEventListener('click', function() {
+        if (window.rubyConfigReset) window.rubyConfigReset();
+        syncControlPanelValues();
+      });
+    }
+
+    function syncControlPanelValues() {
+      for (const sliders of Object.values(SLIDER_GROUPS)) {
+        for (const def of sliders) {
+          const slider = document.getElementById('cpSlider_' + def.key);
+          const valueEl = document.getElementById('cpVal_' + def.key);
+          if (slider && valueEl) {
+            const currentVal = window.rubyConfigGet?.(def.key);
+            if (currentVal !== undefined && typeof currentVal === 'number') {
+              slider.value = currentVal;
+              valueEl.textContent = currentVal.toFixed(def.step < 1 ? 2 : 0);
+            } else {
+              slider.value = def.default;
+              valueEl.textContent = Number(def.default).toFixed(def.step < 1 ? 2 : 0);
+            }
+          }
+        }
+      }
+    }
+
+    function toggleControlPanel() {
+      controlPanelOpen = !controlPanelOpen;
+      const panel = document.getElementById('controlPanel');
+      if (controlPanelOpen) {
+        panel.classList.add('active');
+        syncControlPanelValues();
+      } else {
+        panel.classList.remove('active');
+      }
+    }
 
     // Handle window resize
     window.addEventListener('resize', function() {

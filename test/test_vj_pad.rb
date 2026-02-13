@@ -3,12 +3,7 @@ require_relative 'test_helper'
 class TestVJPad < Test::Unit::TestCase
   def setup
     JS.reset_global!
-    VisualizerPolicy.sensitivity = 1.0
-    VisualizerPolicy.max_brightness = 255
-    VisualizerPolicy.max_lightness = 255
-    VisualizerPolicy.max_emissive = 2.0
-    VisualizerPolicy.max_bloom = 4.5
-    VisualizerPolicy.exclude_max = false
+    VisualizerPolicy.reset_runtime
     ColorPalette.set_hue_mode(nil)
     ColorPalette.set_hue_offset(0.0)
     @pad = VJPad.new
@@ -549,5 +544,103 @@ class TestVJPad < Test::Unit::TestCase
     # Should not raise on other commands
     result = pad.c(1)
     assert_equal "color: red", result
+  end
+
+  # === New audio-reactive parameter commands ===
+
+  def test_bbs_getter_default
+    result = @pad.bbs
+    assert_equal "bloom_base: 1.5", result
+  end
+
+  def test_bbs_setter
+    result = @pad.bbs(3.0)
+    assert_equal "bloom_base: 3.0", result
+    assert_in_delta 3.0, VisualizerPolicy.bloom_base_strength, 0.001
+  end
+
+  def test_bes_getter_default
+    result = @pad.bes
+    assert_equal "bloom_energy: 2.5", result
+  end
+
+  def test_bes_setter
+    result = @pad.bes(4.0)
+    assert_equal "bloom_energy: 4.0", result
+    assert_in_delta 4.0, VisualizerPolicy.bloom_energy_scale, 0.001
+  end
+
+  def test_bis_getter_default
+    result = @pad.bis
+    assert_equal "bloom_impulse: 1.5", result
+  end
+
+  def test_bis_setter
+    result = @pad.bis(2.5)
+    assert_equal "bloom_impulse: 2.5", result
+    assert_in_delta 2.5, VisualizerPolicy.bloom_impulse_scale, 0.001
+  end
+
+  def test_pp_getter_default
+    result = @pad.pp
+    assert_equal "particle_prob: 0.2", result
+  end
+
+  def test_pp_setter
+    result = @pad.pp(0.5)
+    assert_equal "particle_prob: 0.5", result
+    assert_in_delta 0.5, VisualizerPolicy.particle_explosion_base_prob, 0.001
+  end
+
+  def test_pf_getter_default
+    result = @pad.pf
+    assert_equal "particle_force: 0.55", result
+  end
+
+  def test_pf_setter
+    result = @pad.pf(1.0)
+    assert_equal "particle_force: 1.0", result
+    assert_in_delta 1.0, VisualizerPolicy.particle_explosion_force_scale, 0.001
+  end
+
+  def test_fr_getter_default
+    result = @pad.fr
+    assert_equal "friction: 0.86", result
+  end
+
+  def test_fr_setter
+    result = @pad.fr(0.75)
+    assert_equal "friction: 0.75", result
+    assert_in_delta 0.75, VisualizerPolicy.particle_friction, 0.001
+  end
+
+  def test_vs_getter_default
+    result = @pad.vs
+    assert_equal "smoothing: 0.7", result
+  end
+
+  def test_vs_setter
+    result = @pad.vs(0.85)
+    assert_equal "smoothing: 0.85", result
+    assert_in_delta 0.85, VisualizerPolicy.visual_smoothing, 0.001
+  end
+
+  def test_id_getter_default
+    result = @pad.id
+    assert_equal "impulse_decay: 0.82", result
+  end
+
+  def test_id_setter
+    result = @pad.id(0.90)
+    assert_equal "impulse_decay: 0.9", result
+    assert_in_delta 0.90, VisualizerPolicy.impulse_decay, 0.001
+  end
+
+  def test_new_commands_via_exec
+    result = @pad.exec("bbs 2.0; bes 3.0; pp 0.4")
+    assert_equal true, result[:ok]
+    assert_in_delta 2.0, VisualizerPolicy.bloom_base_strength, 0.001
+    assert_in_delta 3.0, VisualizerPolicy.bloom_energy_scale, 0.001
+    assert_in_delta 0.4, VisualizerPolicy.particle_explosion_base_prob, 0.001
   end
 end

@@ -1,6 +1,6 @@
 class BloomController
   def initialize
-    @strength = VisualizerPolicy::BLOOM_BASE_STRENGTH
+    @strength = VisualizerPolicy.bloom_base_strength
     @threshold = VisualizerPolicy::BLOOM_BASE_THRESHOLD
   end
 
@@ -10,9 +10,9 @@ class BloomController
     imp_overall = impulse[:overall] || 0.0
 
     # エネルギーに応じてBloom強度（ソフトクリッピングで飽和防止）
-    @strength = VisualizerPolicy::BLOOM_BASE_STRENGTH + Math.tanh(energy * 2.0) * 2.5
+    @strength = VisualizerPolicy.bloom_base_strength + Math.tanh(energy * VisualizerPolicy.bloom_energy_scale) * 2.5
     # impulse フラッシュ（抑制付き）
-    @strength += Math.tanh(imp_overall) * 1.5
+    @strength += Math.tanh(imp_overall) * VisualizerPolicy.bloom_impulse_scale
     # VJPad flash boost
     bloom_flash = analysis[:bloom_flash] || 0.0
     @strength += bloom_flash * 2.0 if bloom_flash > 0.01
