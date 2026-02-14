@@ -11,6 +11,9 @@ $debug_formatter = nil
 $bpm_estimator = nil
 $frame_counter = nil
 $vj_pad = nil
+$serial_manager = nil
+$pen_input = nil
+$wordart_renderer = nil
 $frame_count = 0  # Kept for JSBridge debug logging throttle
 
 # URL parameter parsing -> Config
@@ -41,9 +44,44 @@ begin
   $debug_formatter = DebugFormatter.new($audio_input_manager)
   $bpm_estimator = BPMEstimator.new
   $frame_counter = FrameCounter.new
-  $vj_pad = VJPad.new($audio_input_manager)
+  $serial_manager = SerialManager.new
+  $pen_input = PenInput.new
+  $wordart_renderer = WordartRenderer.new
+  $vj_pad = VJPad.new($audio_input_manager, serial_manager: $serial_manager)
   VisualizerPolicy.register_devtool_callbacks
   SnapshotManager.register_callbacks
+
+  # Web Serial callbacks (called from JavaScript)
+  JS.global[:rubySerialOnConnect] = lambda do |baud|
+    $serial_manager.on_connect(baud.to_i)
+    JSBridge.log "Serial connected at #{baud}bps"
+  end
+
+  JS.global[:rubySerialOnDisconnect] = lambda do
+    $serial_manager.on_disconnect
+    JSBridge.log "Serial disconnected"
+  end
+
+  JS.global[:rubySerialOnReceive] = lambda do |data|
+    $serial_manager.receive_data(data.to_s)
+    # Update serial RX display
+    last_line = $serial_manager.rx_log.last
+    JS.global[:document].getElementById('serialRxDisplay')[:textContent] = last_line.to_s if last_line
+  end
+
+  # Pen input callbacks (called from JavaScript mouse events)
+  JS.global[:rubyPenDown] = lambda do |x, y, buttons|
+    # Only primary button (left click) for drawing
+    $pen_input.start_stroke(x.to_f, y.to_f) if buttons.to_i & 1 != 0
+  end
+
+  JS.global[:rubyPenMove] = lambda do |x, y|
+    $pen_input.add_point(x.to_f, y.to_f)
+  end
+
+  JS.global[:rubyPenUp] = lambda do
+    $pen_input.end_stroke
+  end
 
   # VJ Pad prompt callback: receives command string from browser prompt UI
   JS.global[:rubyExecPrompt] = lambda do |input|
@@ -109,6 +147,25 @@ begin
 
         vrm_material_config = $vrm_material_controller.apply_emissive(scaled_for_vrm[:overall_energy])
         JSBridge.update_vrm_material(vrm_material_config)
+      end
+
+      # Serial auto-send: transmit audio analysis frame each update
+      if $vj_pad&.serial_auto_send? && $serial_manager&.connected?
+        frame = $serial_manager.send_audio_frame(analysis)
+        JS.global.serialSend(frame) if frame
+      end
+
+      # Pen input: update fade-out and render strokes
+      # Always call penDrawStrokes so JS clears canvas even when all strokes faded
+      if $pen_input
+        $pen_input.update
+        JS.global.penDrawStrokes($pen_input.to_render_json)
+      end
+
+      # WordArt: update animation and render
+      if $wordart_renderer&.active?
+        $wordart_renderer.update(analysis)
+        JS.global.wordartRender($wordart_renderer.to_render_json)
       end
 
       # Frame tracking (Ruby-side FPS calculation)

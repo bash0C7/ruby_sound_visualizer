@@ -36,6 +36,21 @@ Play music near your speakers or microphone, and the visualizer will automatical
 
 You can adjust parameters in real-time using keyboard shortcuts.
 
+### Interface Controls
+
+| Key | Function |
+|------|------|
+| `` ` `` | Toggle VJ Pad command interface (backtick) |
+| `p` | Toggle Controls panel |
+| `m` | Toggle microphone on/off |
+| `Alt+V` | Load/unload VRM avatar model |
+| `Alt+T` | Toggle tab audio capture |
+| `Alt+C` | Toggle camera video capture |
+| `d` / `f` | Rotate camera left / right |
+| `e` / `c` | Rotate camera up / down |
+
+### Parameter Adjustment
+
 | Key | Function |
 |------|------|
 | `0` | Color Mode: Grayscale |
@@ -69,6 +84,15 @@ Press the backtick key (`) to open the VJ Pad prompt at the bottom of the screen
 | `shockwave [force]` | Bass-heavy impulse with bloom flash (plugin) | `shockwave 2.0` |
 | `strobe [intensity]` | Quick bloom strobe flash (plugin) | `strobe 3.0` |
 | `rave [level]` | Max energy preset with param boost (plugin) | `rave 1.5` |
+| `wa "text"` | Display 90s WordArt text with animation | `wa "HELLO"` |
+| `was` | Stop current WordArt animation | `was` |
+| `sc` | Connect to serial device (Web Serial) | `sc` |
+| `sd` | Disconnect serial device | `sd` |
+| `ss "text"` | Send text over serial | `ss "hello"` |
+| `sr [n]` | Show last n lines of serial receive log | `sr 10` |
+| `si` | Show serial connection status | `si` |
+| `sa 1/0` | Enable/disable auto-send of audio frames | `sa 1` |
+| `pc` | Clear pen drawing strokes | `pc` |
 | `plugins` | List all available plugin commands | `plugins` |
 | `r` | Reset all parameters to defaults | `r` |
 
@@ -150,12 +174,17 @@ The visualizer includes:
 - VJ Pad command interface for advanced real-time control via Ruby DSL
 - Plugin system for adding custom VJ Pad effect commands
 - Live display of BPM and frequency levels
+- 90s WordArt text animation with 4 style presets and PowerPoint-style entrance/exit effects
+- Web Serial integration for sending audio data to external hardware (ATOM Matrix LED)
+- Pen input overlay for mouse drawing with fade-out, colors synced with particle palette
+- Performance view mode for multi-monitor setups
 
 ## Technology
 
 - Ruby 3.4.7 (@ruby/4.0-wasm-wasi) for audio analysis and visual logic
 - Three.js for 3D rendering
 - Web Audio API for microphone input and frequency analysis
+- Web Serial API for hardware device communication
 - VRM support via @pixiv/three-vrm
 - Fully client-side, no backend required
 
@@ -170,23 +199,37 @@ ruby_sound_visualizer/
 │   │   ├── vj_flash.rb           #   Flash effect (bloom flash)
 │   │   ├── vj_shockwave.rb       #   Shockwave effect (bass impulse + bloom)
 │   │   ├── vj_strobe.rb          #   Strobe effect (quick bloom flash)
-│   │   └── vj_rave.rb            #   Rave preset (max energy + param boost)
+│   │   ├── vj_rave.rb            #   Rave preset (max energy + param boost)
+│   │   ├── vj_serial.rb          #   Web Serial plugin (connect/send/receive)
+│   │   └── vj_wordart.rb         #   WordArt text effect plugin
 │   ├── vj_plugin.rb              # Plugin system core (registry and DSL)
 │   ├── effect_dispatcher.rb      # Plugin effects to EffectManager translator
 │   ├── vj_pad.rb                 # VJ Pad command interface (delegates to plugins)
 │   ├── effect_manager.rb         # Coordinates all visual effects
 │   ├── audio_analyzer.rb         # Frequency analysis and beat detection
 │   ├── particle_system.rb        # Particle physics and explosions
+│   ├── serial_protocol.rb        # ASCII serial frame format (encode/decode)
+│   ├── serial_manager.rb         # Serial connection state machine
+│   ├── wordart_renderer.rb       # 90s WordArt text animation engine
+│   ├── pen_input.rb              # Mouse pen drawing with fade-out
 │   ├── geometry_morpher.rb       # Torus scaling and rotation
 │   ├── bloom_controller.rb       # Bloom glow effect parameters
 │   ├── camera_controller.rb      # Camera shake and positioning
 │   ├── js_bridge.rb              # JavaScript-Ruby bridge layer
 │   ├── main.rb                   # Entry point and main loop
 │   └── ...                       # Other core modules
+├── picoruby/                     # PicoRuby firmware for ATOM Matrix
+│   ├── led_visualizer.rb         #   5x5 WS2812 LED VU meter firmware
+│   └── CLAUDE.md                 #   PicoRuby project instructions
 ├── test/                         # Unit and integration tests
 │   ├── test_vj_plugin.rb         # Plugin system tests
 │   ├── test_effect_dispatcher.rb # Effect dispatcher tests
 │   ├── test_vj_pad.rb            # VJ Pad tests (including plugin delegation)
+│   ├── test_serial_protocol.rb   # Serial protocol tests
+│   ├── test_serial_manager.rb    # Serial manager tests
+│   ├── test_wordart_renderer.rb  # WordArt renderer tests
+│   ├── test_pen_input.rb         # Pen input tests
+│   ├── test_vj_pad_serial.rb     # VJ Pad serial command tests
 │   └── ...                       # Other test files
 ├── README.md                     # This file (user guide)
 ├── CLAUDE.md                     # Detailed technical documentation
@@ -269,7 +312,7 @@ After making changes, hard refresh your browser (Ctrl+Shift+R / Cmd+Shift+R) to 
 
 - God Rays: Crepuscular rays effect for dramatic lighting
 - Preset System: Save and load custom visual configurations
-- MIDI Controller: External hardware control support
+- MIDI Controller: External MIDI hardware control support
 - WebVR/WebXR: Virtual reality headset support
 - Recording: Export visualizations as video files
 - Audio File Input: Visualize uploaded audio files in addition to microphone
