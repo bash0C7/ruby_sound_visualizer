@@ -76,6 +76,7 @@ Use `/debug-browser` skill for detailed procedures.
 - **Ruby 3.4.7** (via @ruby/4.0-wasm-wasi 2.8.1)
 - **Three.js** (0.160.0) - 3D rendering & post-processing
 - **Web Audio API** - Microphone input & frequency analysis
+- **Web Serial API** - Hardware device communication (ATOM Matrix LED)
 
 ### Architecture
 
@@ -91,12 +92,22 @@ src/ruby/               # Ruby source files
 │   ├── vj_flash.rb           # Flash effect (bloom flash)
 │   ├── vj_shockwave.rb       # Shockwave effect (bass impulse + bloom)
 │   ├── vj_strobe.rb          # Strobe effect (quick bloom flash)
-│   └── vj_rave.rb            # Rave preset (max energy + param boost)
+│   ├── vj_rave.rb            # Rave preset (max energy + param boost)
+│   ├── vj_serial.rb          # Web Serial plugin (connect/send/receive)
+│   └── vj_wordart.rb         # WordArt text effect plugin
 ├── vj_plugin.rb              # Plugin system core (VJPlugin + PluginDefinition)
 ├── effect_dispatcher.rb      # Plugin effects → EffectManager translator
 ├── vj_pad.rb                 # VJ Pad DSL (delegates to plugins)
 ├── effect_manager.rb         # Coordinates all visual effects
+├── serial_protocol.rb        # ASCII serial frame format (encode/decode)
+├── serial_manager.rb         # Serial connection state machine
+├── wordart_renderer.rb       # 90s WordArt text animation engine
+├── pen_input.rb              # Mouse pen drawing with fade-out
 └── ...                       # Other core modules
+picoruby/               # PicoRuby firmware for ATOM Matrix
+├── CLAUDE.md                 # PicoRuby project instructions
+├── AGENTS.md                 # Symlink to CLAUDE.md
+└── led_visualizer.rb         # LED VU meter firmware (5x5 WS2812)
 .claude/                # Project-specific configuration & documentation
 ├── ARCHITECTURE.md     # Architecture details
 ├── INVESTIGATION-PROTOCOL.md  # Investigation protocol
@@ -114,6 +125,7 @@ src/ruby/               # Ruby source files
 └── skills/             # Project-local skills
     ├── create-plugin/  # Scaffold new VJ Pad plugin
     ├── debug-browser/  # Browser debugging procedures
+    ├── browser-clean-session/  # Clean browser session
     └── troubleshoot/   # Basic troubleshooting
 ```
 

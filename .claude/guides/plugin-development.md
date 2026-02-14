@@ -317,6 +317,46 @@ plugin.format_result([2.0]) # => "burst: 2.0"
 | Script tag | `index.html` | Browser loading |
 | Test require | `test/test_helper.rb` | Test loading |
 
+## Non-Effect Plugins
+
+Some plugins use custom VJPad DSL commands instead of the standard effect dispatch system. These plugins register via `VJPlugin.define` for discovery (`plugins` command) but implement their behavior as VJPad instance methods.
+
+### Serial Plugin
+
+The serial plugin (`vj_serial.rb`) adds commands for Web Serial communication:
+
+```ruby
+sc           # Connect to serial device
+sd           # Disconnect
+ss "text"    # Send text
+sr [n]       # Show receive log (last n lines)
+si           # Show status
+sa 1         # Enable auto-send audio frames
+```
+
+Logic is in `SerialManager` (connection state) and `SerialProtocol` (frame format). JS glue handles the browser Web Serial API.
+
+### WordArt Plugin
+
+The wordart plugin (`vj_wordart.rb`) triggers 90s-style text animations:
+
+```ruby
+wa "HELLO"   # Display WordArt with cycling styles
+was          # Stop animation
+```
+
+Logic is in `WordartRenderer` (animation state machine, style presets). JS glue renders to a canvas overlay.
+
+### Pen Input
+
+Pen input is not a plugin but a VJPad built-in command:
+
+```ruby
+pc           # Clear all pen strokes
+```
+
+Logic is in `PenInput` (stroke collection, fade-out, color sync). JS handles mouse events and canvas rendering.
+
 ## Debugging Tips
 
 - Use `JSBridge.log("message")` inside `on_trigger` for console output
