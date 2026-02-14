@@ -6,7 +6,7 @@ class AudioInputManager
 
   def initialize
     @mic_muted = false
-    @source = :microphone  # :microphone or :tab
+    @source = :microphone  # :microphone, :tab, or :camera
   end
 
   # === Mic mute control ===
@@ -37,6 +37,10 @@ class AudioInputManager
     @source = :microphone
   end
 
+  def switch_to_camera
+    @source = :camera
+  end
+
   # === Query methods ===
 
   def tab_capture?
@@ -45,6 +49,10 @@ class AudioInputManager
 
   def mic_input?
     @source == :microphone
+  end
+
+  def camera_input?
+    @source == :camera
   end
 
   # === Volume calculation ===

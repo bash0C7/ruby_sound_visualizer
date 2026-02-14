@@ -43,6 +43,7 @@ begin
   $frame_counter = FrameCounter.new
   $vj_pad = VJPad.new($audio_input_manager)
   VisualizerPolicy.register_devtool_callbacks
+  SnapshotManager.register_callbacks
 
   # VJ Pad prompt callback: receives command string from browser prompt UI
   JS.global[:rubyExecPrompt] = lambda do |input|

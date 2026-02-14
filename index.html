@@ -132,6 +132,7 @@
       border-radius: 3px;
     }
     #controlPanel .cp-close:hover { color: #fff; border-color: #fff; }
+    #controlPanel #cpResetBtn:hover { background: #f44; color: #000; border-color: #f44; }
     #controlPanel .cp-group {
       margin-bottom: 10px;
     }
@@ -202,6 +203,8 @@
       text-align: center;
     }
     #controlPanel .cp-btn:hover { background: #0f0; color: #000; }
+    #controlPanel .cp-btn.active { background: #0f0; color: #000; }
+    #controlPanel .cp-btn.active:hover { background: #0a0; color: #000; }
     /* VRM choice bar (overlaid on preview) */
     #vrmChoiceBar {
       display: none;
@@ -232,19 +235,13 @@
     <div id="loadingTitle">Loading Ruby WASM Sound Visualizer...</div>
     <div id="loadingStatus" style="font-size: 12px; margin-top: 20px;"></div>
   </div>
-  <!-- VRM choice bar (shown after preview starts, overlaid on preview) -->
-  <div id="vrmChoiceBar">
-    <div class="vrm-title">Choose VRM or continue without</div>
-    <label for="vrmFileInput" class="vrm-upload-btn">Upload VRM File</label>
-    <input type="file" id="vrmFileInput" accept=".vrm" style="display: none;">
-    <button id="skipVrmBtn" class="vrm-upload-btn" style="margin-left: 10px;">Start without VRM</button>
-    <button id="captureTabBtn" class="vrm-upload-btn" style="margin-left: 10px;">Capture Tab</button>
-    <div id="vrmFileName" style="margin-top: 10px; font-size: 12px; color: #888;"></div>
-  </div>
+  <!-- Hidden file input for VRM loading (triggered by Controls button or Alt+V) -->
+  <input type="file" id="vrmFileInput" accept=".vrm" style="display: none;">
   <!-- Control Panel (right side overlay) -->
   <div id="controlPanel">
     <div class="cp-header">
       <h3>Controls</h3>
+      <button class="cp-btn" id="cpResetBtn" style="flex:0 0 auto;padding:2px 6px;font-size:10px;color:#f44;border-color:#f44;" title="Reset All">Reset All</button>
       <button class="cp-close" id="cpCloseBtn" title="Close (p)">X</button>
     </div>
     <div class="cp-group" id="cpColorGroup">
@@ -274,7 +271,16 @@
     </div>
     <div id="cpSliders"></div>
     <div class="cp-actions">
-      <button class="cp-btn" id="cpResetBtn">Reset All</button>
+      <button class="cp-btn" id="cpLoadVrmBtn" title="Toggle VRM (Alt+V)">VRM</button>
+      <button class="cp-btn" id="cpCaptureTabBtn" title="Toggle Tab Capture (Alt+T)">Capture Tab</button>
+      <button class="cp-btn" id="cpCaptureCameraBtn" title="Toggle Camera Capture (Alt+C)">Capture Camera</button>
+      <button class="cp-btn" id="cpPerfViewBtn" title="Open performance view window">Perf View</button>
+    </div>
+    <div class="cp-audio-source" id="cpAudioSource" style="display:flex;align-items:center;gap:4px;padding:4px 8px;border-top:1px solid #444;margin-top:4px;">
+      <span style="color:#888;font-size:10px;">Audio:</span>
+      <button class="cp-btn cp-src-btn" id="cpSrcMic" style="padding:2px 6px;font-size:10px;">Mic</button><button class="cp-btn" id="cpMicDeviceBtn" style="padding:2px 4px;font-size:10px;flex:0 0 auto;" title="Select mic device">⚙</button>
+      <button class="cp-btn cp-src-btn" id="cpSrcCamera" style="padding:2px 6px;font-size:10px;">Cam Mic</button>
+      <button class="cp-btn cp-src-btn" id="cpSrcTab" style="padding:2px 6px;font-size:10px;">Tab</button>
     </div>
   </div>
   <div id="vjPrompt">
@@ -355,6 +361,7 @@
   <script type="text/ruby" src="src/ruby/frame_counter.rb"></script>
   <script type="text/ruby" src="src/ruby/vrm_dancer.rb"></script>
   <script type="text/ruby" src="src/ruby/vrm_material_controller.rb"></script>
+  <script type="text/ruby" src="src/ruby/snapshot_manager.rb"></script>
   <script type="text/ruby" src="src/ruby/main.rb"></script>
 
   <script>
@@ -406,12 +413,24 @@
     let renderPass, bloomPass;
     let frameCount = 0;  // Used for DOM update throttle only
 
+    // Performance view mode (URL has ?perf=1)
+    const IS_PERF_VIEW = new URLSearchParams(window.location.search).has('perf');
+
+    // Capture opacity state
+    let capOverlayOpacity = 0.5;
+    let capVideoOpacity   = 1.0;
+
     // Audio input state
     let micGain = null;
+    let micDeviceId = null;  // null = default mic
     let micMuted = false;
     let tabStream = null;
     let tabAudioSource = null;
     let tabAudioGain = null;
+    let cameraStream = null;
+    let camMicStream = null;
+    let camMicSource = null;
+    let camMicGain = null;
 
     // VRM state
     let currentVRM = null;
@@ -441,45 +460,26 @@
     // Ruby VM is set by browser.script.iife.js as window.rubyVM
     const getRubyVM = () => window.rubyVM;
 
-    // Web Audio API Setup
+    // Web Audio API Setup: AudioContext + analyser only (mic not auto-connected)
     async function initAudio() {
       console.log('[JS] Initializing Web Audio API...');
       try {
-        // Reuse AudioContext if already created (e.g. by tab capture during startup)
         if (!audioContext) {
           audioContext = new AudioContext();
         }
-
-        // Chrome のオートプレイポリシー対策: suspended なら resume する
         if (audioContext.state === 'suspended') {
           console.log('[JS] AudioContext is suspended, attempting resume...');
           await audioContext.resume();
           console.log('[JS] AudioContext resumed, state:', audioContext.state);
         }
-
-        // Reuse analyser if already created
         if (!analyser) {
           analyser = audioContext.createAnalyser();
           analyser.fftSize = 2048;
-          analyser.smoothingTimeConstant = 0.5;  // ビート検出のため低めに設定
+          analyser.smoothingTimeConstant = 0.5;
         }
         const bufferLength = analyser.frequencyBinCount;
         dataArray = new Uint8Array(bufferLength);
-
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const source = audioContext.createMediaStreamSource(stream);
-        micGain = audioContext.createGain();
-        micGain.gain.value = 1.0;
-        source.connect(micGain);
-        micGain.connect(analyser);
-        console.log('[JS] Web Audio API initialized successfully, context state:', audioContext.state);
-
-        // getUserMedia 後にまだ suspended なら再度 resume
-        if (audioContext.state === 'suspended') {
-          console.log('[JS] AudioContext still suspended after getUserMedia, retrying resume...');
-          await audioContext.resume();
-          console.log('[JS] AudioContext state after retry:', audioContext.state);
-        }
+        console.log('[JS] Web Audio API initialized (no mic auto-connect), state:', audioContext.state);
       } catch (error) {
         console.error('[JS] Audio init error:', error);
         throw error;
@@ -544,6 +544,7 @@
           track.addEventListener('ended', stopTabCapture);
         });
 
+        document.getElementById('cpSrcTab')?.classList.add('active');
         if (window.rubyOnTabToggle) window.rubyOnTabToggle(true);
         console.log('[JS] Tab capture started');
       } catch (error) {
@@ -576,6 +577,7 @@
       if (renderer && renderer.domElement) {
         renderer.domElement.style.mixBlendMode = 'normal';
       }
+      document.getElementById('cpSrcTab')?.classList.remove('active');
       if (window.rubyOnTabToggle) window.rubyOnTabToggle(false);
       console.log('[JS] Tab capture stopped');
     }
@@ -586,6 +588,202 @@
         stopTabCapture();
       } else {
         startTabCapture();
+      }
+    }
+
+    // Start capturing video from camera
+    async function startCameraCapture() {
+      try {
+        cameraStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const videoEl = document.getElementById('tabVideo');
+        videoEl.srcObject = new MediaStream(cameraStream.getVideoTracks());
+        videoEl.play();
+        videoEl.style.display = 'block';
+        document.getElementById('tabOverlay').style.display = 'block';
+        if (renderer && renderer.domElement) renderer.domElement.style.mixBlendMode = 'screen';
+        updateAudioSourceButtons('camera');
+        console.log('[JS] Camera capture started');
+      } catch (error) {
+        console.error('[JS] Camera capture error:', error);
+        cameraStream = null;
+      }
+    }
+
+    // Stop camera capture
+    function stopCameraCapture() {
+      if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); cameraStream = null; }
+      const videoEl = document.getElementById('tabVideo');
+      if (videoEl) { videoEl.srcObject = null; videoEl.style.display = 'none'; }
+      const overlayEl = document.getElementById('tabOverlay');
+      if (overlayEl) overlayEl.style.display = 'none';
+      if (renderer && renderer.domElement) renderer.domElement.style.mixBlendMode = 'normal';
+      updateAudioSourceButtons('mic');
+      console.log('[JS] Camera capture stopped');
+    }
+
+    // Toggle camera capture on/off
+    function toggleCameraCapture() {
+      if (cameraStream) { stopCameraCapture(); } else { startCameraCapture(); }
+    }
+
+    // Update audio source button active state (individual toggles)
+    function updateAudioSourceButtons(source) {
+      ['mic', 'camera', 'tab'].forEach(s => {
+        const btn = document.getElementById('cpSrc' + s.charAt(0).toUpperCase() + s.slice(1));
+        if (btn) btn.classList.toggle('active', s === source);
+      });
+    }
+
+    // Show microphone device picker popup
+    async function showMicDevicePicker() {
+      // Request permission first so labels are available
+      try { await navigator.mediaDevices.getUserMedia({ audio: true }); } catch (_e) {}
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const audioInputs = devices.filter(d => d.kind === 'audioinput');
+
+      // Remove existing picker
+      document.getElementById('micDevicePicker')?.remove();
+
+      const picker = document.createElement('div');
+      picker.id = 'micDevicePicker';
+      picker.style.cssText = 'position:fixed;background:#1a1a1a;border:1px solid #555;border-radius:4px;z-index:2000;padding:4px;min-width:200px;';
+
+      audioInputs.forEach((dev, i) => {
+        const btn = document.createElement('button');
+        btn.className = 'cp-btn';
+        btn.style.cssText = 'display:block;width:100%;text-align:left;padding:4px 8px;font-size:10px;margin:1px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+        btn.textContent = dev.label || ('Microphone ' + (i + 1));
+        if (dev.deviceId === (micDeviceId || 'default') || (!micDeviceId && dev.deviceId === 'default')) {
+          btn.style.color = '#0f0';
+        }
+        btn.addEventListener('click', async () => {
+          picker.remove();
+          micDeviceId = dev.deviceId;
+          await reconnectMic(dev.deviceId);
+        });
+        picker.appendChild(btn);
+      });
+
+      // Position near Mic button
+      const micBtn = document.getElementById('cpSrcMic');
+      const rect = micBtn?.getBoundingClientRect();
+      if (rect) {
+        picker.style.top = (rect.bottom + 4) + 'px';
+        picker.style.left = rect.left + 'px';
+      }
+      document.body.appendChild(picker);
+
+      // Close on outside click
+      setTimeout(() => {
+        document.addEventListener('click', function closePicker(e) {
+          if (!picker.contains(e.target)) {
+            picker.remove();
+            document.removeEventListener('click', closePicker);
+          }
+        });
+      }, 0);
+    }
+
+    // Reconnect mic to a specific device
+    async function reconnectMic(deviceId) {
+      try {
+        if (micGain) { micGain.disconnect(); micGain = null; }
+        const constraints = { audio: deviceId ? { deviceId: { exact: deviceId } } : true };
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        const source = audioContext.createMediaStreamSource(stream);
+        micGain = audioContext.createGain();
+        micGain.gain.value = micMuted ? 0 : 1;
+        source.connect(micGain);
+        micGain.connect(analyser);
+        document.getElementById('cpSrcMic')?.classList.add('active');
+        console.log('[JS] Mic reconnected:', deviceId);
+      } catch (error) {
+        console.error('[JS] Mic reconnect error:', error);
+      }
+    }
+
+    // Start camera mic audio (separate from camera video stream)
+    async function startCamMic() {
+      try {
+        camMicStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        camMicSource = audioContext.createMediaStreamSource(camMicStream);
+        camMicGain = audioContext.createGain();
+        camMicGain.gain.value = 1.0;
+        camMicSource.connect(camMicGain);
+        camMicGain.connect(analyser);
+        document.getElementById('cpSrcCamera')?.classList.add('active');
+        console.log('[JS] Cam Mic started');
+      } catch (error) {
+        console.error('[JS] Cam Mic error:', error);
+        camMicStream = null;
+      }
+    }
+
+    // Stop camera mic audio
+    function stopCamMic() {
+      if (camMicStream) { camMicStream.getTracks().forEach(t => t.stop()); camMicStream = null; }
+      if (camMicSource) { camMicSource.disconnect(); camMicSource = null; }
+      if (camMicGain) { camMicGain.disconnect(); camMicGain = null; }
+      document.getElementById('cpSrcCamera')?.classList.remove('active');
+      console.log('[JS] Cam Mic stopped');
+    }
+
+    // Toggle cam mic on/off
+    function toggleCamMic() {
+      if (camMicStream) { stopCamMic(); } else { startCamMic(); }
+    }
+
+    // Toggle mic source on/off
+    function toggleMicSource() {
+      if (micGain) {
+        micGain.disconnect();
+        micGain = null;
+        document.getElementById('cpSrcMic')?.classList.remove('active');
+        console.log('[JS] Mic source disconnected');
+      } else {
+        reconnectMic(micDeviceId);
+      }
+    }
+
+    // BroadcastChannel for perf view sync
+    let _perfChannel = null;
+
+    function broadcastState() {
+      if (!_perfChannel) return;
+      const qs = window.location.search;
+      _perfChannel.postMessage({ type: 'state', qs });
+    }
+
+    // Open performance view window (single/multi monitor)
+    async function togglePerfView() {
+      const perfUrl = window.location.origin + window.location.pathname + '?perf=1';
+      let w = null;
+
+      // Try Window Management API for external monitor placement
+      if ('getScreenDetails' in window) {
+        try {
+          const screens = await window.getScreenDetails();
+          const external = screens.screens.find(s => !s.isInternal) || screens.screens[1];
+          if (external) {
+            w = window.open(perfUrl, 'perf-view',
+              'popup,left=' + external.availLeft + ',top=' + external.availTop +
+              ',width=' + external.availWidth + ',height=' + external.availHeight);
+          }
+        } catch (e) {
+          console.log('[JS] Window Management API not available, opening as popup');
+        }
+      }
+
+      // Fallback: open as regular popup window (works on single monitor)
+      if (!w) {
+        w = window.open(perfUrl, 'perf-view', 'popup,width=1280,height=720');
+      }
+
+      if (w) {
+        w.focus();  // Bring perf view to foreground so Ruby WASM initializes properly
+        _perfChannel = new BroadcastChannel('visualizer-sync');
+        setTimeout(() => broadcastState(), 2000);
+        console.log('[JS] Perf view window opened');
       }
     }
 
@@ -732,36 +930,51 @@
       console.log('[JS] Camera controls initialized (d/f: rotate left/right, e/c: rotate up/down)');
     }
 
-    // VRM file upload promise (or skip) - shown after preview is running
-    function waitForVRMChoice() {
-      return new Promise((resolve) => {
-        const input = document.getElementById('vrmFileInput');
-        const skipBtn = document.getElementById('skipVrmBtn');
-        const captureBtn = document.getElementById('captureTabBtn');
+    // Unload current VRM from scene
+    function unloadVRM() {
+      if (!currentVRM) return;
+      scene.remove(currentVRM.scene);
+      currentVRM = null;
+      window.currentVRM = null;
+      if (geometryMesh) geometryMesh.position.z = 0;
+      document.getElementById('cpLoadVrmBtn')?.classList.remove('active');
+      console.log('[JS] VRM unloaded');
+    }
 
-        input.addEventListener('change', (event) => {
-          const file = event.target.files[0];
-          if (file) {
-            document.getElementById('vrmFileName').textContent = file.name;
-            resolve(file);
-          }
-        });
+    // Toggle VRM: if loaded → unload; if not loaded → open file picker
+    function triggerVRMFileLoad() {
+      if (currentVRM) {
+        unloadVRM();
+        return;
+      }
+      const input = document.getElementById('vrmFileInput');
+      input.value = '';  // Reset so same file can be reloaded
+      input.onchange = async (event) => {
+        const file = event.target.files[0];
+        if (file) {
+          await loadVRMFile(file);
+          camera.position.z = 1.5;
+          document.getElementById('cpLoadVrmBtn')?.classList.add('active');
+          console.log('[JS] VRM loaded:', file.name);
+        }
+      };
+      input.click();
+    }
 
-        skipBtn.addEventListener('click', () => {
-          resolve(null);  // No VRM file, start without it
-        });
-
-        // Tab capture (independent of VRM choice, audio already initialized)
-        captureBtn.addEventListener('click', async () => {
-          try {
-            await startTabCapture();
-            captureBtn.textContent = 'Tab Captured!';
-            captureBtn.disabled = true;
-          } catch (error) {
-            console.error('[JS] Tab capture error:', error);
-          }
-        });
-      });
+    // Debounced URL update using rubySnapshotEncode
+    let _urlUpdateTimer = null;
+    function scheduleURLUpdate() {
+      if (!window.rubySnapshotEncode) return;
+      clearTimeout(_urlUpdateTimer);
+      _urlUpdateTimer = setTimeout(() => {
+        const qs = String(window.rubySnapshotEncode(
+          cameraRadius,
+          Math.round(cameraTheta * 180 / Math.PI),
+          Math.round(cameraPhi * 180 / Math.PI)
+        )) + '&ov=' + capOverlayOpacity.toFixed(2) + '&vv=' + capVideoOpacity.toFixed(2);
+        history.replaceState(null, '', window.location.pathname + qs);
+        broadcastState();
+      }, 500);
     }
 
     // Load VRM from File object
@@ -1036,10 +1249,11 @@
       window._animDeltaTime = deltaTime;
 
       // Extract frequency data and call Ruby (Ruby handles FPS, debug, BPM)
-      if (analyser && window.rubyUpdateVisuals) {
+      // analyser may be null in perf view, but Ruby still needs to be called for scene updates
+      if (window.rubyUpdateVisuals) {
         try {
-          analyser.getByteFrequencyData(dataArray);
-          window.rubyUpdateVisuals(Array.from(dataArray), now);
+          if (analyser) analyser.getByteFrequencyData(dataArray);
+          window.rubyUpdateVisuals(Array.from(dataArray || []), now);
         } catch (error) {
           console.error('[JS] Error calling Ruby update:', error);
         }
@@ -1126,32 +1340,90 @@
         updateLoadingStatus('Starting preview...');
         animate();
 
-        // Phase 3: Hide loading, show VRM choice bar + control panel overlaid on preview
+        // Phase 3: Hide loading
         document.getElementById('loading').style.display = 'none';
-        document.getElementById('vrmChoiceBar').classList.add('active');
+
+        if (IS_PERF_VIEW) {
+          // Performance view: no control panel, no audio, BroadcastChannel receiver
+          console.log('[JS] Performance view mode active');
+          // Hide control panel trigger, hide VJ prompt input
+          document.getElementById('controlPanel').style.display = 'none';
+          const vjInputEl = document.getElementById('vjPromptInput');
+          if (vjInputEl) vjInputEl.style.display = 'none';
+          const vjPromptEl = document.getElementById('vjPrompt');
+          if (vjPromptEl) vjPromptEl.style.pointerEvents = 'none';
+
+          // BroadcastChannel receiver
+          _perfChannel = new BroadcastChannel('visualizer-sync');
+          _perfChannel.addEventListener('message', (e) => {
+            if (e.data.type === 'state' && window.rubySnapshotApply) {
+              const _snapRaw = String(window.rubySnapshotApply(e.data.qs) || '');
+              if (_snapRaw) {
+                try {
+                  const _cam = JSON.parse(_snapRaw);
+                  SLIDER_GROUPS['Camera'][0].setter(_cam.cr);
+                  SLIDER_GROUPS['Camera'][1].setter(_cam.cth);
+                  SLIDER_GROUPS['Camera'][2].setter(_cam.cph);
+                } catch (_e) {}
+              }
+              const _p = new URLSearchParams(e.data.qs);
+              const _ov = parseFloat(_p.get('ov'));
+              const _vv = parseFloat(_p.get('vv'));
+              if (!isNaN(_ov)) { capOverlayOpacity = _ov; document.getElementById('tabOverlay').style.opacity = _ov; }
+              if (!isNaN(_vv)) { capVideoOpacity = _vv; document.getElementById('tabVideo').style.opacity = _vv; }
+            }
+            if (e.data.type === 'vj_log' && e.data.cmd) {
+              const vjResult = document.getElementById('vjPromptResult');
+              if (vjResult) vjResult.textContent = '> ' + e.data.cmd + (e.data.result ? ' → ' + e.data.result : '');
+            }
+          });
+          console.log('[JS] BroadcastChannel receiver started');
+          return;
+        }
+
+        // Normal mode: show control panel
         buildControlPanel();
         document.getElementById('controlPanel').classList.add('active');
         controlPanelOpen = true;
 
+        // Apply URL snapshot before audio init (restores Ruby params + camera)
+        const _snapRaw = String(window.rubySnapshotApply?.(window.location.search) || '');
+        if (_snapRaw) {
+          const _cam = JSON.parse(_snapRaw);
+          SLIDER_GROUPS['Camera'][0].setter(_cam.cr);
+          SLIDER_GROUPS['Camera'][1].setter(_cam.cth);
+          SLIDER_GROUPS['Camera'][2].setter(_cam.cph);
+          syncControlPanelValues();
+        }
+
+        // Apply ov/vv from URL and sync slider UI
+        const _urlParams = new URLSearchParams(window.location.search);
+        const _ov = parseFloat(_urlParams.get('ov'));
+        const _vv = parseFloat(_urlParams.get('vv'));
+        if (!isNaN(_ov)) {
+          capOverlayOpacity = _ov;
+          document.getElementById('tabOverlay').style.opacity = _ov;
+          const _ovSlider = document.getElementById('cpSlider_cap_overlay_opacity');
+          const _ovVal = document.getElementById('cpVal_cap_overlay_opacity');
+          if (_ovSlider) _ovSlider.value = _ov;
+          if (_ovVal) _ovVal.textContent = _ov.toFixed(2);
+        }
+        if (!isNaN(_vv)) {
+          capVideoOpacity = _vv;
+          document.getElementById('tabVideo').style.opacity = _vv;
+          const _vvSlider = document.getElementById('cpSlider_cap_video_opacity');
+          const _vvVal = document.getElementById('cpVal_cap_video_opacity');
+          if (_vvSlider) _vvSlider.value = _vv;
+          if (_vvVal) _vvVal.textContent = _vv.toFixed(2);
+        }
+
         console.log('[JS] Preview started with control panel');
 
-        // Phase 4: Start audio and wait for VRM choice in parallel
-        const [vrmFile] = await Promise.all([
-          waitForVRMChoice(),
-          initAudio().catch(error => {
-            console.warn('[JS] Audio init failed (will retry on user click):', error.message);
-          })
-        ]);
-        document.getElementById('vrmChoiceBar').classList.remove('active');
-
-        // Load VRM if file was provided
-        if (vrmFile) {
-          await loadVRMFile(vrmFile);
-          camera.position.z = 1.5;
-          console.log('[JS] VRM loaded into preview');
-        } else {
-          console.log('[JS] Continuing without VRM');
-        }
+        // Phase 4: Start audio (VRM loaded later via Controls or Alt+V)
+        await initAudio().catch(error => {
+          console.warn('[JS] Audio init failed (will retry on user click):', error.message);
+        });
+        console.log('[JS] Continuing without VRM (use Controls or Alt+V to load)');
       } catch (error) {
         console.error('[JS] Initialization error:', error);
         updateLoadingStatus('Error: ' + error.message);
@@ -1207,6 +1479,13 @@
       vjResult.textContent = result || '';
       vjResult.className = isErr ? 'error' : '';
       vjInput.value = '';
+      if (_syncChannel) _syncChannel.postMessage({ type: 'vj_log', cmd, result: String(result || '') });
+      // Auto-clear result after 3s
+      clearTimeout(vjResult._clearTimer);
+      vjResult._clearTimer = setTimeout(() => {
+        vjResult.textContent = '';
+        vjResult.className = '';
+      }, 3000);
     }
 
     // Prompt input key handling
@@ -1242,12 +1521,16 @@
       // Backtick toggles VJ Pad prompt
       if (key === '`') { event.preventDefault(); vjPromptToggle(); return; }
 
-      // Control panel toggle
-      if (key === 'p') { toggleControlPanel(); return; }
+      // Control panel toggle (disabled in perf view)
+      if (key === 'p' && !IS_PERF_VIEW) { toggleControlPanel(); return; }
 
       // Audio input controls (must stay in JS - direct Web Audio manipulation)
       if (key === 'm') { toggleMic(); return; }
-      if (key === 't') { toggleTabCapture(); return; }
+
+      // VRM / Tab capture / Camera: Alt modifier required to prevent accidental trigger during VJ play
+      if (event.altKey && key === 't') { toggleTabCapture(); return; }
+      if (event.altKey && key === 'v') { triggerVRMFileLoad(); return; }
+      if (event.altKey && key === 'c') { toggleCameraCapture(); return; }
 
       // Camera position controls (must stay in JS - direct Three.js manipulation)
       if ('aswxqz'.includes(key) && camera) {
@@ -1265,6 +1548,7 @@
       if (window.rubyHandleKey) {
         try {
           window.rubyHandleKey(key);
+          scheduleURLUpdate();
         } catch (error) {
           console.error('[JS] Error calling rubyHandleKey:', error);
         }
@@ -1321,6 +1605,14 @@
         { key: 'camera_phi', label: 'V.Rotation', min: -80, max: 80, step: 5, default: 0,
           setter: v => { cameraPhi = v * Math.PI / 180; if (cameraTarget) updateCameraPosition(); },
           getter: () => Math.round(cameraPhi * 180 / Math.PI) },
+      ],
+      'Capture': [
+        { key: 'cap_overlay_opacity', label: 'Overlay Opacity', min: 0, max: 1, step: 0.01, default: 0.5,
+          setter: v => { capOverlayOpacity = v; document.getElementById('tabOverlay').style.opacity = v; },
+          getter: () => capOverlayOpacity },
+        { key: 'cap_video_opacity', label: 'Video Opacity', min: 0, max: 1, step: 0.01, default: 1.0,
+          setter: v => { capVideoOpacity = v; document.getElementById('tabVideo').style.opacity = v; },
+          getter: () => capVideoOpacity },
       ],
     };
 
@@ -1413,6 +1705,7 @@
           window.rubyExecPrompt('h ' + hue);
         }
         syncWheelTo(hue);
+        scheduleURLUpdate();
       });
 
       // Brightness and Saturation sliders (wired to rubyConfigSet/Get)
@@ -1439,6 +1732,7 @@
             window.rubyExecPrompt('c 0');
             syncWheelTo(0);
           }
+          scheduleURLUpdate();
         });
         slider.addEventListener('keydown', function(e) { e.stopPropagation(); });
       });
@@ -1474,6 +1768,7 @@
               restoreSatIfZero();
               syncWheelTo(0);
             }
+            scheduleURLUpdate();
           });
           modeContainer.appendChild(btn);
         });
@@ -1532,6 +1827,7 @@
             } else if (window.rubyConfigSet) {
               window.rubyConfigSet(def.key, v);
             }
+            scheduleURLUpdate();
           });
 
           // Prevent keyboard events from propagating (avoid camera/color controls)
@@ -1547,6 +1843,31 @@
         container.appendChild(group);
       }
 
+      // Wire action buttons
+      document.getElementById('cpLoadVrmBtn').addEventListener('click', triggerVRMFileLoad);
+      document.getElementById('cpCaptureTabBtn').addEventListener('click', toggleTabCapture);
+      document.getElementById('cpCaptureCameraBtn').addEventListener('click', toggleCameraCapture);
+      document.getElementById('cpPerfViewBtn').addEventListener('click', togglePerfView);
+
+      // Wire Audio Source buttons
+      // Mic: toggle mic source on/off
+      document.getElementById('cpSrcMic').addEventListener('click', () => {
+        toggleMicSource();
+      });
+      // ⚙: open mic device picker
+      document.getElementById('cpMicDeviceBtn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        showMicDevicePicker();
+      });
+      // Cam Mic: toggle camera mic audio
+      document.getElementById('cpSrcCamera').addEventListener('click', () => {
+        toggleCamMic();
+      });
+      // Tab: toggle tab capture
+      document.getElementById('cpSrcTab').addEventListener('click', () => {
+        toggleTabCapture();
+      });
+
       // Wire close and reset buttons
       document.getElementById('cpCloseBtn').addEventListener('click', toggleControlPanel);
       document.getElementById('cpResetBtn').addEventListener('click', function() {
@@ -1558,6 +1879,7 @@
           }
         }
         syncControlPanelValues();
+        scheduleURLUpdate();
       });
 
       // Initialize hue wheel
