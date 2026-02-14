@@ -2,6 +2,21 @@
 
 プロジェクトの進行状況を追跡するためのタスクリスト。
 
+## 🐛 既知のバグ (Known Bugs)
+
+- [ ] Perf View ウィンドウが静止して動かない 🖥️
+  - **現象**: Perf View ボタンを押して開いたポップアップウィンドウでパーティクルが静止
+  - **再現条件**: シングルモニター・マルチモニター両方で再現
+  - **調査済み内容**:
+    - `?perf=1` タブを直接開くと FPS: 47 で正常動作する
+    - `w.focus()` 追加（ポップアップをフォアグラウンドに）しても解決せず
+    - Chrome バックグラウンド throttle（`requestAnimationFrame` 1fps制限）の影響が疑われる
+    - Ruby WASM 初期化 (`waitForRubyReady`) が詰まっている可能性も残る
+  - **未検証の仮説**:
+    - ポップアップウィンドウで Ruby WASM の `wasm-wasi` ロードが失敗している
+    - `animate()` の `requestAnimationFrame` がバックグラウンドで停止し、初期化完了後も再開されない
+  - **次のステップ**: ポップアップ内のコンソールログ・FPS・エラーを Chrome DevTools で直接確認
+
 ## 🏗️ 重量級タスク (Major Refactoring)
 
 - [x] 画面上で Ruby で命令をかけるプロンプトエリアを実装 🌐
