@@ -31,15 +31,19 @@ class KeyboardHandler
     case key
     when 0
       ColorPalette.set_hue_mode(nil)
+      VisualizerPolicy.max_saturation = 0
       JSBridge.log "Color Mode: Grayscale"
     when 1
       ColorPalette.set_hue_mode(1)
+      VisualizerPolicy.max_saturation = 100 if VisualizerPolicy.max_saturation == 0
       JSBridge.log "Color Mode: 1:Vivid Red (±70deg)"
     when 2
       ColorPalette.set_hue_mode(2)
+      VisualizerPolicy.max_saturation = 100 if VisualizerPolicy.max_saturation == 0
       JSBridge.log "Color Mode: 2:Shocking Yellow (±70deg)"
     when 3
       ColorPalette.set_hue_mode(3)
+      VisualizerPolicy.max_saturation = 100 if VisualizerPolicy.max_saturation == 0
       JSBridge.log "Color Mode: 3:Turquoise Blue (±70deg)"
     end
   end

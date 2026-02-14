@@ -232,15 +232,8 @@
     <div id="loadingTitle">Loading Ruby WASM Sound Visualizer...</div>
     <div id="loadingStatus" style="font-size: 12px; margin-top: 20px;"></div>
   </div>
-  <!-- VRM choice bar (shown after preview starts, overlaid on preview) -->
-  <div id="vrmChoiceBar">
-    <div class="vrm-title">Choose VRM or continue without</div>
-    <label for="vrmFileInput" class="vrm-upload-btn">Upload VRM File</label>
-    <input type="file" id="vrmFileInput" accept=".vrm" style="display: none;">
-    <button id="skipVrmBtn" class="vrm-upload-btn" style="margin-left: 10px;">Start without VRM</button>
-    <button id="captureTabBtn" class="vrm-upload-btn" style="margin-left: 10px;">Capture Tab</button>
-    <div id="vrmFileName" style="margin-top: 10px; font-size: 12px; color: #888;"></div>
-  </div>
+  <!-- Hidden file input for VRM loading (triggered by Controls button or Alt+V) -->
+  <input type="file" id="vrmFileInput" accept=".vrm" style="display: none;">
   <!-- Control Panel (right side overlay) -->
   <div id="controlPanel">
     <div class="cp-header">
@@ -274,6 +267,8 @@
     </div>
     <div id="cpSliders"></div>
     <div class="cp-actions">
+      <button class="cp-btn" id="cpLoadVrmBtn" title="Load VRM (Alt+V)">Load VRM</button>
+      <button class="cp-btn" id="cpCaptureTabBtn" title="Toggle Tab Capture (Alt+T)">Capture Tab</button>
       <button class="cp-btn" id="cpResetBtn">Reset All</button>
     </div>
   </div>
@@ -355,6 +350,7 @@
   <script type="text/ruby" src="src/ruby/frame_counter.rb"></script>
   <script type="text/ruby" src="src/ruby/vrm_dancer.rb"></script>
   <script type="text/ruby" src="src/ruby/vrm_material_controller.rb"></script>
+  <script type="text/ruby" src="src/ruby/snapshot_manager.rb"></script>
   <script type="text/ruby" src="src/ruby/main.rb"></script>
 
   <script>
@@ -733,35 +729,34 @@
     }
 
     // VRM file upload promise (or skip) - shown after preview is running
-    function waitForVRMChoice() {
-      return new Promise((resolve) => {
-        const input = document.getElementById('vrmFileInput');
-        const skipBtn = document.getElementById('skipVrmBtn');
-        const captureBtn = document.getElementById('captureTabBtn');
+    // Open file dialog to load VRM (used by Controls button and Alt+V)
+    function triggerVRMFileLoad() {
+      const input = document.getElementById('vrmFileInput');
+      input.value = '';  // Reset so same file can be reloaded
+      input.onchange = async (event) => {
+        const file = event.target.files[0];
+        if (file) {
+          await loadVRMFile(file);
+          camera.position.z = 1.5;
+          console.log('[JS] VRM loaded:', file.name);
+        }
+      };
+      input.click();
+    }
 
-        input.addEventListener('change', (event) => {
-          const file = event.target.files[0];
-          if (file) {
-            document.getElementById('vrmFileName').textContent = file.name;
-            resolve(file);
-          }
-        });
-
-        skipBtn.addEventListener('click', () => {
-          resolve(null);  // No VRM file, start without it
-        });
-
-        // Tab capture (independent of VRM choice, audio already initialized)
-        captureBtn.addEventListener('click', async () => {
-          try {
-            await startTabCapture();
-            captureBtn.textContent = 'Tab Captured!';
-            captureBtn.disabled = true;
-          } catch (error) {
-            console.error('[JS] Tab capture error:', error);
-          }
-        });
-      });
+    // Debounced URL update using rubySnapshotEncode
+    let _urlUpdateTimer = null;
+    function scheduleURLUpdate() {
+      if (!window.rubySnapshotEncode) return;
+      clearTimeout(_urlUpdateTimer);
+      _urlUpdateTimer = setTimeout(() => {
+        const qs = String(window.rubySnapshotEncode(
+          cameraRadius,
+          Math.round(cameraTheta * 180 / Math.PI),
+          Math.round(cameraPhi * 180 / Math.PI)
+        ));
+        history.replaceState(null, '', window.location.pathname + qs);
+      }, 500);
     }
 
     // Load VRM from File object
@@ -1126,32 +1121,29 @@
         updateLoadingStatus('Starting preview...');
         animate();
 
-        // Phase 3: Hide loading, show VRM choice bar + control panel overlaid on preview
+        // Phase 3: Hide loading, show control panel overlaid on preview
         document.getElementById('loading').style.display = 'none';
-        document.getElementById('vrmChoiceBar').classList.add('active');
         buildControlPanel();
         document.getElementById('controlPanel').classList.add('active');
         controlPanelOpen = true;
 
+        // Apply URL snapshot before audio init (restores Ruby params + camera)
+        const _snapRaw = String(window.rubySnapshotApply?.(window.location.search) || '');
+        if (_snapRaw) {
+          const _cam = JSON.parse(_snapRaw);
+          SLIDER_GROUPS['Camera'][0].setter(_cam.cr);
+          SLIDER_GROUPS['Camera'][1].setter(_cam.cth);
+          SLIDER_GROUPS['Camera'][2].setter(_cam.cph);
+          syncControlPanelValues();
+        }
+
         console.log('[JS] Preview started with control panel');
 
-        // Phase 4: Start audio and wait for VRM choice in parallel
-        const [vrmFile] = await Promise.all([
-          waitForVRMChoice(),
-          initAudio().catch(error => {
-            console.warn('[JS] Audio init failed (will retry on user click):', error.message);
-          })
-        ]);
-        document.getElementById('vrmChoiceBar').classList.remove('active');
-
-        // Load VRM if file was provided
-        if (vrmFile) {
-          await loadVRMFile(vrmFile);
-          camera.position.z = 1.5;
-          console.log('[JS] VRM loaded into preview');
-        } else {
-          console.log('[JS] Continuing without VRM');
-        }
+        // Phase 4: Start audio (VRM loaded later via Controls or Alt+V)
+        await initAudio().catch(error => {
+          console.warn('[JS] Audio init failed (will retry on user click):', error.message);
+        });
+        console.log('[JS] Continuing without VRM (use Controls or Alt+V to load)');
       } catch (error) {
         console.error('[JS] Initialization error:', error);
         updateLoadingStatus('Error: ' + error.message);
@@ -1247,7 +1239,10 @@
 
       // Audio input controls (must stay in JS - direct Web Audio manipulation)
       if (key === 'm') { toggleMic(); return; }
-      if (key === 't') { toggleTabCapture(); return; }
+
+      // VRM / Tab capture: Alt modifier required to prevent accidental trigger during VJ play
+      if (event.altKey && key === 't') { toggleTabCapture(); return; }
+      if (event.altKey && key === 'v') { triggerVRMFileLoad(); return; }
 
       // Camera position controls (must stay in JS - direct Three.js manipulation)
       if ('aswxqz'.includes(key) && camera) {
@@ -1265,6 +1260,7 @@
       if (window.rubyHandleKey) {
         try {
           window.rubyHandleKey(key);
+          scheduleURLUpdate();
         } catch (error) {
           console.error('[JS] Error calling rubyHandleKey:', error);
         }
@@ -1413,6 +1409,7 @@
           window.rubyExecPrompt('h ' + hue);
         }
         syncWheelTo(hue);
+        scheduleURLUpdate();
       });
 
       // Brightness and Saturation sliders (wired to rubyConfigSet/Get)
@@ -1439,6 +1436,7 @@
             window.rubyExecPrompt('c 0');
             syncWheelTo(0);
           }
+          scheduleURLUpdate();
         });
         slider.addEventListener('keydown', function(e) { e.stopPropagation(); });
       });
@@ -1474,6 +1472,7 @@
               restoreSatIfZero();
               syncWheelTo(0);
             }
+            scheduleURLUpdate();
           });
           modeContainer.appendChild(btn);
         });
@@ -1532,6 +1531,7 @@
             } else if (window.rubyConfigSet) {
               window.rubyConfigSet(def.key, v);
             }
+            scheduleURLUpdate();
           });
 
           // Prevent keyboard events from propagating (avoid camera/color controls)
@@ -1547,6 +1547,10 @@
         container.appendChild(group);
       }
 
+      // Wire Load VRM and Capture Tab buttons
+      document.getElementById('cpLoadVrmBtn').addEventListener('click', triggerVRMFileLoad);
+      document.getElementById('cpCaptureTabBtn').addEventListener('click', toggleTabCapture);
+
       // Wire close and reset buttons
       document.getElementById('cpCloseBtn').addEventListener('click', toggleControlPanel);
       document.getElementById('cpResetBtn').addEventListener('click', function() {
@@ -1558,6 +1562,7 @@
           }
         }
         syncControlPanelValues();
+        scheduleURLUpdate();
       });
 
       // Initialize hue wheel

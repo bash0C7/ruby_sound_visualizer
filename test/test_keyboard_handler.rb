@@ -254,4 +254,55 @@ class TestKeyboardHandler < Test::Unit::TestCase
     # Should not raise, just silently do nothing
     handler.handle_key('m')
   end
+
+  # === Saturation sync on color mode change ===
+
+  def test_gray_mode_sets_saturation_to_zero
+    VisualizerPolicy.max_saturation = 80
+    handler = KeyboardHandler.new
+    handler.handle_color_mode(0)
+    assert_equal 0, VisualizerPolicy.max_saturation
+  end
+
+  def test_color_mode_restores_saturation_when_zero
+    VisualizerPolicy.max_saturation = 0
+    handler = KeyboardHandler.new
+    handler.handle_color_mode(1)
+    assert_equal 100, VisualizerPolicy.max_saturation
+  end
+
+  def test_color_mode_does_not_change_saturation_when_nonzero
+    VisualizerPolicy.max_saturation = 60
+    handler = KeyboardHandler.new
+    handler.handle_color_mode(1)
+    assert_equal 60, VisualizerPolicy.max_saturation
+  end
+
+  def test_color_mode_2_restores_saturation_when_zero
+    VisualizerPolicy.max_saturation = 0
+    handler = KeyboardHandler.new
+    handler.handle_color_mode(2)
+    assert_equal 100, VisualizerPolicy.max_saturation
+  end
+
+  def test_color_mode_3_restores_saturation_when_zero
+    VisualizerPolicy.max_saturation = 0
+    handler = KeyboardHandler.new
+    handler.handle_color_mode(3)
+    assert_equal 100, VisualizerPolicy.max_saturation
+  end
+
+  def test_key_0_sets_saturation_to_zero_via_dispatch
+    VisualizerPolicy.max_saturation = 80
+    handler = KeyboardHandler.new
+    handler.handle_key('0')
+    assert_equal 0, VisualizerPolicy.max_saturation
+  end
+
+  def test_key_1_restores_saturation_when_zero_via_dispatch
+    VisualizerPolicy.max_saturation = 0
+    handler = KeyboardHandler.new
+    handler.handle_key('1')
+    assert_equal 100, VisualizerPolicy.max_saturation
+  end
 end
