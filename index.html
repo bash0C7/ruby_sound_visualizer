@@ -885,7 +885,10 @@
       if (!data || !data.text) return;
       _wordartCtx.save();
       _wordartCtx.globalAlpha = data.opacity || 1.0;
-      _wordartCtx.translate(data.x || _wordartCanvas.width / 2, data.y || _wordartCanvas.height / 2);
+      _wordartCtx.translate(
+        _wordartCanvas.width / 2 + (data.x_offset || 0),
+        _wordartCanvas.height / 2 + (data.y_offset || 0)
+      );
       if (data.rotation) _wordartCtx.rotate(data.rotation);
       if (data.scale) _wordartCtx.scale(data.scale, data.scale);
 

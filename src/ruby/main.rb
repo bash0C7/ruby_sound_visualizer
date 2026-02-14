@@ -156,11 +156,10 @@ begin
       end
 
       # Pen input: update fade-out and render strokes
+      # Always call penDrawStrokes so JS clears canvas even when all strokes faded
       if $pen_input
         $pen_input.update
-        if $pen_input.has_visible_strokes?
-          JS.global.penDrawStrokes($pen_input.to_render_json)
-        end
+        JS.global.penDrawStrokes($pen_input.to_render_json)
       end
 
       # WordArt: update animation and render

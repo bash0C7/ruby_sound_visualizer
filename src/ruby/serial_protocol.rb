@@ -43,6 +43,7 @@ module SerialProtocol
     pairs.each do |pair|
       key, val = pair.split(':')
       return nil unless key && val
+      return nil unless val.match?(/\A\d+\z/)
       int_val = val.to_i
       return nil if int_val < MIN_VALUE || int_val > MAX_VALUE
       case key

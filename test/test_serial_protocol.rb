@@ -76,6 +76,12 @@ class TestSerialProtocol < Test::Unit::TestCase
     assert_nil SerialProtocol.decode("<L:-1,B:128,M:64,H:0>")
   end
 
+  def test_decode_nil_for_malformed_numeric_value
+    assert_nil SerialProtocol.decode("<L:12x,B:128,M:64,H:0>")
+    assert_nil SerialProtocol.decode("<L:128,B:abc,M:64,H:0>")
+    assert_nil SerialProtocol.decode("<L:12.5,B:128,M:64,H:0>")
+  end
+
   # --- Round-trip ---
 
   def test_encode_decode_roundtrip
