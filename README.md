@@ -36,6 +36,21 @@ Play music near your speakers or microphone, and the visualizer will automatical
 
 You can adjust parameters in real-time using keyboard shortcuts.
 
+### Interface Controls
+
+| Key | Function |
+|------|------|
+| `` ` `` | Toggle VJ Pad command interface (backtick) |
+| `p` | Toggle Controls panel |
+| `m` | Toggle microphone on/off |
+| `Alt+V` | Load/unload VRM avatar model |
+| `Alt+T` | Toggle tab audio capture |
+| `Alt+C` | Toggle camera video capture |
+| `d` / `f` | Rotate camera left / right |
+| `e` / `c` | Rotate camera up / down |
+
+### Parameter Adjustment
+
 | Key | Function |
 |------|------|
 | `0` | Color Mode: Grayscale |
