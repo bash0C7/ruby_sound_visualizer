@@ -40,6 +40,34 @@
   - 技術調査: Chrome Tab Capture API（拡張機能版）も検討
   - Completed: PR #14 (6 commits, +74 tests, 309 total tests, 100% pass)
 
+## External Hardware Integration (Web Serial + PicoRuby)
+
+- [ ] Web Serial -> ATOM Matrix LED meter + low/mid/high analyzer (PicoRuby firmware) 🖥️
+  - Goal: send overall level + low/mid/high band values from the browser to ATOM Matrix over USB Serial and render as LEDs.
+  - PicoRuby workspace: create `picoruby/` and keep PicoRuby code + PicoRuby AGENTS.md there (task list stays in `.claude/tasks.md`).
+  - PicoRuby AGENTS.md: base on upstream CLAUDE.md and add this project’s serial + LED requirements plus ATOM Matrix hardware notes.
+    - Create `picoruby/CLAUDE.md`, then add a symlink `picoruby/AGENTS.md` -> `picoruby/CLAUDE.md` to support multi-LLM tooling.
+  - Hardware context (from upstream resources):
+    - ATOM Matrix uses ESP32-PICO-D4; USB Serial is `ESP32_UART0`.
+    - UART example: `UART.new(unit: :ESP32_UART0, baudrate: 115200)` with `bytes_available` + `read(1)`.
+    - External UART options include TX/RX 26/32 (Grove) or 22/19 (PortD/J5); button GPIO39.
+    - Reference: https://github.com/bash0C7/picoruby-recipes/blob/irq_fukuoka05/src_components/R2P2-ESP32/storage/home/rwc.rb
+      - Focus: `pc_uart` setup (`ESP32_UART0`), `bytes_available` + `read(1)` receive loop, and simple command parsing pattern.
+  - LED context (from upstream resources):
+    - `require 'ws2812'` + `WS2812.new(RMTDriver.new(pin))`.
+    - Rendering helpers like `show_hsb_hex` and `flash!` are used in samples.
+    - External strip target: `LED_PIN = 33`, `LED_COUNT = 60` (wire like `otma.rb` reference).
+    - Reference: https://github.com/bash0C7/picoruby-recipes/blob/irq_fukuoka05/src_components/R2P2-ESP32/storage/home/otma.rb
+      - Focus: `require 'ws2812'` usage, `WS2812.new(RMTDriver.new(pin))`, and `show_hsb_hex` rendering call pattern.
+  - Serial protocol design: define a stateless frame format (robust to mid-stream disconnects) with explicit start/end markers.
+    - Include exact newline behavior (e.g., `\n` or `\r\n`) in the spec and implement on both sides.
+    - Decide ASCII vs binary and list byte order and scaling rules for level/low/mid/high (0-255 each).
+  - Browser-side implementation: Web Serial UI (requestPort on user action), port selection, baud choices, connect/disconnect handling, and TX log.
+  - PicoRuby-side implementation: UART frame parsing and LED buffer updates for low/mid/high visualization.
+    - Use HSB; light all LEDs and control brightness by audio magnitude.
+    - Update rate: send once per visualizer frame (existing FPS loop); document smoothing policy if used.
+  - Verification: human handles build/flash; browser behavior verified with Chrome MCP tools.
+
 ## 🧩 コマンド入力・インタラクション拡張タスク
 
 - [ ] コマンド入力機能の plugin 実装として、入力文字列をもとに、画面上に Microsoft Word のワードアートな 90 年代テキストアートを Power Point のアニメーションのようにダサ格好よくエフェクトさせて、一時的に(ある程度の時間)表示する機能を作る 🖥️
