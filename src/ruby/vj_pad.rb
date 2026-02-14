@@ -12,11 +12,13 @@ class VJPad
 
   COLOR_NAMES = { 0 => 'gray', 1 => 'red', 2 => 'yellow', 3 => 'blue' }.freeze
 
-  def initialize(audio_input_manager = nil)
+  def initialize(audio_input_manager = nil, serial_manager: nil)
     @audio_input_manager = audio_input_manager
+    @serial_manager = serial_manager
     @history = []
     @last_result = nil
     @pending_actions = []
+    @serial_auto_send = false
   end
 
   def exec(input)
@@ -211,6 +213,125 @@ class VJPad
       end
       JS.global.toggleTabCapture()
       "tab: toggled"
+    end
+  end
+
+  # --- WordArt Commands ---
+
+  # wa "text" - display 90s WordArt text animation
+  def wa(text = '')
+    return "wordart: not available" unless $wordart_renderer
+    return "wordart: empty text" if text.to_s.strip.empty?
+    $wordart_renderer.trigger(text.to_s)
+    "wordart: #{text}"
+  end
+
+  # was - stop current WordArt animation
+  def was
+    return "wordart: not available" unless $wordart_renderer
+    $wordart_renderer.stop
+    "wordart: stopped"
+  end
+
+  # --- Pen Input Commands ---
+
+  # pc - clear all pen strokes
+  def pc
+    return "pen: not available" unless $pen_input
+    $pen_input.clear
+    "pen: cleared"
+  end
+
+  # --- Serial Commands ---
+
+  def serial_manager
+    @serial_manager
+  end
+
+  def serial_auto_send?
+    @serial_auto_send
+  end
+
+  # sc - serial connect (triggers JS requestPort + open)
+  def sc
+    return "serial: not available" unless @serial_manager
+    baud = @serial_manager.baud_rate
+    JS.global.serialConnect(baud)
+    "serial: connecting at #{baud}bps..."
+  end
+
+  # sd - serial disconnect
+  def sd
+    return "serial: not available" unless @serial_manager
+    JS.global.serialDisconnect()
+    @serial_manager.on_disconnect
+  end
+
+  # ss "text" - serial send text
+  def ss(text = '')
+    return "serial: not available" unless @serial_manager
+    msg = @serial_manager.send_text(text.to_s)
+    if msg && !msg.start_with?("serial:")
+      JS.global.serialSend(msg)
+      "serial TX: #{msg}"
+    else
+      msg
+    end
+  end
+
+  # sr - show received log (last 10 lines)
+  def sr(count = 10)
+    return "serial: not available" unless @serial_manager
+    lines = @serial_manager.rx_log.last(count.to_i)
+    return "serial RX: (empty)" if lines.empty?
+    "serial RX:\n#{lines.join("\n")}"
+  end
+
+  # st - show transmit log (last 10 lines)
+  def st(count = 10)
+    return "serial: not available" unless @serial_manager
+    lines = @serial_manager.tx_log.last(count.to_i)
+    return "serial TX: (empty)" if lines.empty?
+    "serial TX:\n#{lines.join("\n")}"
+  end
+
+  # sb rate - set baud rate (38400 or 115200)
+  def sb(rate = :_get)
+    return "serial: not available" unless @serial_manager
+    if rate == :_get
+      return "serial baud: #{@serial_manager.baud_rate}"
+    end
+    @serial_manager.set_baud(rate.to_i)
+  end
+
+  # si - serial info/status
+  def si
+    return "serial: not available" unless @serial_manager
+    @serial_manager.status
+  end
+
+  # sa 1/0 - enable/disable auto-send of audio frames per visualizer frame
+  def sa(val = :_get)
+    return "serial: not available" unless @serial_manager
+    if val == :_get
+      return "serial auto: #{@serial_auto_send ? 'on' : 'off'}"
+    end
+    @serial_auto_send = val.to_i != 0
+    "serial auto: #{@serial_auto_send ? 'on' : 'off'}"
+  end
+
+  # scl - clear serial logs
+  def scl(target = 'all')
+    return "serial: not available" unless @serial_manager
+    case target.to_s
+    when 'rx'
+      @serial_manager.clear_rx_log
+    when 'tx'
+      @serial_manager.clear_tx_log
+    else
+      @serial_manager.clear_rx_log
+      @serial_manager.clear_tx_log
+      "serial: logs cleared"
     end
   end
 
