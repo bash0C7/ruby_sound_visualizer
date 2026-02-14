@@ -1693,7 +1693,7 @@
       vjResult.textContent = result || '';
       vjResult.className = isErr ? 'error' : '';
       vjInput.value = '';
-      if (_syncChannel) _syncChannel.postMessage({ type: 'vj_log', cmd, result: String(result || '') });
+      if (_perfChannel) _perfChannel.postMessage({ type: 'vj_log', cmd, result: String(result || '') });
       // Auto-clear result after 3s
       clearTimeout(vjResult._clearTimer);
       vjResult._clearTimer = setTimeout(() => {
