@@ -111,8 +111,8 @@ class TestSnapshotManager < Test::Unit::TestCase
   end
 
   def test_apply_sets_sensitivity
-    SnapshotManager.apply("?v=1&sens=2.5")
-    assert_in_delta 2.5, VisualizerPolicy.sensitivity, 0.001
+    SnapshotManager.apply("?v=1&sens=1.5")
+    assert_in_delta 1.5, VisualizerPolicy.sensitivity, 0.001
   end
 
   def test_apply_sets_max_brightness
@@ -147,10 +147,10 @@ class TestSnapshotManager < Test::Unit::TestCase
   end
 
   def test_apply_missing_keys_leave_defaults_unchanged
-    VisualizerPolicy.sensitivity = 2.0
+    VisualizerPolicy.sensitivity = 1.5
     SnapshotManager.apply("?v=1&hue=90")
-    # sensitivity not in URL → stays 2.0
-    assert_in_delta 2.0, VisualizerPolicy.sensitivity, 0.001
+    # sensitivity not in URL → stays 1.5
+    assert_in_delta 1.5, VisualizerPolicy.sensitivity, 0.001
   end
 
   def test_apply_sets_bloom_base_strength

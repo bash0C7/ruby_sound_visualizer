@@ -1,6 +1,7 @@
 class AudioAnalyzer
   def initialize
     @frequency_mapper = FrequencyMapper.new
+    @limiter = AudioLimiter.new
 
     # Beat detection smoothing (fast response)
     @smoothed_bass = 0.0
@@ -45,12 +46,27 @@ class AudioAnalyzer
 
     return empty_analysis if freq_array.empty?
 
+    # Apply input gain (amplifier/attenuator) to raw frequency data
+    gain = VisualizerPolicy.input_gain_linear
+    if gain != 1.0
+      freq_array = freq_array.map { |v| [[v.to_f * gain, 0].max, 255].min }
+    end
+
     bands = @frequency_mapper.split_bands(freq_array)
 
     bass_energy = calculate_energy(bands[:bass])
     mid_energy = calculate_energy(bands[:mid])
     high_energy = calculate_energy(bands[:high])
     overall_energy = calculate_energy(freq_array)
+
+    # Apply limiter to prevent transient whiteout (hand claps, etc.)
+    limited = @limiter.process_bands(
+      bass: bass_energy, mid: mid_energy, high: high_energy, overall: overall_energy
+    )
+    bass_energy = limited[:bass]
+    mid_energy = limited[:mid]
+    high_energy = limited[:high]
+    overall_energy = limited[:overall]
 
     # Beat detection smoothing (fast response for accurate beat detection)
     @smoothed_bass = lerp(@smoothed_bass, bass_energy, 1.0 - VisualizerPolicy::AUDIO_SMOOTHING_FACTOR)
@@ -272,4 +288,3 @@ class AudioAnalyzer
     }
   end
 end
-  

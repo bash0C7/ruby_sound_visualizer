@@ -59,9 +59,9 @@ class TestKeyboardHandler < Test::Unit::TestCase
 
   def test_adjust_sensitivity_minimum_clamp
     handler = KeyboardHandler.new
-    VisualizerPolicy.sensitivity = 0.05
+    VisualizerPolicy.sensitivity = 0.15
     handler.handle_sensitivity(-0.10)
-    assert_in_delta 0.05, VisualizerPolicy.sensitivity, 0.001
+    assert_in_delta 0.1, VisualizerPolicy.sensitivity, 0.001
   end
 
   def test_shift_hue_positive
@@ -184,6 +184,20 @@ class TestKeyboardHandler < Test::Unit::TestCase
     handler = KeyboardHandler.new
     handler.handle_key('=')
     assert_in_delta 1.05, VisualizerPolicy.sensitivity, 0.001
+  end
+
+  def test_dispatch_input_gain_decrease
+    handler = KeyboardHandler.new
+    VisualizerPolicy.input_gain = 0.0
+    handler.handle_key('[')
+    assert_in_delta(-1.0, VisualizerPolicy.input_gain, 0.001)
+  end
+
+  def test_dispatch_input_gain_increase
+    handler = KeyboardHandler.new
+    VisualizerPolicy.input_gain = 0.0
+    handler.handle_key(']')
+    assert_in_delta 1.0, VisualizerPolicy.input_gain, 0.001
   end
 
   def test_dispatch_unknown_key_does_nothing

@@ -77,7 +77,7 @@ class TestVJRavePlugin < Test::Unit::TestCase
       dispatcher.dispatch(action[:effects])
     end
 
-    # set_param should have updated VisualizerPolicy
-    assert_in_delta 4.0, VisualizerPolicy.bloom_base_strength, 0.001
+    # set_param should have updated VisualizerPolicy (clamped to max 3.0)
+    assert_in_delta 3.0, VisualizerPolicy.bloom_base_strength, 0.001
   end
 end

@@ -95,16 +95,16 @@ class TestEffectDispatcher < Test::Unit::TestCase
 
   def test_dispatch_set_param_adjusts_policy
     VisualizerPolicy.reset_runtime
-    effects = { set_param: { "bloom_base_strength" => 3.5 } }
+    effects = { set_param: { "bloom_base_strength" => 2.5 } }
     @dispatcher.dispatch(effects)
-    assert_in_delta 3.5, VisualizerPolicy.bloom_base_strength, 0.001
+    assert_in_delta 2.5, VisualizerPolicy.bloom_base_strength, 0.001
   end
 
   def test_dispatch_set_param_multiple_keys
     VisualizerPolicy.reset_runtime
-    effects = { set_param: { "bloom_base_strength" => 4.0, "particle_friction" => 0.92 } }
+    effects = { set_param: { "bloom_base_strength" => 3.0, "particle_friction" => 0.92 } }
     @dispatcher.dispatch(effects)
-    assert_in_delta 4.0, VisualizerPolicy.bloom_base_strength, 0.001
+    assert_in_delta 3.0, VisualizerPolicy.bloom_base_strength, 0.001
     assert_in_delta 0.92, VisualizerPolicy.particle_friction, 0.001
   end
 

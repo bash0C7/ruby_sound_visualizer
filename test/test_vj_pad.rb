@@ -38,6 +38,22 @@ class TestVJPad < Test::Unit::TestCase
     assert_equal "sens: 1.0", result
   end
 
+  def test_ig_getter_default
+    result = @pad.ig
+    assert_equal "gain: 0.0dB", result
+  end
+
+  def test_ig_setter
+    result = @pad.ig(-6.0)
+    assert_equal "gain: -6.0dB", result
+    assert_in_delta(-6.0, VisualizerPolicy.input_gain, 0.001)
+  end
+
+  def test_ig_setter_clamped
+    @pad.ig(25.0)
+    assert_in_delta 20.0, VisualizerPolicy.input_gain, 0.001
+  end
+
   def test_br_getter_default
     result = @pad.br
     assert_equal "bright: 255", result
@@ -63,6 +79,7 @@ class TestVJPad < Test::Unit::TestCase
     assert_match(/c:gray/, result)
     assert_match(/h:0\.0/, result)
     assert_match(/s:1\.0/, result)
+    assert_match(/ig:0\.0dB/, result)
     assert_match(/br:255/, result)
     assert_match(/lt:255/, result)
     assert_match(/em:2\.0/, result)
@@ -162,7 +179,7 @@ class TestVJPad < Test::Unit::TestCase
 
   def test_s_set_clamped_min
     @pad.s(0.01)
-    assert_in_delta 0.05, VisualizerPolicy.sensitivity, 0.001
+    assert_in_delta 0.1, VisualizerPolicy.sensitivity, 0.001
   end
 
   def test_br_set
@@ -208,16 +225,18 @@ class TestVJPad < Test::Unit::TestCase
 
   def test_r_resets_all
     @pad.c(1)
-    @pad.s(2.0)
+    @pad.s(1.5)
+    @pad.ig(6.0)
     @pad.br(100)
     @pad.lt(100)
-    @pad.em(5.0)
+    @pad.em(3.0)
     @pad.bm(8.0)
     @pad.h(90)
     result = @pad.r
     assert_equal "reset done", result
     assert_nil ColorPalette.get_hue_mode
     assert_in_delta 1.0, VisualizerPolicy.sensitivity, 0.001
+    assert_in_delta 0.0, VisualizerPolicy.input_gain, 0.001
     assert_equal 255, VisualizerPolicy.max_brightness
     assert_equal 255, VisualizerPolicy.max_lightness
     assert_in_delta 2.0, VisualizerPolicy.max_emissive, 0.001
@@ -240,13 +259,13 @@ class TestVJPad < Test::Unit::TestCase
   end
 
   def test_exec_multiple_with_semicolons
-    result = @pad.exec("c 1; s 2.0")
+    result = @pad.exec("c 1; s 1.5")
     assert_equal true, result[:ok]
     # Last expression result
-    assert_equal "sens: 2.0", result[:msg]
+    assert_equal "sens: 1.5", result[:msg]
     # Both should have taken effect
     assert_equal 1, ColorPalette.get_hue_mode
-    assert_in_delta 2.0, VisualizerPolicy.sensitivity, 0.001
+    assert_in_delta 1.5, VisualizerPolicy.sensitivity, 0.001
   end
 
   def test_exec_invalid_command
