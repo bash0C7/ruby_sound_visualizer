@@ -24,6 +24,8 @@ class VJPad
   def exec(input)
     input = input.to_s.strip
     return { ok: true, msg: '' } if input.empty?
+    # Preprocess: wa/was with unquoted text -> quote the argument
+    input = preprocess_text_command(input)
     @history << input
     result = instance_eval(input)
     @last_result = result.to_s
@@ -365,6 +367,12 @@ class VJPad
   end
 
   private
+
+  # Preprocess text commands (wa) to auto-quote unquoted string arguments.
+  # Allows `wa hello world` instead of requiring `wa "hello world"`.
+  def preprocess_text_command(input)
+    input.sub(/\A(wa)\s+(?!["'])(.+)/) { "#{$1} \"#{$2.gsub('\\', '\\\\\\\\').gsub('"', '\\"')}\"" }
+  end
 
   def execute_plugin(plugin, args)
     param_keys = plugin.params.keys
