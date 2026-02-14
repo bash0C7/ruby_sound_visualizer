@@ -228,6 +228,9 @@
   <!-- Tab video background (hidden until tab capture starts) -->
   <video id="tabVideo" autoplay playsinline muted
          style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; object-fit:cover; z-index:-2;"></video>
+  <!-- Perf View mirror: shows VJ canvas stream in performance window -->
+  <video id="perfMirror" autoplay playsinline
+         style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;object-fit:cover;z-index:1;background:#000"></video>
   <div id="tabOverlay"
        style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:-1;"></div>
 
@@ -975,6 +978,17 @@
         _perfChannel = new BroadcastChannel('visualizer-sync');
         setTimeout(() => broadcastState(), 2000);
         console.log('[JS] Perf view window opened');
+        // Pass VJ canvas stream to perf view <video>
+        const _stream = renderer ? renderer.domElement.captureStream(60) : null;
+        if (_stream) {
+          const _checkStream = setInterval(() => {
+            try {
+              const _v = w.document.getElementById('perfMirror');
+              if (_v) { _v.srcObject = _stream; _v.play().catch(() => {}); clearInterval(_checkStream); }
+            } catch (_e) {}
+          }, 100);
+          setTimeout(() => clearInterval(_checkStream), 5000);
+        }
       }
     }
 
@@ -1445,8 +1459,8 @@
       window._animDeltaTime = deltaTime;
 
       // Extract frequency data and call Ruby (Ruby handles FPS, debug, BPM)
-      // analyser may be null in perf view, but Ruby still needs to be called for scene updates
-      if (window.rubyUpdateVisuals) {
+      // Skip in perf view: no audio data, avoid wasteful VM calls (video mirror handles display)
+      if (!IS_PERF_VIEW && window.rubyUpdateVisuals) {
         try {
           if (analyser) analyser.getByteFrequencyData(dataArray);
           window.rubyUpdateVisuals(Array.from(dataArray || []), now);
@@ -1483,8 +1497,8 @@
       // VRM spring bones update
       if (currentVRM) currentVRM.update(deltaTime);
 
-      // Render
-      if (composer) composer.render();
+      // Render (skip in perf view: video mirror handles display)
+      if (!IS_PERF_VIEW && composer) composer.render();
     }
 
     // Load Ruby code from embedded script tags
@@ -1558,14 +1572,18 @@
         document.getElementById('loading').style.display = 'none';
 
         if (IS_PERF_VIEW) {
-          // Performance view: no control panel, no audio, BroadcastChannel receiver
+          // Performance view: show mirror video, hide Three.js canvas
+          const _mirrorVideo = document.getElementById('perfMirror');
+          if (_mirrorVideo) _mirrorVideo.style.display = 'block';
+          if (renderer && renderer.domElement) renderer.domElement.style.display = 'none';
           console.log('[JS] Performance view mode active');
-          // Hide control panel trigger, hide VJ prompt input
+          // Hide all UI overlays: control panel, VJ prompt, status/FPS/debug info
           document.getElementById('controlPanel').style.display = 'none';
+          document.getElementById('status').style.display = 'none';
           const vjInputEl = document.getElementById('vjPromptInput');
           if (vjInputEl) vjInputEl.style.display = 'none';
           const vjPromptEl = document.getElementById('vjPrompt');
-          if (vjPromptEl) vjPromptEl.style.pointerEvents = 'none';
+          if (vjPromptEl) { vjPromptEl.style.display = 'none'; vjPromptEl.style.pointerEvents = 'none'; }
 
           // BroadcastChannel receiver
           _perfChannel = new BroadcastChannel('visualizer-sync');
