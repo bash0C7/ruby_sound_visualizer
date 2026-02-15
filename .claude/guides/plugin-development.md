@@ -1,276 +1,37 @@
 # VJ Pad Plugin Development Guide
 
-This guide covers how to create custom VJ Pad plugins for the Ruby WASM Sound Visualizer. Plugins add new commands to the VJ Pad prompt, each triggering visual effects when executed.
+How to add and maintain VJ Pad plugins in the current architecture.
 
 ## Architecture Overview
 
+```text
+src/ruby/plugins/vj_<name>.rb
+  -> VJPlugin.define(:name)
+  -> VJPlugin registry
+  -> VJPad method_missing dispatch
+  -> pending_actions queue
+  -> EffectDispatcher.dispatch(effects)
+  -> EffectManager / VisualizerPolicy updates
+  -> JSBridge -> Three.js output
 ```
-Plugin File (src/ruby/plugins/vj_<name>.rb)
-  ↓ VJPlugin.define(:name) { ... }
-VJPlugin Registry
-  ↓ method_missing lookup
-VJPad DSL (user types command)
-  ↓ pending_actions queue
-EffectDispatcher
-  ↓ dispatch(effects)
-EffectManager → ParticleSystem / BloomController / ...
-  ↓
-JSBridge → Three.js rendering
-```
+
+Key runtime flow:
+1. User executes command from control panel VJ Pad input.
+2. `VJPad#exec` evaluates DSL expression.
+3. Plugin command pushes an action into `pending_actions`.
+4. Main loop consumes actions and dispatches effects.
 
 ## Quick Start
 
-### 1. Create a Plugin File
+### 1. Create a plugin file
 
-Create `src/ruby/plugins/vj_<name>.rb`:
-
-```ruby
-VJPlugin.define(:shockwave) do
-  desc "Trigger a shockwave with impulse and bloom"
-  param :force, default: 1.0, range: 0.0..5.0
-
-  on_trigger do |params|
-    f = params[:force]
-    {
-      impulse: { bass: f, mid: f * 0.5, high: f * 0.3, overall: f },
-      bloom_flash: f * 0.8
-    }
-  end
-end
-```
-
-### 2. Register in index.html
-
-Add a script tag after the existing plugin entries:
-
-```html
-<!-- VJ Pad Plugins (src/ruby/plugins/vj_*.rb) -->
-<script type="text/ruby" src="src/ruby/plugins/vj_burst.rb"></script>
-<script type="text/ruby" src="src/ruby/plugins/vj_flash.rb"></script>
-<script type="text/ruby" src="src/ruby/plugins/vj_shockwave.rb"></script>
-```
-
-### 3. Add to Test Helper
-
-In `test/test_helper.rb`, add a require for testing:
-
-```ruby
-# Load plugins (same order as index.html)
-require_relative '../src/ruby/plugins/vj_burst'
-require_relative '../src/ruby/plugins/vj_flash'
-require_relative '../src/ruby/plugins/vj_shockwave'
-```
-
-### 4. Use It
-
-Open VJ Pad (backtick key) and type:
-
-```
-shockwave       # default force 1.0
-shockwave 2.5   # custom force
-```
-
-## Plugin Definition DSL
-
-### `VJPlugin.define(name, &block)`
-
-Registers a new plugin command. The block is evaluated in the context of a `PluginDefinition` instance.
-
-```ruby
-VJPlugin.define(:my_effect) do
-  # DSL methods available inside this block:
-  desc "..."
-  param :name, default: value, range: min..max
-  on_trigger do |params|
-    { ... }  # effect hash
-  end
-end
-```
-
-### `desc(text)`
-
-Sets a human-readable description for the plugin. Used in documentation and the `plugins` command.
-
-```ruby
-desc "Inject impulse across all frequency bands"
-```
-
-### `param(name, default:, range: nil)`
-
-Declares a parameter that the user can pass as an argument. Parameters are positional (first param gets first argument, second param gets second, etc.).
-
-- `name` - Symbol identifying the parameter
-- `default:` - Default value when the user omits the argument
-- `range:` - Optional Range for clamping (e.g., `0.0..5.0`)
-
-All parameter values are converted to Float automatically.
-
-```ruby
-param :force, default: 1.0
-param :intensity, default: 0.5, range: 0.0..3.0
-param :spread, default: 1.0, range: 0.1..10.0
-```
-
-### `on_trigger { |params| ... }`
-
-Defines the effect logic. Receives a Hash of resolved parameter values (defaults applied, ranges clamped). Must return an effect hash.
-
-```ruby
-on_trigger do |params|
-  f = params[:force]
-  { impulse: { bass: f, overall: f } }
-end
-```
-
-## Effect Hash Reference
-
-The `on_trigger` block returns a Hash describing what visual effects to apply. Available keys:
-
-### `impulse:`
-
-Injects energy impulse into the effect system. Affects particle explosions, geometry scaling, and camera shake.
-
-```ruby
-{
-  impulse: {
-    bass: 1.0,      # Low frequency impulse (0.0-5.0)
-    mid: 0.5,       # Mid frequency impulse (0.0-5.0)
-    high: 0.3,      # High frequency impulse (0.0-5.0)
-    overall: 1.0    # Overall energy impulse (0.0-5.0)
-  }
-}
-```
-
-All keys are optional. Omitted keys default to 0.0.
-
-Visual mapping:
-- `bass` - Particle explosion force, X-axis rotation, camera shake
-- `mid` - Particle spread, Y-axis rotation
-- `high` - Particle color brightness, Z-axis rotation
-- `overall` - Combined effect intensity, geometry scale
-
-### `bloom_flash:`
-
-Triggers a bloom (glow) flash effect. The value controls peak brightness.
-
-```ruby
-{ bloom_flash: 2.0 }  # Intensity (0.0-5.0)
-```
-
-### `set_param:`
-
-Updates runtime-mutable VisualizerPolicy parameters. Useful for preset commands that modify global behavior.
-
-```ruby
-{
-  set_param: {
-    "bloom_base_strength" => 3.0,
-    "particle_explosion_base_prob" => 0.5
-  }
-}
-```
-
-All keys are optional. Invalid keys are silently ignored. Available parameter keys match `VisualizerPolicy::MUTABLE_KEYS` (see `VisualizerPolicy.list_keys` for full list).
-
-### Combining Effects
-
-Multiple effect types can be combined in a single hash:
-
-```ruby
-on_trigger do |params|
-  f = params[:force]
-  {
-    impulse: { bass: f, mid: f, high: f, overall: f },
-    bloom_flash: f * 0.5
-  }
-end
-```
-
-## Writing Tests
-
-Plugin tests verify the effect hash output. Use TDD (write test first).
-
-### Test File Structure
-
-Create `test/test_vj_<name>.rb`:
-
-```ruby
-require_relative 'test_helper'
-
-class TestVJShockwavePlugin < Test::Unit::TestCase
-  def setup
-    VJPlugin.reset!
-    # Re-register (reset clears registry)
-    load File.expand_path('../src/ruby/plugins/vj_shockwave.rb', __dir__)
-  end
-
-  def test_plugin_registered
-    assert VJPlugin.find(:shockwave)
-  end
-
-  def test_default_effects
-    plugin = VJPlugin.find(:shockwave)
-    result = plugin.execute({})
-    assert_in_delta 1.0, result[:impulse][:bass], 0.001
-    assert_in_delta 0.8, result[:bloom_flash], 0.001
-  end
-
-  def test_custom_force
-    plugin = VJPlugin.find(:shockwave)
-    result = plugin.execute({ force: 2.0 })
-    assert_in_delta 2.0, result[:impulse][:bass], 0.001
-  end
-
-  def test_range_clamping
-    plugin = VJPlugin.find(:shockwave)
-    result = plugin.execute({ force: 10.0 })
-    assert_in_delta 5.0, result[:impulse][:bass], 0.001
-  end
-
-  def test_via_vj_pad
-    pad = VJPad.new
-    result = pad.exec("shockwave 2.0")
-    assert_equal true, result[:ok]
-    assert_equal "shockwave: 2.0", result[:msg]
-    actions = pad.pending_actions
-    assert_equal :shockwave, actions[0][:name]
-  end
-end
-```
-
-### Running Tests
-
-```bash
-# Single plugin test
-BUNDLE_GEMFILE="" ruby -Itest test/test_vj_shockwave.rb
-
-# All tests
-BUNDLE_GEMFILE="" ruby -Itest -e "Dir.glob('test/test_*.rb').each { |f| require_relative f }"
-```
-
-## Plugin Examples
-
-### Bass-Only Burst
-
-```ruby
-VJPlugin.define(:bass_hit) do
-  desc "Bass-focused impulse"
-  param :force, default: 1.5, range: 0.0..5.0
-
-  on_trigger do |params|
-    f = params[:force]
-    { impulse: { bass: f, overall: f * 0.3 } }
-  end
-end
-```
-
-### Multi-Parameter Effect
+Create `src/ruby/plugins/vj_nova.rb`:
 
 ```ruby
 VJPlugin.define(:nova) do
-  desc "Combined impulse and bloom nova"
+  desc "Combined impulse and bloom burst"
   param :force, default: 1.0, range: 0.0..3.0
-  param :glow, default: 2.0, range: 0.0..5.0
+  param :glow, default: 1.5, range: 0.0..5.0
 
   on_trigger do |params|
     f = params[:force]
@@ -283,83 +44,255 @@ VJPlugin.define(:nova) do
 end
 ```
 
-Usage: `nova 2.0 3.0` (force=2.0, glow=3.0)
+### 2. Register in `index.html`
+
+Add a Ruby script tag in the plugin section:
+
+```html
+<script type="text/ruby" src="src/ruby/plugins/vj_nova.rb"></script>
+```
+
+### 3. Ensure test loading includes the plugin
+
+In test setup (usually `test/test_helper.rb`), require the plugin so tests see it.
+
+### 4. Use it
+
+Open control panel with `p`, then run VJ Pad commands like:
+
+```text
+nova
+nova 2.0 3.5
+```
+
+## Plugin Definition DSL
+
+### `VJPlugin.define(name) { ... }`
+
+Registers a plugin under `name`.
+
+### `desc(text)`
+
+Human-readable description shown by `plugins` command output.
+
+### `param(name, default:, range: nil)`
+
+Declares positional arguments.
+
+Behavior:
+- inputs are converted to `Float`
+- default is used when omitted
+- optional range clamps values
+
+### `on_trigger { |params| ... }`
+
+Called with resolved parameters and returns an effect hash.
+
+## Effect Hash Reference
+
+`EffectDispatcher` currently handles three keys.
+
+### `impulse:`
+
+```ruby
+{
+  impulse: {
+    bass: 1.0,
+    mid: 0.6,
+    high: 0.4,
+    overall: 1.0
+  }
+}
+```
+
+Mapped into `EffectManager#inject_impulse`.
+
+### `bloom_flash:`
+
+```ruby
+{ bloom_flash: 2.0 }
+```
+
+Mapped into `EffectManager#inject_bloom_flash`.
+
+### `set_param:`
+
+```ruby
+{
+  set_param: {
+    "bloom_base_strength" => 2.5,
+    "particle_explosion_base_prob" => 0.35
+  }
+}
+```
+
+Mapped via `VisualizerPolicy.set_by_key`.
+
+### Combining effects
+
+```ruby
+on_trigger do |params|
+  l = params[:level]
+  {
+    impulse: { bass: l, mid: l, high: l, overall: l },
+    bloom_flash: l * 1.2,
+    set_param: { "bloom_base_strength" => 1.5 + l }
+  }
+end
+```
+
+## Writing Tests
+
+Use TDD style for plugin behavior.
+
+### Test structure
+
+Create `test/test_vj_nova.rb` and validate:
+- registration
+- default parameter behavior
+- range clamp behavior
+- `VJPad#exec` behavior and queued actions
+
+### Example
+
+```ruby
+require_relative 'test_helper'
+
+class TestVJNova < Test::Unit::TestCase
+  def setup
+    VJPlugin.reset!
+    load File.expand_path('../src/ruby/plugins/vj_nova.rb', __dir__)
+  end
+
+  def test_plugin_registered
+    assert VJPlugin.find(:nova)
+  end
+
+  def test_exec_queues_action
+    pad = VJPad.new
+    result = pad.exec('nova 2.0 3.0')
+    assert result[:ok]
+    assert_equal :nova, pad.pending_actions[0][:name]
+  end
+end
+```
+
+### Running tests
+
+```bash
+bundle exec rake test
+```
+
+Or run a single file:
+
+```bash
+ruby -Itest test/test_vj_nova.rb
+```
+
+## Plugin Examples
+
+### Impulse-only plugin
+
+```ruby
+VJPlugin.define(:kick) do
+  desc "Bass-focused kick"
+  param :force, default: 1.2, range: 0.0..5.0
+
+  on_trigger do |params|
+    f = params[:force]
+    { impulse: { bass: f, overall: f * 0.8 } }
+  end
+end
+```
+
+### Preset-style plugin
+
+```ruby
+VJPlugin.define(:boost) do
+  desc "Temporary aggressive preset"
+  param :level, default: 1.0, range: 0.0..3.0
+
+  on_trigger do |params|
+    l = params[:level]
+    {
+      bloom_flash: l,
+      set_param: {
+        "bloom_energy_scale" => 2.5 + l,
+        "particle_explosion_force_scale" => 0.55 + l * 0.2
+      }
+    }
+  end
+end
+```
 
 ## VJPlugin Module API
 
-### Registry Methods
+### Registry methods
 
-```ruby
-VJPlugin.find(:name)     # Returns PluginDefinition or nil
-VJPlugin.all             # Returns Array of all PluginDefinition instances
-VJPlugin.names           # Returns Array of registered Symbol names
-VJPlugin.reset!          # Clears all registrations (used in tests)
-```
+- `VJPlugin.find(:name)`
+- `VJPlugin.all`
+- `VJPlugin.names`
+- `VJPlugin.reset!`
 
-### PluginDefinition Methods
+### `PluginDefinition` methods
 
-```ruby
-plugin = VJPlugin.find(:burst)
-plugin.name              # => :burst
-plugin.description       # => "Inject impulse across all frequency bands"
-plugin.params            # => { force: { default: 1.0, range: nil } }
-plugin.execute({})       # => { impulse: { ... } }
-plugin.format_result([]) # => "burst!"
-plugin.format_result([2.0]) # => "burst: 2.0"
-```
+- `name`
+- `description`
+- `params`
+- `resolve_params(args)`
+- `execute(args)`
+- `format_result(resolved)`
+
+`format_result` behavior:
+- empty resolved hash -> `<name>!`
+- non-empty resolved hash -> `<name>: value1, value2, ...`
 
 ## File Naming Convention
 
 | File | Location | Purpose |
-|------|----------|---------|
+|---|---|---|
 | Plugin source | `src/ruby/plugins/vj_<name>.rb` | Plugin definition |
-| Plugin test | `test/test_vj_<name>.rb` | Unit tests |
-| Script tag | `index.html` | Browser loading |
-| Test require | `test/test_helper.rb` | Test loading |
+| Plugin tests | `test/test_vj_<name>.rb` | Unit tests |
+| Browser load point | `index.html` | Runtime script loading |
+| Test load point | `test/test_helper.rb` | Test environment requires |
 
 ## Non-Effect Plugins
 
-Some plugins use custom VJPad DSL commands instead of the standard effect dispatch system. These plugins register via `VJPlugin.define` for discovery (`plugins` command) but implement their behavior as VJPad instance methods.
+Some commands are plugin-registered for discovery but implemented mainly through dedicated VJPad methods.
 
-### Serial Plugin
+### Serial plugin (`vj_serial.rb`)
 
-The serial plugin (`vj_serial.rb`) adds commands for Web Serial communication:
+Available commands:
 
-```ruby
-sc           # Connect to serial device
-sd           # Disconnect
-ss "text"    # Send text
-sr [n]       # Show receive log (last n lines)
-si           # Show status
-sa 1         # Enable auto-send audio frames
+```text
+sc
+sd
+ss "text"
+sr [n]
+st [n]
+sb [baud]
+si
+sa [1/0]
+scl [all/rx/tx]
 ```
 
-Logic is in `SerialManager` (connection state) and `SerialProtocol` (frame format). JS glue handles the browser Web Serial API.
+### WordArt plugin (`vj_wordart.rb`)
 
-### WordArt Plugin
-
-The wordart plugin (`vj_wordart.rb`) triggers 90s-style text animations:
-
-```ruby
-wa "HELLO"   # Display WordArt with cycling styles
-was          # Stop animation
+```text
+wa "HELLO"
+was
 ```
 
-Logic is in `WordartRenderer` (animation state machine, style presets). JS glue renders to a canvas overlay.
+### Pen command (built-in VJPad command, not plugin-dispatched)
 
-### Pen Input
-
-Pen input is not a plugin but a VJPad built-in command:
-
-```ruby
-pc           # Clear all pen strokes
+```text
+pc
 ```
-
-Logic is in `PenInput` (stroke collection, fade-out, color sync). JS handles mouse events and canvas rendering.
 
 ## Debugging Tips
 
-- Use `JSBridge.log("message")` inside `on_trigger` for console output
-- Check browser DevTools console for `[Ruby]` prefixed messages
-- Test plugin execution in isolation: `plugin.execute({ force: 2.0 })`
-- Use VJ Pad `i` command to check current visualizer state after triggering effects
+- Run `plugins` in VJ Pad to confirm registration.
+- Inspect `pad.pending_actions` in unit tests.
+- Verify dispatch behavior through `EffectDispatcher` tests.
+- Use browser console logs (`[Ruby] ...`) for runtime traces.
+- Keep plugin side effects minimal and encode behavior through explicit effect hashes.

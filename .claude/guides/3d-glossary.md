@@ -1,427 +1,240 @@
-# 3D プログラミング・シェーダー用語集
+# 3D Programming and Shader Glossary
 
-本プロジェクトの開発に必要な 3D グラフィックス、モデリング、シェーダーの用語と概念を解説する。
+Glossary of 3D, rendering, and shader terms relevant to this project.
 
-## 目次
+## Table of Contents
 
-1. [基礎概念](#基礎概念)
-2. [ジオメトリとメッシュ](#ジオメトリとメッシュ)
-3. [マテリアルとテクスチャ](#マテリアルとテクスチャ)
-4. [照明とシェーディング](#照明とシェーディング)
-5. [シェーダー](#シェーダー)
-6. [レンダリングパイプライン](#レンダリングパイプライン)
-7. [ポストプロセッシング](#ポストプロセッシング)
-8. [色彩と色空間](#色彩と色空間)
-9. [アニメーションとモーション](#アニメーションとモーション)
-10. [パフォーマンス関連](#パフォーマンス関連)
+1. [Core Concepts](#core-concepts)
+2. [Geometry and Mesh](#geometry-and-mesh)
+3. [Materials and Textures](#materials-and-textures)
+4. [Lighting and Shading](#lighting-and-shading)
+5. [Shaders](#shaders)
+6. [Rendering Pipeline](#rendering-pipeline)
+7. [Post-Processing](#post-processing)
+8. [Color and Color Space](#color-and-color-space)
+9. [Animation and Motion](#animation-and-motion)
+10. [Performance Terms](#performance-terms)
 
-## 基礎概念
+## Core Concepts
 
-### シーングラフ (Scene Graph)
+### Scene Graph
+A tree of renderable and non-renderable nodes. Parent transforms affect children.
 
-3D オブジェクトをツリー構造で管理するデータ構造。親の変換 (位置・回転・スケール) が子に伝播する。Three.js では `Scene` がルートノード。
+### Coordinate System
+Three.js uses a right-handed system: +X right, +Y up, +Z toward viewer.
 
-### 座標系 (Coordinate System)
+### World Space / Local Space
+- World space: final position in the scene
+- Local space: position relative to parent node
 
-3D 空間内の位置を表す。Three.js は右手座標系を採用:
-- X 軸: 右方向が正
-- Y 軸: 上方向が正
-- Z 軸: 手前方向が正
+### Transform
+Position, rotation, and scale of an object.
 
-### ワールド座標 / ローカル座標
+### Euler Angles
+Rotation represented by X/Y/Z angles. Easy to read, can hit gimbal lock.
 
-- ワールド座標: シーン全体の絶対座標
-- ローカル座標: 親オブジェクトからの相対座標
+### Quaternion
+Rotation represented with four values (x, y, z, w). Better for stable interpolation.
 
-子オブジェクトの position は親からの相対位置。ワールド座標は全親の transform を合成して得る。
+### Gimbal Lock
+Loss of rotational freedom when axes align. Common with Euler angle camera controls.
 
-### トランスフォーム (Transform)
+### Radian
+Rotation unit used in Three.js (`Math.PI` based values).
 
-オブジェクトの位置 (Position)、回転 (Rotation)、スケール (Scale) の総称。3D オブジェクトの基本操作。
+## Geometry and Mesh
 
-### オイラー角 (Euler Angles)
+### Vertex
+A point in 3D space. May include attributes such as color, normal, and UV.
 
-X, Y, Z 軸回りの回転を 3 つの角度で表現する方法。直感的だがジンバルロック問題がある。Three.js の `rotation.set(x, y, z)` はオイラー角。
+### Triangle / Polygon
+GPU primitives are triangles. Complex surfaces are built from many triangles.
 
-### クォータニオン (Quaternion)
+### Geometry
+Structured vertex/index data. In modern Three.js, typically `BufferGeometry`.
 
-回転を 4 つの数値 (x, y, z, w) で表現する方法。ジンバルロックがなく、補間が滑らか。VRM のボーン回転に使われることがある。Three.js の `quaternion` プロパティ。
+### Mesh
+`Geometry + Material` combination for drawable 3D surfaces.
 
-### ジンバルロック (Gimbal Lock)
-
-オイラー角で 2 つの回転軸が一致してしまい、1 自由度が失われる現象。カメラの垂直回転 (phi) を ±90 度付近でクランプする理由。
-
-### ラジアン (Radian)
-
-角度の単位。360 度 = 2π ラジアン。Three.js の回転は全てラジアン。
-
-| 角度 | ラジアン | 概算値 |
-|------|---------|-------|
-| 1 度 | π/180 | 0.0175 |
-| 10 度 | π/18 | 0.175 |
-| 45 度 | π/4 | 0.785 |
-| 90 度 | π/2 | 1.571 |
-| 180 度 | π | 3.142 |
-| 360 度 | 2π | 6.283 |
-
-## ジオメトリとメッシュ
-
-### 頂点 (Vertex)
-
-3D 空間上の点。位置座標 (x, y, z) を持つ。色、法線、UV 座標などの属性も持てる。
-
-### ポリゴン (Polygon) / 三角形 (Triangle)
-
-3 つ以上の頂点で構成される面。GPU は三角形を基本単位として描画する。四角形は内部で 2 つの三角形に分割される。
-
-### メッシュ (Mesh)
-
-ジオメトリ (形状データ) とマテリアル (見た目の設定) を組み合わせたもの。Three.js の `Mesh` クラス。
-
-### ワイヤーフレーム (Wireframe)
-
-メッシュの辺のみを描画するモード。面を塗りつぶさないため、内部構造が見える。`material.wireframe = true` で有効化。
+### Wireframe
+Render only edges, not filled faces.
 
 ### BufferGeometry
-
-GPU に効率よく転送するための頂点データの格納形式。Float32Array でフラットな配列としてデータを保持する。パーティクルシステムなど大量の頂点を扱う場合に必須。
-
-### セグメント数 (Segments)
-
-ジオメトリの分割数。多いほど滑らかだがポリゴン数が増える。
-
-トーラスの場合:
-- `radialSegments`: 断面 (円) の分割数
-- `tubularSegments`: チューブに沿った分割数
-- ポリゴン数 ≈ radialSegments × tubularSegments × 2
-
-### 法線 (Normal)
-
-面に対して垂直な方向ベクトル。照明の計算に使われ、面の向きを決定する。法線の向きが照明の明暗を生む。
-
-### UV 座標 (UV Coordinates)
-
-テクスチャを 3D 面に貼り付けるための 2D 座標。U は水平、V は垂直方向。0.0-1.0 の範囲でテクスチャ全体をマッピングする。
-
-### トーラス (Torus)
-
-ドーナツ形状。数学的にはリング (大きい円) にチューブ (小さい円) を沿わせた回転体。本プロジェクトのメインジオメトリ。
-
-## マテリアルとテクスチャ
-
-### マテリアル (Material)
-
-オブジェクトの表面の見た目を定義する設定。色、反射率、透明度、テクスチャなどを含む。
-
-### PBR (Physically Based Rendering)
-
-物理法則に基づいたレンダリング手法。現実の光の振る舞いをシミュレートし、リアルな質感を表現する。Three.js では `MeshStandardMaterial` や `MeshPhysicalMaterial`。
-
-### メタルネス (Metalness)
-
-PBR における金属度。0.0 = 非金属 (プラスチック、木), 1.0 = 金属 (鉄、金)。
-
-- 非金属: 拡散反射 (diffuse) が支配的。色が見える
-- 金属: 鏡面反射 (specular) が支配的。環境が映り込む
-
-### ラフネス (Roughness)
-
-PBR における表面の粗さ。0.0 = 鏡面 (鏡、ガラス), 1.0 = 粗い (コンクリート、布)。
-
-- 低い: 反射がシャープ (鏡のように映り込む)
-- 高い: 反射がぼやける (ざらざらした質感)
-
-### エミッシブ (Emissive)
-
-自己発光。照明に関係なくマテリアルが放つ光。実際に周囲を照らすのではなく、そのマテリアルが光って見えるだけ。
-
-- `emissive`: 発光色
-- `emissiveIntensity`: 発光の強度 (倍率)
-- Bloom エフェクトと組み合わせると光の滲み表現になる
-
-### テクスチャ (Texture)
-
-メッシュの表面に貼る 2D 画像。色テクスチャ、法線マップ、環境マップなど複数の種類がある。
-
-### アルファ / 透明度 (Alpha / Opacity)
-
-- `opacity`: 0.0 = 完全透明, 1.0 = 完全不透明
-- `transparent: true` を設定しないと opacity が無視される
-
-## 照明とシェーディング
-
-### アンビエントライト (Ambient Light)
-
-全方向から均一に照らす環境光。影を作らない。全体の明るさの底上げに使う。
-
-### ディレクショナルライト (Directional Light)
-
-太陽光のような平行光線。位置ではなく方向で定義される。全オブジェクトに同じ方向から光が当たる。
-
-### ポイントライト (Point Light)
-
-電球のような点光源。光源からの距離で減衰する。
-
-### 拡散反射 (Diffuse Reflection)
-
-光が表面で散乱する反射。面の向き (法線) と光の方向の角度で明暗が決まる (ランバート反射)。
-
-### 鏡面反射 (Specular Reflection)
-
-光が表面で鏡のように反射する成分。視点の方向に依存するハイライト。
-
-### フォンシェーディング (Phong Shading)
-
-頂点間で法線を補間して各ピクセルごとに照明計算するシェーディング手法。滑らかな照明を実現する。
-
-## シェーダー
-
-### シェーダーとは
-
-GPU 上で実行される小さなプログラム。各頂点やピクセルに対して並列に処理が走る。
-
-### GLSL (OpenGL Shading Language)
-
-WebGL/OpenGL のシェーダー記述言語。C 言語に似た構文。
-
-```glsl
-// 頂点シェーダーの例
-void main() {
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-}
-
-// フラグメントシェーダーの例
-void main() {
-  gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0); // 赤色
-}
-```
-
-### 頂点シェーダー (Vertex Shader)
-
-各頂点に対して実行されるシェーダー。主な役割:
-- 頂点位置の変換 (モデル空間 → スクリーン空間)
-- 法線の変換
-- テクスチャ座標の計算
-
-### フラグメントシェーダー (Fragment Shader) / ピクセルシェーダー
-
-各ピクセルに対して実行されるシェーダー。主な役割:
-- ピクセルの最終色を決定
-- 照明計算
-- テクスチャサンプリング
-- 特殊効果 (グロー、ブラー等)
-
-### Uniform
-
-JavaScript からシェーダーに渡す定数値。毎フレーム更新可能。全頂点/ピクセルで共通の値。
-
-```glsl
-uniform float time;        // 時間
-uniform vec3 color;        // 色
-uniform float intensity;   // 強度
-```
-
-Three.js のビルトインマテリアルでは `emissiveIntensity` や `opacity` 等が内部的に uniform として渡される。
-
-### Varying
-
-頂点シェーダーからフラグメントシェーダーに渡される補間値。頂点間で自動的に線形補間される。
+Efficient GPU-oriented geometry representation using typed arrays.
 
 ### Attribute
+Per-vertex array data bound to geometry, such as `position` and `color`.
 
-頂点ごとに異なる値 (位置、色、法線など)。BufferGeometry の各属性に対応する。
+### Segment Count
+Subdivision density in generated geometry. Higher segments improve smoothness but cost more GPU work.
 
-### ShaderMaterial / RawShaderMaterial
+### Torus
+Ring-shaped primitive used as the main mesh in this project.
 
-Three.js でカスタム GLSL シェーダーを使うためのマテリアル。本プロジェクトでは使用していないが、カスタムエフェクトを追加する場合に必要になる。
+## Materials and Textures
 
-### ポストプロセッシングシェーダー
+### Material
+Defines visual surface behavior: color, transparency, reflectance, emission.
 
-レンダリング結果 (フレームバッファ) に対して適用するシェーダー。画面全体を 1 枚のテクスチャとして読み、加工して書き戻す。Bloom, ブラー, 色調補正などに使われる。
+### PBR
+Physically based rendering model (`MeshStandardMaterial`) with metalness/roughness.
 
-## レンダリングパイプライン
+### Metalness
+How metallic the surface appears (`0.0` dielectric, `1.0` metallic).
 
-### WebGL レンダリングの流れ
+### Roughness
+Micro-surface roughness (`0.0` mirror-like, `1.0` diffuse).
 
-```
-頂点データ (Attribute)
-  ↓
-頂点シェーダー (各頂点の位置変換)
-  ↓
-ラスタライズ (三角形をピクセルに変換)
-  ↓
-フラグメントシェーダー (各ピクセルの色決定)
-  ↓
-フレームバッファ (画面に表示)
-```
+### Emissive / Emissive Intensity
+Self-illumination channel. Important for bloom response in this app.
 
-### フレームバッファ (Framebuffer)
+### Opacity and Transparency
+`opacity` requires `transparent: true` for blending behavior.
 
-描画結果を格納するメモリ領域。画面表示用のデフォルトバッファと、オフスクリーン描画用のカスタムバッファがある。ポストプロセッシングではオフスクリーンバッファに描画し、それを入力として次の処理を行う。
+### Texture
+Image-based input for material channels (color, normal, emissive, etc.).
 
-### デプスバッファ / Z バッファ (Depth Buffer)
+## Lighting and Shading
 
-各ピクセルの奥行き情報を記録するバッファ。手前のオブジェクトが奥のオブジェクトを隠す (Depth Testing) ために使われる。
+### Ambient Light
+Uniform scene-wide light contribution.
 
-### アンチエイリアシング (Anti-Aliasing)
+### Directional Light
+Infinite-distance light with a direction (sun-like behavior).
 
-ポリゴンの辺がギザギザに見える現象 (ジャギー) を軽減する処理。
+### Point Light
+Light emitted from a position with distance attenuation.
 
-- MSAA (Multi-Sample Anti-Aliasing): WebGLRenderer の `antialias: true` で有効化
-- SMAA / FXAA: ポストプロセッシングパスとして適用
+### Diffuse Reflection
+Light scattered by surface orientation relative to the light direction.
 
-## ポストプロセッシング
+### Specular Reflection
+View-dependent highlight from reflective response.
 
-### Bloom (ブルーム / グロー)
+### Shading
+How per-pixel/per-vertex lighting is computed.
 
-明るい部分から光がにじみ出る効果。実装手順:
-1. シーンを通常描画
-2. 明るい部分を抽出 (threshold 以上)
-3. 抽出画像にガウシアンブラーを適用
-4. 元の画像に加算合成
+## Shaders
 
-### ガウシアンブラー (Gaussian Blur)
+### Shader
+GPU program stage used to transform geometry and color pixels.
 
-正規分布 (ガウス分布) の重み付けでピクセルを平均化するぼかし処理。水平方向と垂直方向に分離して適用すると効率的 (分離可能フィルタ)。
+### GLSL
+Shader language used in WebGL.
 
-### トーンマッピング (Tone Mapping)
+### Vertex Shader
+Processes each vertex and outputs clip-space position.
 
-HDR (High Dynamic Range) の色値を、画面に表示可能な LDR (Low Dynamic Range, 0-1) に変換する処理。明るすぎる部分の情報を失わずに圧縮する。
+### Fragment Shader
+Processes each fragment (pixel candidate) and outputs final color.
 
-### ビネット (Vignette)
+### Uniform
+Global shader input shared across many vertices/fragments.
 
-画面の周辺部を暗くする効果。注目を画面中央に集める演出。
+### Varying
+Interpolated value from vertex shader to fragment shader.
 
-## 色彩と色空間
+### ShaderMaterial
+Three.js material for custom GLSL pipelines.
+
+## Rendering Pipeline
+
+### Pipeline Stages
+Typical flow:
+1. Vertex fetch and transform
+2. Primitive assembly
+3. Rasterization
+4. Fragment shading
+5. Framebuffer write
+
+### Framebuffer
+Render target memory. May be on-screen or off-screen.
+
+### Depth Buffer
+Per-pixel depth storage used for occlusion.
+
+### Draw Call
+Single GPU submission for a renderable object/material state.
+
+## Post-Processing
+
+### Post-Processing
+Image-space effects applied after primary scene render.
+
+### EffectComposer
+Chains multiple render passes in sequence.
+
+### RenderPass
+Initial scene render pass.
+
+### UnrealBloomPass
+Glow pass for bright regions.
+
+### OutputPass
+Final output and tone-mapping stage.
+
+### Tone Mapping
+Maps HDR-like intensity range into displayable output.
+
+## Color and Color Space
 
 ### RGB
+Additive color space used for direct pixel output.
 
-赤 (Red), 緑 (Green), 青 (Blue) の 3 成分で色を表現。Three.js では 0.0-1.0 の float 値を使用。
+### HSV/HSL
+Perceptual color representations useful for dynamic palette logic.
 
-### HSV / HSB
+### Hue
+Color angle on a wheel (0-360 degrees).
 
-色相 (Hue), 彩度 (Saturation), 明度 (Value/Brightness) で色を表現。色の操作が直感的。
+### Saturation
+Color purity/intensity.
 
-| 成分 | 範囲 | 説明 |
-|------|------|------|
-| H (色相) | 0-360 度 (または 0.0-1.0) | 色の種類 (赤→黄→緑→シアン→青→マゼンタ) |
-| S (彩度) | 0.0-1.0 | 色の鮮やかさ (0=灰色, 1=鮮やか) |
-| V (明度) | 0.0-1.0 | 色の明るさ (0=黒, 1=最大) |
+### Value / Lightness
+Brightness-style channel used for luminance control.
 
-### 色相環 (Hue Wheel)
+### Clamping
+Limiting values into a safe range to prevent clipping or visual blowout.
 
-色相を円形に配置したもの:
+## Animation and Motion
 
-```
-  0°: 赤
- 60°: 黄
-120°: 緑
-180°: シアン
-240°: 青
-300°: マゼンタ
-360°: 赤 (0° に戻る)
-```
+### Delta Time
+Elapsed time between frames, used for frame-rate-independent movement.
 
-### 加算合成 (Additive Blending)
+### Interpolation (Lerp)
+Smooth transition from current value to target value.
 
-RGB 値を単純に加算する合成方式。光の重ね合わせを表現:
-- 赤 + 緑 = 黄
-- 赤 + 青 = マゼンタ
-- 赤 + 緑 + 青 = 白
+### Smoothing
+Reducing jitter by low-pass behavior across frames.
 
-黒背景のパーティクルシステムで自然な光表現になる。
+### Impulse
+Short-lived high-energy spike used for beat-reactive effects.
 
-### HDR (High Dynamic Range)
+### Decay
+Gradual reduction after an impulse to avoid abrupt drop-offs.
 
-通常の 0-1 の範囲を超える色値。`emissiveIntensity` を 1.0 以上にすると HDR 値になり、Bloom エフェクトで光のにじみが発生する。
+## Performance Terms
 
-### ソフトクリッピング (Soft Clipping / tanh)
+### FPS
+Frames per second; measured and shown by Ruby-side `FrameCounter`.
 
-`Math.tanh()` (双曲線正接) を使い、値が大きくなっても滑らかに 1.0 に漸近させる手法。大音量時のホワイトアウトを防止する。`clamp` (ハードクリッピング) と異なり、不連続点がなく視覚的に自然な飽和を実現する。本プロジェクトでは Bloom 強度、パーティクル輝度、トーラス発光強度の制御に使用。
+### CPU-bound
+Performance limited by JavaScript/Ruby processing cost.
 
-## アニメーションとモーション
+### GPU-bound
+Performance limited by rendering workload.
 
-### デルタタイム (Delta Time)
+### Fill Rate
+How many pixels can be shaded per frame.
 
-前フレームからの経過時間 (秒)。フレームレートに依存しない一定速度のアニメーションに必須。
+### Overdraw
+Multiple fragments rendered for the same screen pixel.
 
-```
-// 60 FPS: deltaTime ≈ 0.0167
-// 30 FPS: deltaTime ≈ 0.0333
-speed = distance_per_second * deltaTime
-```
+### Culling
+Skipping non-visible geometry to reduce draw cost.
 
-### 線形補間 (Lerp / Linear Interpolation)
+### Batching
+Reducing draw calls by grouping compatible geometry/material state.
 
-2 つの値の間を滑らかに遷移する計算:
-
-```
-lerp(a, b, t) = a + (b - a) * t
-```
-
-- t=0.0: a を返す
-- t=0.5: a と b の中間値
-- t=1.0: b を返す
-
-スムージング (追従する動き) によく使われる:
-
-```
-current = lerp(current, target, speed * deltaTime)
-```
-
-### スムージング / イージング (Smoothing / Easing)
-
-急な値の変化を滑らかにする手法。ロボット的な動きを防ぎ、自然な慣性のある動きを実現する。
-
-### デュアルスムージング (Dual Smoothing)
-
-本プロジェクトでは 2 段階のスムージングを採用:
-
-| 種類 | 係数 | 用途 | 応答速度 |
-|------|------|------|---------|
-| Audio Smoothing | 0.55 (`AUDIO_SMOOTHING_FACTOR`) | ビート検出 | 高速 (45% 新データ) |
-| Visual Smoothing | 0.70 (`VISUAL_SMOOTHING_FACTOR`) | 描画更新 | 低速 (30% 新データ) |
-
-ビート検出は速い応答が必要だが、描画は急変動を抑えて滑らかに見せたい。この 2 系統の値を独立に管理することで両立させている。
-
-### インパルス (Impulse)
-
-ビート検出時に瞬時に 1.0 にセットし、毎フレーム減衰 (`IMPULSE_DECAY_AUDIO = 0.65`, `IMPULSE_DECAY_EFFECT = 0.82`) する値。ビジュアルスムージングとは独立に動作し、パーティクル爆発やスケールブーストなどの瞬間的な反応に使われる。視覚的なスムージング値は滑らかに変化しつつ、インパルスでビート感を表現する。
-
-### スケルタルアニメーション (Skeletal Animation)
-
-骨格 (スケルトン) の各ボーンを回転させてメッシュを変形させるアニメーション手法。VRM モデルのダンスに使用。
-
-### フォワードキネマティクス (FK)
-
-親ボーンから子ボーンへ順に回転を適用する方法。直接各ボーンの回転角度を指定する。
-
-### インバースキネマティクス (IK)
-
-末端 (手先、足先) の目標位置から中間ボーンの回転を逆算する方法。自然なポーズ制御に有用だが計算コストが高い。
-
-### ブレンドシェイプ / モーフターゲット (Blend Shape / Morph Target)
-
-メッシュの各頂点に対して複数の変形パターンを用意し、重み付けで補間する技術。顔の表情表現に使われる。VRM の Expression (aa, blink 等) はこの仕組み。
-
-### スプリングボーン (Spring Bone)
-
-物理シミュレーションで揺れる骨格。バネとダンパーのモデルで自然な揺れを実現する。髪の毛、リボン、スカートなど。
-
-## パフォーマンス関連
-
-### FPS (Frames Per Second)
-
-1 秒間の描画回数。一般的な目標は 60 FPS (16.7ms/frame) または 30 FPS (33.3ms/frame)。
-
-### ドローコール (Draw Call)
-
-CPU が GPU に描画命令を発行する回数。ドローコールが多いと CPU がボトルネックになる。メッシュの統合やインスタンシングで削減可能。
-
-### GPU メモリ
-
-テクスチャ、頂点バッファ、フレームバッファが消費するメモリ。不足すると描画が破綻する。
-
-### requestAnimationFrame (RAF)
-
-ブラウザのリフレッシュレート (通常 60Hz) に同期した描画コールバック。`setInterval` より省電力で画面更新に適している。タブがバックグラウンドになると自動的に停止する。
+### Memory Bandwidth
+Cost of moving large typed arrays each frame (important for particle updates).
