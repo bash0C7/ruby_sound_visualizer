@@ -118,6 +118,43 @@ class TestAudioInputManager < Test::Unit::TestCase
     assert_equal false, @manager.camera_input?
   end
 
+  # === Serial source tests ===
+
+  def test_switch_to_serial_sets_source_to_serial
+    @manager.switch_to_serial
+    assert_equal :serial, @manager.source
+  end
+
+  def test_serial_input_returns_true_when_source_is_serial
+    @manager.switch_to_serial
+    assert_equal true, @manager.serial_input?
+  end
+
+  def test_serial_input_returns_false_when_source_is_mic
+    assert_equal false, @manager.serial_input?
+  end
+
+  def test_switch_to_mic_from_serial
+    @manager.switch_to_serial
+    @manager.switch_to_mic
+    assert_equal :microphone, @manager.source
+  end
+
+  def test_mic_input_returns_false_when_source_is_serial
+    @manager.switch_to_serial
+    assert_equal false, @manager.mic_input?
+  end
+
+  def test_tab_capture_returns_false_when_source_is_serial
+    @manager.switch_to_serial
+    assert_equal false, @manager.tab_capture?
+  end
+
+  def test_camera_input_returns_false_when_source_is_serial
+    @manager.switch_to_serial
+    assert_equal false, @manager.camera_input?
+  end
+
   # === Volume calculation tests ===
 
   def test_get_mic_volume_when_muted_returns_0

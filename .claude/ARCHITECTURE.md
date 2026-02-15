@@ -24,11 +24,32 @@ WebGL Rendering
   - EffectComposer でポストエフェクト適用
 ```
 
+## Serial Audio Data Flow (PicoRuby → Chrome)
+
+```
+PicoRuby (ESP32)
+  ↓ USB Serial: <F:NNNNN,D:NNN>\n
+Chrome Web Serial read loop
+  ↓ rubySerialOnReceive(data)
+Ruby WASM VM
+  - SerialManager.receive_data → SerialProtocol.extract_frames
+  - Frequency frame detected (type: :frequency)
+  - SerialAudioSource.update(freq, duty)
+  ↓ pending_update? in main loop
+JavaScript
+  - updateSerialAudio(freq, duty, active, volume)
+  - OscillatorNode with PWM PeriodicWave
+  ↓
+Web Audio API
+  ├→ AnalyserNode (visualization source, like mic/tab/cam)
+  └→ AudioContext.destination (speaker output)
+```
+
 ## Technical Stack
 
 - **Ruby 3.4.7** (via @ruby/4.0-wasm-wasi 2.8.1)
 - **Three.js** (0.160.0) - 3D rendering & post-processing
-- **Web Audio API** - マイク入力 & 周波数解析
+- **Web Audio API** - マイク入力 & 周波数解析 & シリアルPWM音声出力
 
 ## Audio Analysis (Ruby)
 
@@ -75,8 +96,9 @@ All parameters have min/max bounds and can be reset to defaults with `r` (VJ Pad
 
 HTML/CSS control panel overlaying the visualizer canvas:
 - Toggle visibility with `p` key
-- Sliders grouped by category (Bloom, Particles, Audio)
+- Sliders grouped by category (Bloom, Particles, Audio, Serial Audio, Camera, Capture)
 - Real-time bidirectional sync with VisualizerPolicy
+- Audio source buttons (Mic, Cam Mic, Tab) + Serial audio output (PWM button, output device picker)
 - Preview-first startup flow (panel visible before audio starts)
 
 ## Particle System (Ruby)
@@ -221,6 +243,7 @@ Ruby Code (lines Y-Z)
   ├── EffectManager
   ├── BloomController
   ├── AudioInputManager
+  ├── SerialAudioSource
   ├── VisualizerPolicy (constants + mutable params)
   ├── VJPad (DSL commands)
   └── Main (initialization & main loop)

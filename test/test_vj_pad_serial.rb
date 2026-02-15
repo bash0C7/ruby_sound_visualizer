@@ -179,4 +179,101 @@ class TestVJPadSerial < Test::Unit::TestCase
     assert_equal 1, @serial.rx_log.length
     assert_equal 0, @serial.tx_log.length
   end
+
+  # --- sao (serial audio on/off) ---
+
+  def test_sao_unavailable_without_serial_audio_source
+    pad = VJPad.new(nil, serial_manager: @serial)
+    result = pad.exec("sao")
+    assert result[:ok]
+    assert_match(/not available/, result[:msg])
+  end
+
+  def test_sao_getter_default_off
+    source = SerialAudioSource.new
+    pad = VJPad.new(nil, serial_manager: @serial, serial_audio_source: source)
+    result = pad.exec("sao")
+    assert result[:ok]
+    assert_match(/off/, result[:msg])
+  end
+
+  def test_sao_enable
+    source = SerialAudioSource.new
+    pad = VJPad.new(nil, serial_manager: @serial, serial_audio_source: source)
+    result = pad.exec("sao 1")
+    assert result[:ok]
+    assert_match(/on/, result[:msg])
+    assert_equal true, source.active?
+  end
+
+  def test_sao_disable
+    source = SerialAudioSource.new
+    pad = VJPad.new(nil, serial_manager: @serial, serial_audio_source: source)
+    pad.exec("sao 1")
+    result = pad.exec("sao 0")
+    assert result[:ok]
+    assert_match(/off/, result[:msg])
+    assert_equal false, source.active?
+  end
+
+  # --- sav (serial audio volume) ---
+
+  def test_sav_getter
+    source = SerialAudioSource.new
+    pad = VJPad.new(nil, serial_manager: @serial, serial_audio_source: source)
+    result = pad.exec("sav")
+    assert result[:ok]
+    assert_match(/30/, result[:msg])
+  end
+
+  def test_sav_setter
+    source = SerialAudioSource.new
+    pad = VJPad.new(nil, serial_manager: @serial, serial_audio_source: source)
+    result = pad.exec("sav 80")
+    assert result[:ok]
+    assert_match(/80/, result[:msg])
+    assert_in_delta 0.8, source.volume, 0.01
+  end
+
+  def test_sav_unavailable_without_source
+    pad = VJPad.new(nil, serial_manager: @serial)
+    result = pad.exec("sav")
+    assert result[:ok]
+    assert_match(/not available/, result[:msg])
+  end
+
+  # --- sai (serial audio info) ---
+
+  def test_sai_shows_status
+    source = SerialAudioSource.new
+    pad = VJPad.new(nil, serial_manager: @serial, serial_audio_source: source)
+    result = pad.exec("sai")
+    assert result[:ok]
+    assert_match(/serial_audio/, result[:msg])
+    assert_match(/440/, result[:msg])
+  end
+
+  def test_sai_unavailable_without_source
+    pad = VJPad.new(nil, serial_manager: @serial)
+    result = pad.exec("sai")
+    assert result[:ok]
+    assert_match(/not available/, result[:msg])
+  end
+
+  # --- sad (serial audio device) ---
+
+  def test_sad_triggers_device_picker
+    source = SerialAudioSource.new
+    pad = VJPad.new(nil, serial_manager: @serial, serial_audio_source: source)
+    result = pad.exec("sad")
+    assert result[:ok]
+    assert_match(/device picker/, result[:msg])
+  end
+
+  def test_sad_unavailable_without_source
+    pad = VJPad.new(nil, serial_manager: @serial)
+    result = pad.exec("sad")
+    assert result[:ok]
+    assert_match(/not available/, result[:msg])
+  end
 end

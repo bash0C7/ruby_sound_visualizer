@@ -67,6 +67,7 @@ The app relies on deterministic script order. `main.rb` must be last.
 <script type="text/ruby" src="src/ruby/plugins/vj_wordart.rb"></script>
 <script type="text/ruby" src="src/ruby/serial_protocol.rb"></script>
 <script type="text/ruby" src="src/ruby/serial_manager.rb"></script>
+<script type="text/ruby" src="src/ruby/serial_audio_source.rb"></script>
 <script type="text/ruby" src="src/ruby/pen_input.rb"></script>
 <script type="text/ruby" src="src/ruby/wordart_renderer.rb"></script>
 <script type="text/ruby" src="src/ruby/debug_formatter.rb"></script>
@@ -122,12 +123,13 @@ Current analyser config:
 
 ### Audio source model
 
-JS manages multiple sources:
+JS manages multiple input sources (feed into AnalyserNode for visualization):
 - microphone input
 - tab capture
 - camera microphone
+- serial audio (PWM oscillator from PicoRuby frequency data, also outputs to speakers)
 
-Ruby tracks logical input state through `AudioInputManager` and key/VJ commands.
+Ruby tracks logical input state through `AudioInputManager` (`:microphone`, `:tab`, `:camera`, `:serial`) and key/VJ commands. Serial audio state is managed by `SerialAudioSource` which receives frequency/duty frames via `SerialProtocol`.
 
 ### Suspended context handling
 

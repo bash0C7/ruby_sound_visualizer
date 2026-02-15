@@ -265,16 +265,27 @@ Some commands are plugin-registered for discovery but implemented mainly through
 Available commands:
 
 ```text
-sc
-sd
-ss "text"
-sr [n]
-st [n]
-sb [baud]
-si
-sa [1/0]
-scl [all/rx/tx]
+sc              # connect serial
+sd              # disconnect serial
+ss "text"       # send text
+sr [n]          # show RX log (last n lines)
+st [n]          # show TX log (last n lines)
+sb [baud]       # get/set baud rate
+si              # serial info/status
+sa [1/0]        # auto-send audio frames on/off
+scl [all/rx/tx] # clear logs
 ```
+
+### Serial audio commands (built-in VJPad, not plugin-dispatched)
+
+```text
+sao [1/0]       # serial audio on/off (PWM oscillator)
+sav [0-100]     # serial audio volume (percentage)
+sai             # serial audio info/status
+sad             # open audio output device picker
+```
+
+These control `SerialAudioSource` which generates PWM audio from serial frequency data.
 
 ### WordArt plugin (`vj_wordart.rb`)
 
