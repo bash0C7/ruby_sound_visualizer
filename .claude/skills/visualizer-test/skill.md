@@ -311,10 +311,10 @@ Performance View は `?perf=1` URLで起動する独立ウィンドウ。Broadca
 | flash | flash! | [実際] | ✓/✗ | |
 | s 1.5 | sens: 1.5 | [実際] | ✓/✗ | |
 | c 2; burst | burst! | [実際] | ✓/✗ | セミコロン複数コマンド |
-| sao 1 | serial audio: on | [実際] | ✓/✗ | Serial Audio ON |
-| sav 50 | serial audio vol: 50 | [実際] | ✓/✗ | 音量設定 |
-| sai | serial audio: ... | [実際] | ✓/✗ | 設定表示 |
-| sao 0 | serial audio: off | [実際] | ✓/✗ | Serial Audio OFF |
+| sao 1 | serial_audio: on | [実際] | ✓/✗ | Serial Audio ON |
+| sav 50 | serial_audio vol: 50% | [実際] | ✓/✗ | 音量設定 |
+| sai | serial_audio: on freq=... | [実際] | ✓/✗ | 設定表示（部分一致） |
+| sao 0 | serial_audio: off | [実際] | ✓/✗ | Serial Audio OFF |
 
 ### URL Snapshot テスト
 - [✓/✗] スライダー操作で URL に ov/vv パラメータが追加される
