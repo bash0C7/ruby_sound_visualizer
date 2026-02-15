@@ -15,6 +15,7 @@
    - Master / Bloom / Particles / Rendering / Audio グループ
    - Camera グループ（Distance / H.Rotation / V.Rotation）
    - **Capture グループ**（Overlay Opacity / Video Opacity スライダー）← 今回追加
+   - **Serial Audio グループ**（PWM ボタン、⚙ ボタン）← Serial PWM audio output
    - アクションボタン: Load VRM / Capture Tab / **Capture Camera** / **Perf View** / Reset All
    - **Audio ソース**: Mic / Cam Mic / Tab ボタン ← 今回追加
 
@@ -33,6 +34,7 @@
    - **感度調整**: `s 1.5` (感度を1.5に設定)
    - **アクション**: `burst` (パーティクルバースト), `flash` (ブルームフラッシュ)
    - **複数コマンド**: `c 1; s 2.0; flash` (セミコロン区切り)
+   - **Serial Audio**: `sao 1` (ON), `sao 0` (OFF), `sav 50` (音量50%), `sai` (設定表示), `sad` (デフォルト)
 
 5. **URL Snapshot テスト** ← 今回追加
    - スライダー操作後に URL パラメータが更新されること
@@ -309,6 +311,10 @@ Performance View は `?perf=1` URLで起動する独立ウィンドウ。Broadca
 | flash | flash! | [実際] | ✓/✗ | |
 | s 1.5 | sens: 1.5 | [実際] | ✓/✗ | |
 | c 2; burst | burst! | [実際] | ✓/✗ | セミコロン複数コマンド |
+| sao 1 | serial audio: on | [実際] | ✓/✗ | Serial Audio ON |
+| sav 50 | serial audio vol: 50 | [実際] | ✓/✗ | 音量設定 |
+| sai | serial audio: ... | [実際] | ✓/✗ | 設定表示 |
+| sao 0 | serial audio: off | [実際] | ✓/✗ | Serial Audio OFF |
 
 ### URL Snapshot テスト
 - [✓/✗] スライダー操作で URL に ov/vv パラメータが追加される
@@ -384,6 +390,7 @@ bundle exec rake server:start
    - Capture グループに Overlay Opacity (0.50) / Video Opacity (1.00) スライダー
    - Load VRM / Capture Tab / Capture Camera / Multi-Monitor / Reset All ボタン
    - Audio: Mic / Cam Mic / Tab ボタン（Mic がデフォルト active）
+   - Serial Audio グループに PWM ボタン（ON/OFF トグル）と ⚙（設定）ボタン
 
 3. **キー入力後**
    - 色モード切り替え（0-3）: パーティクルとトーラスの色が変化

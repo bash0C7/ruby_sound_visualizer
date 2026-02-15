@@ -45,8 +45,9 @@ module SerialProtocol
 
     values = {}
     pairs.each do |pair|
-      key, val = pair.split(':')
-      return nil unless key && val
+      parts = pair.split(':')
+      return nil unless parts.length == 2
+      key, val = parts
       return nil unless val.match?(/\A\d+\z/)
       int_val = val.to_i
       return nil if int_val < MIN_VALUE || int_val > MAX_VALUE
@@ -87,8 +88,9 @@ module SerialProtocol
 
     values = {}
     pairs.each do |pair|
-      key, val = pair.split(':')
-      return nil unless key && val
+      parts = pair.split(':')
+      return nil unless parts.length == 2
+      key, val = parts
       return nil unless val.match?(/\A\d+\z/)
       int_val = val.to_i
       case key

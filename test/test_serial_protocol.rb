@@ -82,6 +82,11 @@ class TestSerialProtocol < Test::Unit::TestCase
     assert_nil SerialProtocol.decode("<L:12.5,B:128,M:64,H:0>")
   end
 
+  def test_decode_nil_for_extra_colon_in_pair
+    assert_nil SerialProtocol.decode("<L:255:99,B:128,M:64,H:0>")
+    assert_nil SerialProtocol.decode("<L:255,B:128:1,M:64,H:0>")
+  end
+
   # --- Round-trip ---
 
   def test_encode_decode_roundtrip
@@ -226,6 +231,11 @@ class TestSerialProtocol < Test::Unit::TestCase
   def test_decode_frequency_nil_for_malformed_value
     assert_nil SerialProtocol.decode_frequency("<F:abc,D:50>")
     assert_nil SerialProtocol.decode_frequency("<F:440,D:12.5>")
+  end
+
+  def test_decode_frequency_nil_for_extra_colon_in_pair
+    assert_nil SerialProtocol.decode_frequency("<F:440:999,D:50>")
+    assert_nil SerialProtocol.decode_frequency("<F:440,D:50:1>")
   end
 
   def test_decode_frequency_nil_for_audio_level_frame
