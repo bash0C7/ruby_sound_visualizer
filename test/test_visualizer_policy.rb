@@ -59,12 +59,44 @@ class TestVisualizerPolicy < Test::Unit::TestCase
   def test_sensitivity_accessor
     assert_equal 1.0, VisualizerPolicy.sensitivity
 
-    VisualizerPolicy.sensitivity = 2.5
-    assert_equal 2.5, VisualizerPolicy.sensitivity
+    VisualizerPolicy.sensitivity = 1.5
+    assert_equal 1.5, VisualizerPolicy.sensitivity
 
-    # Test minimum clipping
+    # Test minimum clipping (new range: 0.1-1.9)
     VisualizerPolicy.sensitivity = 0.01
-    assert_equal 0.05, VisualizerPolicy.sensitivity, "Sensitivity should be clamped to minimum 0.05"
+    assert_equal 0.1, VisualizerPolicy.sensitivity, "Sensitivity should be clamped to minimum 0.1"
+
+    # Test maximum clipping
+    VisualizerPolicy.sensitivity = 5.0
+    assert_equal 1.9, VisualizerPolicy.sensitivity, "Sensitivity should be clamped to maximum 1.9"
+  end
+
+  def test_input_gain_accessor
+    assert_equal 0.0, VisualizerPolicy.input_gain
+
+    VisualizerPolicy.input_gain = 10.0
+    assert_equal 10.0, VisualizerPolicy.input_gain
+
+    VisualizerPolicy.input_gain = -10.0
+    assert_equal(-10.0, VisualizerPolicy.input_gain)
+
+    # Test clamping
+    VisualizerPolicy.input_gain = 25.0
+    assert_equal 20.0, VisualizerPolicy.input_gain
+
+    VisualizerPolicy.input_gain = -25.0
+    assert_equal(-20.0, VisualizerPolicy.input_gain)
+  end
+
+  def test_input_gain_linear
+    VisualizerPolicy.input_gain = 0.0
+    assert_in_delta 1.0, VisualizerPolicy.input_gain_linear, 0.001
+
+    VisualizerPolicy.input_gain = 20.0
+    assert_in_delta 10.0, VisualizerPolicy.input_gain_linear, 0.01
+
+    VisualizerPolicy.input_gain = -20.0
+    assert_in_delta 0.1, VisualizerPolicy.input_gain_linear, 0.001
   end
 
   def test_max_brightness_accessor
@@ -104,17 +136,17 @@ class TestVisualizerPolicy < Test::Unit::TestCase
   end
 
   def test_set_by_key_sensitivity
-    result = VisualizerPolicy.set_by_key('sensitivity', 2.5)
-    assert_equal 2.5, VisualizerPolicy.sensitivity
+    result = VisualizerPolicy.set_by_key('sensitivity', 1.5)
+    assert_equal 1.5, VisualizerPolicy.sensitivity
     assert_match(/sensitivity/, result)
   end
 
   def test_set_by_key_clamps_to_range
     VisualizerPolicy.set_by_key('sensitivity', 999.0)
-    assert_equal 10.0, VisualizerPolicy.sensitivity
+    assert_equal 1.9, VisualizerPolicy.sensitivity
 
     VisualizerPolicy.set_by_key('sensitivity', -5.0)
-    assert_equal 0.05, VisualizerPolicy.sensitivity
+    assert_equal 0.1, VisualizerPolicy.sensitivity
   end
 
   def test_set_by_key_max_brightness
@@ -128,8 +160,8 @@ class TestVisualizerPolicy < Test::Unit::TestCase
   end
 
   def test_get_by_key
-    VisualizerPolicy.sensitivity = 2.0
-    assert_equal 2.0, VisualizerPolicy.get_by_key('sensitivity')
+    VisualizerPolicy.sensitivity = 1.5
+    assert_equal 1.5, VisualizerPolicy.get_by_key('sensitivity')
   end
 
   def test_get_by_key_unknown

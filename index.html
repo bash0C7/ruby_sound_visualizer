@@ -346,6 +346,7 @@
   <script type="text/ruby" src="src/ruby/math_helper.rb"></script>
   <script type="text/ruby" src="src/ruby/js_bridge.rb"></script>
   <script type="text/ruby" src="src/ruby/frequency_mapper.rb"></script>
+  <script type="text/ruby" src="src/ruby/audio_limiter.rb"></script>
   <script type="text/ruby" src="src/ruby/audio_analyzer.rb"></script>
   <script type="text/ruby" src="src/ruby/color_palette.rb"></script>
   <script type="text/ruby" src="src/ruby/particle_system.rb"></script>
@@ -1775,27 +1776,28 @@
     // Slider definitions (mirrors VisualizerPolicy::MUTABLE_KEYS)
     const SLIDER_GROUPS = {
       'Master': [
-        { key: 'sensitivity', label: 'Sensitivity', min: 0.05, max: 10.0, step: 0.05, default: 1.0 },
+        { key: 'sensitivity', label: 'Sensitivity', min: 0.1, max: 1.9, step: 0.05, default: 1.0 },
+        { key: 'input_gain', label: 'Input Gain (dB)', min: -20.0, max: 20.0, step: 0.5, default: 0.0 },
       ],
       'Bloom': [
-        { key: 'bloom_base_strength', label: 'Base Strength', min: 0.0, max: 5.0, step: 0.1, default: 1.5 },
-        { key: 'max_bloom', label: 'Max (Cap)', min: 0.0, max: 10.0, step: 0.1, default: 4.5 },
+        { key: 'bloom_base_strength', label: 'Base Strength', min: 0.0, max: 3.0, step: 0.1, default: 1.5 },
+        { key: 'max_bloom', label: 'Max (Cap)', min: 0.0, max: 9.0, step: 0.1, default: 4.5 },
         { key: 'bloom_energy_scale', label: 'Energy Scale', min: 0.0, max: 5.0, step: 0.1, default: 2.5 },
         { key: 'bloom_impulse_scale', label: 'Impulse Scale', min: 0.0, max: 3.0, step: 0.1, default: 1.5 },
       ],
       'Particles': [
-        { key: 'particle_explosion_base_prob', label: 'Explosion Prob.', min: 0.0, max: 1.0, step: 0.01, default: 0.20 },
-        { key: 'particle_explosion_energy_scale', label: 'Energy Scale', min: 0.0, max: 2.0, step: 0.01, default: 0.50 },
-        { key: 'particle_explosion_force_scale', label: 'Force Scale', min: 0.0, max: 2.0, step: 0.01, default: 0.55 },
-        { key: 'particle_friction', label: 'Friction', min: 0.50, max: 0.99, step: 0.01, default: 0.86 },
+        { key: 'particle_explosion_base_prob', label: 'Explosion Prob.', min: 0.0, max: 0.40, step: 0.01, default: 0.20 },
+        { key: 'particle_explosion_energy_scale', label: 'Energy Scale', min: 0.0, max: 1.0, step: 0.01, default: 0.50 },
+        { key: 'particle_explosion_force_scale', label: 'Force Scale', min: 0.0, max: 1.10, step: 0.01, default: 0.55 },
+        { key: 'particle_friction', label: 'Friction', min: 0.73, max: 0.99, step: 0.01, default: 0.86 },
       ],
       'Rendering': [
         { key: 'max_lightness', label: 'Max Lightness', min: 0, max: 255, step: 1, default: 255 },
-        { key: 'max_emissive', label: 'Max Emissive', min: 0.0, max: 10.0, step: 0.1, default: 2.0 },
+        { key: 'max_emissive', label: 'Max Emissive', min: 0.0, max: 4.0, step: 0.1, default: 2.0 },
       ],
       'Audio': [
-        { key: 'visual_smoothing', label: 'Visual Smoothing', min: 0.0, max: 0.99, step: 0.01, default: 0.70 },
-        { key: 'impulse_decay', label: 'Impulse Decay', min: 0.50, max: 0.99, step: 0.01, default: 0.82 },
+        { key: 'visual_smoothing', label: 'Visual Smoothing', min: 0.41, max: 0.99, step: 0.01, default: 0.70 },
+        { key: 'impulse_decay', label: 'Impulse Decay', min: 0.65, max: 0.99, step: 0.01, default: 0.82 },
       ],
       'Camera': [
         { key: 'camera_radius', label: 'Distance', min: 1, max: 20, step: 0.1, default: 5,

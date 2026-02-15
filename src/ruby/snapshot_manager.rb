@@ -17,6 +17,8 @@ class SnapshotManager
                 set: ->(v) { VisualizerPolicy.max_saturation = v.to_i } },
     'sens' => { get: -> { VisualizerPolicy.sensitivity.round(3) },
                 set: ->(v) { VisualizerPolicy.sensitivity = v.to_f } },
+    'ig'   => { get: -> { VisualizerPolicy.input_gain.round(1) },
+                set: ->(v) { VisualizerPolicy.input_gain = v.to_f } },
     'bbs'  => { get: -> { VisualizerPolicy.bloom_base_strength },
                 set: ->(v) { VisualizerPolicy.bloom_base_strength = v.to_f } },
     'bmax' => { get: -> { VisualizerPolicy.max_bloom },

@@ -22,6 +22,8 @@ class KeyboardHandler
     when '9' then handle_lightness(5)
     when '-' then handle_sensitivity(-0.05)
     when '+', '=' then handle_sensitivity(0.05)
+    when '[' then handle_input_gain(-1.0)
+    when ']' then handle_input_gain(1.0)
     when 'm' then handle_mic_toggle
     when 't' then handle_tab_capture
     end
@@ -49,8 +51,13 @@ class KeyboardHandler
   end
 
   def handle_sensitivity(delta)
-    VisualizerPolicy.sensitivity = [(VisualizerPolicy.sensitivity + delta).round(2), 0.05].max
+    VisualizerPolicy.sensitivity = (VisualizerPolicy.sensitivity + delta).round(2)
     JSBridge.log "Sensitivity: #{VisualizerPolicy.sensitivity}x"
+  end
+
+  def handle_input_gain(delta)
+    VisualizerPolicy.input_gain = (VisualizerPolicy.input_gain + delta).round(1)
+    JSBridge.log "Input Gain: #{VisualizerPolicy.input_gain}dB (#{VisualizerPolicy.input_gain_linear.round(2)}x)"
   end
 
   def handle_hue_shift(delta)

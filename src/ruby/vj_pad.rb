@@ -68,6 +68,12 @@ class VJPad
     "sens: #{VisualizerPolicy.sensitivity}"
   end
 
+  def ig(val = :_get)
+    return "gain: #{VisualizerPolicy.input_gain}dB" if val == :_get
+    VisualizerPolicy.input_gain = val.to_f
+    "gain: #{VisualizerPolicy.input_gain}dB"
+  end
+
   def br(val = :_get)
     return "bright: #{VisualizerPolicy.max_brightness}" if val == :_get
     VisualizerPolicy.max_brightness = val.to_i
@@ -107,12 +113,13 @@ class VJPad
     cn = COLOR_NAMES[ColorPalette.get_hue_mode] || 'gray'
     ho = ColorPalette.get_hue_offset.round(1)
     se = VisualizerPolicy.sensitivity
+    ig = VisualizerPolicy.input_gain
     b = VisualizerPolicy.max_brightness
     l = VisualizerPolicy.max_lightness
     e = VisualizerPolicy.max_emissive
     bl = VisualizerPolicy.max_bloom
     ex = VisualizerPolicy.exclude_max
-    "c:#{cn} h:#{ho} | s:#{se} br:#{b} lt:#{l} | em:#{e} bm:#{bl} x:#{ex}"
+    "c:#{cn} h:#{ho} | s:#{se} ig:#{ig}dB br:#{b} lt:#{l} | em:#{e} bm:#{bl} x:#{ex}"
   end
 
   # --- Audio-reactive Parameter Commands ---

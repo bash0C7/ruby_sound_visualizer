@@ -48,6 +48,7 @@ module VisualizerPolicy
 
   # Runtime mutable config (set by URL params / keyboard / DevTool / Control Panel)
   @@sensitivity = 1.0
+  @@input_gain = 0.0  # Input gain in dB (0 = neutral, + = amplify, - = attenuate)
   @@max_brightness = 255
   @@max_lightness = 255
   @@max_saturation = 100
@@ -71,7 +72,20 @@ module VisualizerPolicy
   end
 
   def self.sensitivity=(v)
-    @@sensitivity = [v, 0.05].max
+    @@sensitivity = [[v.to_f, 0.1].max, 1.9].min
+  end
+
+  def self.input_gain
+    @@input_gain
+  end
+
+  def self.input_gain=(v)
+    @@input_gain = [[v.to_f, -20.0].max, 20.0].min
+  end
+
+  # Convert dB input_gain to linear multiplier: 10^(dB/20)
+  def self.input_gain_linear
+    10.0 ** (@@input_gain / 20.0)
   end
 
   def self.max_brightness
@@ -182,23 +196,27 @@ module VisualizerPolicy
 
   # === DevTool Console Interface ===
   # Allows dynamic config changes from Chrome DevTools via rubyVisualizerPolicy.set/get/list/reset
+  #
+  # Slider ranges are designed so that default = center position:
+  #   min --|-- default --|-- max  (symmetric around default)
 
   MUTABLE_KEYS = {
-    'sensitivity' => { min: 0.05, max: 10.0, type: :float, default: 1.0, group: 'Master', step: 0.05 },
-    'bloom_base_strength' => { min: 0.0, max: 5.0, type: :float, default: 1.5, group: 'Bloom', step: 0.1 },
-    'max_bloom' => { min: 0.0, max: 10.0, type: :float, default: 4.5, group: 'Bloom', step: 0.1 },
+    'sensitivity' => { min: 0.1, max: 1.9, type: :float, default: 1.0, group: 'Master', step: 0.05 },
+    'input_gain' => { min: -20.0, max: 20.0, type: :float, default: 0.0, group: 'Master', step: 0.5 },
+    'bloom_base_strength' => { min: 0.0, max: 3.0, type: :float, default: 1.5, group: 'Bloom', step: 0.1 },
+    'max_bloom' => { min: 0.0, max: 9.0, type: :float, default: 4.5, group: 'Bloom', step: 0.1 },
     'bloom_energy_scale' => { min: 0.0, max: 5.0, type: :float, default: 2.5, group: 'Bloom', step: 0.1 },
     'bloom_impulse_scale' => { min: 0.0, max: 3.0, type: :float, default: 1.5, group: 'Bloom', step: 0.1 },
-    'particle_explosion_base_prob' => { min: 0.0, max: 1.0, type: :float, default: 0.20, group: 'Particles', step: 0.01 },
-    'particle_explosion_energy_scale' => { min: 0.0, max: 2.0, type: :float, default: 0.50, group: 'Particles', step: 0.01 },
-    'particle_explosion_force_scale' => { min: 0.0, max: 2.0, type: :float, default: 0.55, group: 'Particles', step: 0.01 },
-    'particle_friction' => { min: 0.50, max: 0.99, type: :float, default: 0.86, group: 'Particles', step: 0.01 },
+    'particle_explosion_base_prob' => { min: 0.0, max: 0.40, type: :float, default: 0.20, group: 'Particles', step: 0.01 },
+    'particle_explosion_energy_scale' => { min: 0.0, max: 1.0, type: :float, default: 0.50, group: 'Particles', step: 0.01 },
+    'particle_explosion_force_scale' => { min: 0.0, max: 1.10, type: :float, default: 0.55, group: 'Particles', step: 0.01 },
+    'particle_friction' => { min: 0.73, max: 0.99, type: :float, default: 0.86, group: 'Particles', step: 0.01 },
     'max_brightness' => { min: 0, max: 255, type: :int, default: 255, group: 'Rendering', step: 1 },
     'max_lightness' => { min: 0, max: 255, type: :int, default: 255, group: 'Rendering', step: 1 },
     'max_saturation' => { min: 0, max: 100, type: :int, default: 100, group: 'Color', step: 1 },
-    'max_emissive' => { min: 0.0, max: 10.0, type: :float, default: 2.0, group: 'Rendering', step: 0.1 },
-    'visual_smoothing' => { min: 0.0, max: 0.99, type: :float, default: 0.70, group: 'Audio', step: 0.01 },
-    'impulse_decay' => { min: 0.50, max: 0.99, type: :float, default: 0.82, group: 'Audio', step: 0.01 },
+    'max_emissive' => { min: 0.0, max: 4.0, type: :float, default: 2.0, group: 'Rendering', step: 0.1 },
+    'visual_smoothing' => { min: 0.41, max: 0.99, type: :float, default: 0.70, group: 'Audio', step: 0.01 },
+    'impulse_decay' => { min: 0.65, max: 0.99, type: :float, default: 0.82, group: 'Audio', step: 0.01 },
     'exclude_max' => { min: 0, max: 1, type: :bool, default: false, group: 'Master', step: 1 }
   }.freeze
 
@@ -217,6 +235,7 @@ module VisualizerPolicy
 
     case key_str
     when 'sensitivity' then self.sensitivity = val
+    when 'input_gain' then self.input_gain = val
     when 'max_brightness' then self.max_brightness = val
     when 'max_lightness' then self.max_lightness = val
     when 'max_saturation' then self.max_saturation = val
@@ -240,6 +259,7 @@ module VisualizerPolicy
   def self.get_by_key(key)
     case key.to_s
     when 'sensitivity' then sensitivity
+    when 'input_gain' then input_gain
     when 'max_brightness' then max_brightness
     when 'max_lightness' then max_lightness
     when 'max_saturation' then max_saturation
@@ -268,6 +288,7 @@ module VisualizerPolicy
 
   def self.reset_runtime
     self.sensitivity = 1.0
+    self.input_gain = 0.0
     self.max_brightness = 255
     self.max_lightness = 255
     self.max_saturation = 100
