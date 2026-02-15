@@ -295,6 +295,9 @@
       <button class="cp-btn cp-src-btn" id="cpSrcMic" style="padding:2px 6px;font-size:10px;">Mic</button><button class="cp-btn" id="cpMicDeviceBtn" style="padding:2px 4px;font-size:10px;flex:0 0 auto;" title="Select mic device">⚙</button>
       <button class="cp-btn cp-src-btn" id="cpSrcCamera" style="padding:2px 6px;font-size:10px;">Cam Mic</button>
       <button class="cp-btn cp-src-btn" id="cpSrcTab" style="padding:2px 6px;font-size:10px;">Tab</button>
+      <span style="color:#444;margin:0 2px;">|</span>
+      <span style="color:#888;font-size:10px;">Out:</span>
+      <button class="cp-btn cp-src-btn" id="cpSrcSerialAudio" style="padding:2px 6px;font-size:10px;" title="Serial PWM Audio Output">PWM</button><button class="cp-btn" id="cpSerialAudioDeviceBtn" style="padding:2px 4px;font-size:10px;flex:0 0 auto;" title="Select audio output device">⚙</button>
     </div>
   </div>
   <div id="status">
@@ -370,6 +373,7 @@
   <script type="text/ruby" src="src/ruby/plugins/vj_wordart.rb"></script>
   <script type="text/ruby" src="src/ruby/serial_protocol.rb"></script>
   <script type="text/ruby" src="src/ruby/serial_manager.rb"></script>
+  <script type="text/ruby" src="src/ruby/serial_audio_source.rb"></script>
   <script type="text/ruby" src="src/ruby/pen_input.rb"></script>
   <script type="text/ruby" src="src/ruby/wordart_renderer.rb"></script>
   <script type="text/ruby" src="src/ruby/debug_formatter.rb"></script>
@@ -817,6 +821,114 @@
         const encoder = new TextEncoder();
         await _serialWriter.write(encoder.encode(text));
       } catch (e) { console.error('[Serial] Send error:', e); }
+    };
+
+    // === Serial Audio Output (PWM tone from PicoRuby frequency data) ===
+    let _serialOscillator = null;
+    let _serialGain = null;
+    let _serialOutputGain = null;
+    let _serialAudioActive = false;
+
+    // Create PWM-like PeriodicWave from duty cycle (0-100)
+    function createPWMWave(dutyCycle) {
+      const d = dutyCycle / 100.0;
+      const n = 64;
+      const real = new Float32Array(n);
+      const imag = new Float32Array(n);
+      real[0] = 0; imag[0] = 0;
+      for (let k = 1; k < n; k++) {
+        real[k] = (1 / (k * Math.PI)) * Math.sin(2 * Math.PI * k * d);
+        imag[k] = (1 / (k * Math.PI)) * (1 - Math.cos(2 * Math.PI * k * d));
+      }
+      return audioContext.createPeriodicWave(real, imag, { disableNormalization: false });
+    }
+
+    function startSerialAudio(freq, duty, volume) {
+      if (!audioContext) return;
+      stopSerialAudio();
+      _serialOscillator = audioContext.createOscillator();
+      _serialGain = audioContext.createGain();
+      _serialOutputGain = audioContext.createGain();
+      _serialGain.gain.value = 1.0;
+      _serialOutputGain.gain.value = volume;
+      _serialOscillator.setPeriodicWave(createPWMWave(duty));
+      _serialOscillator.frequency.setValueAtTime(freq, audioContext.currentTime);
+      _serialOscillator.connect(_serialGain);
+      _serialGain.connect(analyser);
+      _serialGain.connect(_serialOutputGain);
+      _serialOutputGain.connect(audioContext.destination);
+      _serialOscillator.start();
+      _serialAudioActive = true;
+      document.getElementById('cpSrcSerialAudio')?.classList.add('active');
+      console.log('[SerialAudio] Started: ' + freq + 'Hz duty=' + duty + '%');
+    }
+
+    function stopSerialAudio() {
+      if (_serialOscillator) {
+        try { _serialOscillator.stop(); } catch (_e) {}
+        _serialOscillator.disconnect();
+        _serialOscillator = null;
+      }
+      if (_serialGain) { _serialGain.disconnect(); _serialGain = null; }
+      if (_serialOutputGain) { _serialOutputGain.disconnect(); _serialOutputGain = null; }
+      _serialAudioActive = false;
+      document.getElementById('cpSrcSerialAudio')?.classList.remove('active');
+    }
+
+    // Called from Ruby each frame when serial audio state changes
+    window.updateSerialAudio = function(freq, duty, active, volume) {
+      if (active && freq > 0) {
+        if (!_serialAudioActive) {
+          startSerialAudio(freq, duty, volume);
+        } else {
+          if (_serialOscillator) {
+            _serialOscillator.frequency.setValueAtTime(freq, audioContext.currentTime);
+            _serialOscillator.setPeriodicWave(createPWMWave(duty));
+          }
+          if (_serialOutputGain) {
+            _serialOutputGain.gain.setValueAtTime(volume, audioContext.currentTime);
+          }
+        }
+      } else {
+        if (_serialAudioActive) stopSerialAudio();
+      }
+    };
+
+    // Output device picker (follows mic device picker pattern)
+    window.showSerialAudioDevicePicker = async function() {
+      try { await navigator.mediaDevices.getUserMedia({ audio: true }); } catch (_e) {}
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const audioOutputs = devices.filter(d => d.kind === 'audiooutput');
+      document.getElementById('serialAudioDevicePicker')?.remove();
+      const picker = document.createElement('div');
+      picker.id = 'serialAudioDevicePicker';
+      picker.style.cssText = 'position:fixed;background:#1a1a1a;border:1px solid #555;border-radius:4px;z-index:2000;padding:4px;min-width:200px;';
+      audioOutputs.forEach((dev, i) => {
+        const btn = document.createElement('button');
+        btn.className = 'cp-btn';
+        btn.style.cssText = 'display:block;width:100%;text-align:left;padding:4px 8px;font-size:10px;margin:1px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+        btn.textContent = dev.label || ('Speaker ' + (i + 1));
+        if (dev.deviceId === 'default') btn.style.color = '#0f0';
+        btn.addEventListener('click', async () => {
+          picker.remove();
+          if (audioContext && audioContext.setSinkId) {
+            try {
+              await audioContext.setSinkId(dev.deviceId);
+              console.log('[SerialAudio] Output device: ' + dev.label);
+            } catch (e) { console.error('[SerialAudio] setSinkId error:', e); }
+          }
+        });
+        picker.appendChild(btn);
+      });
+      const refBtn = document.getElementById('cpSerialAudioDeviceBtn');
+      const rect = refBtn?.getBoundingClientRect();
+      if (rect) { picker.style.top = (rect.bottom + 4) + 'px'; picker.style.left = rect.left + 'px'; }
+      document.body.appendChild(picker);
+      setTimeout(() => {
+        document.addEventListener('click', function closePicker(e) {
+          if (!picker.contains(e.target)) { picker.remove(); document.removeEventListener('click', closePicker); }
+        });
+      }, 0);
     };
 
     // === Pen Input Overlay Canvas (minimal JS, logic in Ruby PenInput) ===
@@ -2098,6 +2210,18 @@
       // Tab: toggle tab capture
       document.getElementById('cpSrcTab').addEventListener('click', () => {
         toggleTabCapture();
+      });
+      // PWM: toggle serial audio via VJ Pad
+      document.getElementById('cpSrcSerialAudio').addEventListener('click', () => {
+        if (window.rubyExecPrompt) {
+          const isActive = document.getElementById('cpSrcSerialAudio').classList.contains('active');
+          window.rubyExecPrompt(isActive ? 'sao 0' : 'sao 1');
+        }
+      });
+      // ⚙: open serial audio output device picker
+      document.getElementById('cpSerialAudioDeviceBtn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (window.showSerialAudioDevicePicker) window.showSerialAudioDevicePicker();
       });
 
       // Wire close and reset buttons

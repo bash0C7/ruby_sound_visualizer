@@ -138,4 +138,143 @@ class TestSerialProtocol < Test::Unit::TestCase
     assert_equal 1, frames.length
     assert_in_delta 0.502, frames[0][:level], 0.01
   end
+
+  # --- Frequency frame encoding ---
+
+  def test_encode_frequency_produces_valid_frame_format
+    frame = SerialProtocol.encode_frequency(freq: 440, duty: 50)
+    assert frame.start_with?('<')
+    assert frame.include?('>')
+    assert frame.end_with?("\n")
+  end
+
+  def test_encode_frequency_full_frame_string
+    frame = SerialProtocol.encode_frequency(freq: 440, duty: 50)
+    assert_equal "<F:440,D:50>\n", frame
+  end
+
+  def test_encode_frequency_clamps_above_max
+    frame = SerialProtocol.encode_frequency(freq: 25000, duty: 150)
+    assert_match(/F:20000/, frame)
+    assert_match(/D:100/, frame)
+  end
+
+  def test_encode_frequency_clamps_below_min
+    frame = SerialProtocol.encode_frequency(freq: -100, duty: -10)
+    assert_match(/F:0/, frame)
+    assert_match(/D:0/, frame)
+  end
+
+  def test_encode_frequency_rounds_floats
+    frame = SerialProtocol.encode_frequency(freq: 440.7, duty: 50.3)
+    assert_match(/F:441/, frame)
+    assert_match(/D:50/, frame)
+  end
+
+  # --- Frequency frame decoding ---
+
+  def test_decode_frequency_valid_frame
+    result = SerialProtocol.decode_frequency("<F:440,D:50>")
+    assert_not_nil result
+    assert_equal 440, result[:frequency]
+    assert_equal 50, result[:duty]
+  end
+
+  def test_decode_frequency_boundary_values
+    result = SerialProtocol.decode_frequency("<F:0,D:0>")
+    assert_not_nil result
+    assert_equal 0, result[:frequency]
+    assert_equal 0, result[:duty]
+
+    result = SerialProtocol.decode_frequency("<F:20000,D:100>")
+    assert_not_nil result
+    assert_equal 20000, result[:frequency]
+    assert_equal 100, result[:duty]
+  end
+
+  def test_decode_frequency_nil_for_nil_input
+    assert_nil SerialProtocol.decode_frequency(nil)
+  end
+
+  def test_decode_frequency_nil_for_empty_string
+    assert_nil SerialProtocol.decode_frequency("")
+  end
+
+  def test_decode_frequency_nil_for_missing_markers
+    assert_nil SerialProtocol.decode_frequency("F:440,D:50>")
+    assert_nil SerialProtocol.decode_frequency("<F:440,D:50")
+  end
+
+  def test_decode_frequency_nil_for_wrong_field_count
+    assert_nil SerialProtocol.decode_frequency("<F:440>")
+    assert_nil SerialProtocol.decode_frequency("<F:440,D:50,X:1>")
+  end
+
+  def test_decode_frequency_nil_for_unknown_key
+    assert_nil SerialProtocol.decode_frequency("<F:440,X:50>")
+  end
+
+  def test_decode_frequency_nil_for_out_of_range
+    assert_nil SerialProtocol.decode_frequency("<F:20001,D:50>")
+    assert_nil SerialProtocol.decode_frequency("<F:440,D:101>")
+  end
+
+  def test_decode_frequency_nil_for_negative_value
+    assert_nil SerialProtocol.decode_frequency("<F:-1,D:50>")
+  end
+
+  def test_decode_frequency_nil_for_malformed_value
+    assert_nil SerialProtocol.decode_frequency("<F:abc,D:50>")
+    assert_nil SerialProtocol.decode_frequency("<F:440,D:12.5>")
+  end
+
+  def test_decode_frequency_nil_for_audio_level_frame
+    assert_nil SerialProtocol.decode_frequency("<L:255,B:128,M:64,H:0>")
+  end
+
+  # --- Frequency round-trip ---
+
+  def test_encode_decode_frequency_roundtrip
+    frame = SerialProtocol.encode_frequency(freq: 880, duty: 75)
+    decoded = SerialProtocol.decode_frequency(frame.strip)
+    assert_not_nil decoded
+    assert_equal 880, decoded[:frequency]
+    assert_equal 75, decoded[:duty]
+  end
+
+  # --- Mixed frame extraction ---
+
+  def test_extract_frames_frequency_frame
+    buffer = "<F:440,D:50>\n"
+    frames, remaining = SerialProtocol.extract_frames(buffer)
+    assert_equal 1, frames.length
+    assert_equal :frequency, frames[0][:type]
+    assert_equal 440, frames[0][:frequency]
+    assert_equal 50, frames[0][:duty]
+  end
+
+  def test_extract_frames_audio_level_has_type
+    buffer = "<L:128,B:64,M:32,H:0>\n"
+    frames, remaining = SerialProtocol.extract_frames(buffer)
+    assert_equal 1, frames.length
+    assert_equal :audio_level, frames[0][:type]
+    assert frames[0].key?(:level)
+  end
+
+  def test_extract_frames_mixed_frame_types
+    buffer = "<L:128,B:64,M:32,H:0>\n<F:440,D:50>\n<L:255,B:0,M:0,H:0>\n"
+    frames, remaining = SerialProtocol.extract_frames(buffer)
+    assert_equal 3, frames.length
+    assert_equal :audio_level, frames[0][:type]
+    assert_equal :frequency, frames[1][:type]
+    assert_equal :audio_level, frames[2][:type]
+    assert_equal 440, frames[1][:frequency]
+  end
+
+  def test_extract_frames_incomplete_frequency_frame_preserved
+    buffer = "<F:440,D:50>\n<F:88"
+    frames, remaining = SerialProtocol.extract_frames(buffer)
+    assert_equal 1, frames.length
+    assert_equal '<F:88', remaining
+  end
 end

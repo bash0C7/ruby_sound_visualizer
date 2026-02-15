@@ -12,9 +12,10 @@ class VJPad
 
   COLOR_NAMES = { 0 => 'gray', 1 => 'red', 2 => 'yellow', 3 => 'blue' }.freeze
 
-  def initialize(audio_input_manager = nil, serial_manager: nil)
+  def initialize(audio_input_manager = nil, serial_manager: nil, serial_audio_source: nil)
     @audio_input_manager = audio_input_manager
     @serial_manager = serial_manager
+    @serial_audio_source = serial_audio_source
     @history = []
     @last_result = nil
     @pending_actions = []
@@ -342,6 +343,45 @@ class VJPad
       @serial_manager.clear_tx_log
       "serial: logs cleared"
     end
+  end
+
+  # --- Serial Audio Commands ---
+
+  # sao [1/0] - serial audio on/off
+  def sao(val = :_get)
+    return "serial_audio: not available" unless @serial_audio_source
+    if val == :_get
+      return "serial_audio: #{@serial_audio_source.active? ? 'on' : 'off'}"
+    end
+    if val.to_i != 0
+      @serial_audio_source.start
+    else
+      @serial_audio_source.stop
+    end
+    "serial_audio: #{@serial_audio_source.active? ? 'on' : 'off'}"
+  end
+
+  # sav [0-100] - serial audio volume (percentage)
+  def sav(val = :_get)
+    return "serial_audio: not available" unless @serial_audio_source
+    if val == :_get
+      return "serial_audio vol: #{(@serial_audio_source.volume * 100).round}%"
+    end
+    @serial_audio_source.set_volume(val.to_f / 100.0)
+    "serial_audio vol: #{(@serial_audio_source.volume * 100).round}%"
+  end
+
+  # sai - serial audio info/status
+  def sai
+    return "serial_audio: not available" unless @serial_audio_source
+    @serial_audio_source.status
+  end
+
+  # sad - serial audio output device picker
+  def sad
+    return "serial_audio: not available" unless @serial_audio_source
+    JS.global.showSerialAudioDevicePicker()
+    "serial_audio: device picker opened"
   end
 
   # --- Plugin Discovery ---

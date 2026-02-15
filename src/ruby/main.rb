@@ -12,6 +12,7 @@ $bpm_estimator = nil
 $frame_counter = nil
 $vj_pad = nil
 $serial_manager = nil
+$serial_audio_source = nil
 $pen_input = nil
 $wordart_renderer = nil
 $frame_count = 0  # Kept for JSBridge debug logging throttle
@@ -45,9 +46,10 @@ begin
   $bpm_estimator = BPMEstimator.new
   $frame_counter = FrameCounter.new
   $serial_manager = SerialManager.new
+  $serial_audio_source = SerialAudioSource.new
   $pen_input = PenInput.new
   $wordart_renderer = WordartRenderer.new
-  $vj_pad = VJPad.new($audio_input_manager, serial_manager: $serial_manager)
+  $vj_pad = VJPad.new($audio_input_manager, serial_manager: $serial_manager, serial_audio_source: $serial_audio_source)
   VisualizerPolicy.register_devtool_callbacks
   SnapshotManager.register_callbacks
 
@@ -63,7 +65,15 @@ begin
   end
 
   JS.global[:rubySerialOnReceive] = lambda do |data|
-    $serial_manager.receive_data(data.to_s)
+    frames = $serial_manager.receive_data(data.to_s)
+    # Route frequency frames to serial audio source
+    if frames && $serial_audio_source
+      frames.each do |frame|
+        if frame[:type] == :frequency
+          $serial_audio_source.update(frame[:frequency], frame[:duty])
+        end
+      end
+    end
     # Update serial RX display
     last_line = $serial_manager.rx_log.last
     JS.global[:document].getElementById('serialRxDisplay')[:textContent] = last_line.to_s if last_line
@@ -153,6 +163,17 @@ begin
       if $vj_pad&.serial_auto_send? && $serial_manager&.connected?
         frame = $serial_manager.send_audio_frame(analysis)
         JS.global.serialSend(frame) if frame
+      end
+
+      # Serial audio: update PWM oscillator when frequency/duty changes
+      if $serial_audio_source&.pending_update?
+        sa_data = $serial_audio_source.consume_update
+        JS.global.updateSerialAudio(
+          sa_data[:frequency],
+          sa_data[:duty],
+          sa_data[:active] ? 1 : 0,
+          sa_data[:volume]
+        )
       end
 
       # Pen input: update fade-out and render strokes
