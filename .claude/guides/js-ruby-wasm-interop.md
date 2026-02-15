@@ -70,6 +70,10 @@ Serial and input glue:
 - `serialConnect`, `serialDisconnect`, `serialSend`
 - `toggleTabCapture`, `setMicMute`
 
+Serial audio output:
+- `updateSerialAudio(freq, duty, active, volume)` - Update PWM oscillator state
+- `showSerialAudioDevicePicker()` - Open audio output device picker
+
 ## Calling Ruby from JavaScript
 
 Ruby registers callbacks on `window` using lambdas.
