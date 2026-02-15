@@ -559,6 +559,8 @@
             try {
               const _cv = _perfWindow.document.getElementById('captureVideoMirror');
               if (_cv) { _cv.srcObject = videoEl.srcObject; _cv.play().catch(() => {}); }
+              const _to = _perfWindow.document.getElementById('tabOverlay');
+              if (_to) _to.style.display = 'block';
             } catch (_e) {}
           }
           console.log('[JS] Tab video overlay active');
@@ -609,6 +611,8 @@
         try {
           const _cv = _perfWindow.document.getElementById('captureVideoMirror');
           if (_cv) _cv.srcObject = null;
+          const _to = _perfWindow.document.getElementById('tabOverlay');
+          if (_to) _to.style.display = 'none';
         } catch (_e) {}
       }
       if (window.rubyOnTabToggle) window.rubyOnTabToggle(false);
@@ -639,6 +643,8 @@
           try {
             const _cv = _perfWindow.document.getElementById('captureVideoMirror');
             if (_cv) { _cv.srcObject = videoEl.srcObject; _cv.play().catch(() => {}); }
+            const _to = _perfWindow.document.getElementById('tabOverlay');
+            if (_to) _to.style.display = 'block';
           } catch (_e) {}
         }
         updateAudioSourceButtons('camera');
@@ -662,6 +668,8 @@
         try {
           const _cv = _perfWindow.document.getElementById('captureVideoMirror');
           if (_cv) _cv.srcObject = null;
+          const _to = _perfWindow.document.getElementById('tabOverlay');
+          if (_to) _to.style.display = 'none';
         } catch (_e) {}
       }
       updateAudioSourceButtons('mic');
@@ -973,7 +981,11 @@
 
     function broadcastState() {
       if (!_perfChannel) return;
-      const qs = window.location.search;
+      // Always include ov/vv even if URL params are missing (e.g. fresh load before any slider move)
+      const _bp = new URLSearchParams(window.location.search);
+      _bp.set('ov', capOverlayOpacity.toFixed(2));
+      _bp.set('vv', capVideoOpacity.toFixed(2));
+      const qs = '?' + _bp.toString();
       _perfChannel.postMessage({ type: 'state', qs });
     }
 
@@ -1044,7 +1056,12 @@
           const _checkCap = setInterval(() => {
             try {
               const _cv = w.document.getElementById('captureVideoMirror');
-              if (_cv) { _cv.srcObject = _capEl.srcObject; _cv.play().catch(() => {}); clearInterval(_checkCap); }
+              if (_cv) {
+                _cv.srcObject = _capEl.srcObject; _cv.play().catch(() => {});
+                const _to = w.document.getElementById('tabOverlay');
+                if (_to) _to.style.display = 'block';
+                clearInterval(_checkCap);
+              }
             } catch (_e) {}
           }, 100);
           setTimeout(() => clearInterval(_checkCap), 5000);
@@ -1636,7 +1653,18 @@
           const _mirrorVideo = document.getElementById('perfMirror');
           if (_mirrorVideo) _mirrorVideo.style.display = 'block';
           const _captureVideoMirror = document.getElementById('captureVideoMirror');
-          if (_captureVideoMirror) _captureVideoMirror.style.display = 'block';
+          if (_captureVideoMirror) {
+            _captureVideoMirror.style.display = 'block';
+            // If srcObject was already set before display:block (by _checkCap), replay now
+            if (_captureVideoMirror.srcObject && _captureVideoMirror.paused) {
+              _captureVideoMirror.play().catch(() => {});
+            }
+          }
+          // Fix z-index so tabOverlay sits above captureVideoMirror and below perfMirror
+          const _tabOverlayEl = document.getElementById('tabOverlay');
+          if (_tabOverlayEl) { _tabOverlayEl.style.zIndex = '1'; }
+          const _perfMirrorEl = document.getElementById('perfMirror');
+          if (_perfMirrorEl) { _perfMirrorEl.style.zIndex = '2'; }
           if (renderer && renderer.domElement) renderer.domElement.style.display = 'none';
           console.log('[JS] Performance view mode active');
           // Show Perf View command display overlay
@@ -1649,21 +1677,25 @@
           // BroadcastChannel receiver
           _perfChannel = new BroadcastChannel('visualizer-sync');
           _perfChannel.addEventListener('message', (e) => {
-            if (e.data.type === 'state' && window.rubySnapshotApply) {
-              const _snapRaw = String(window.rubySnapshotApply(e.data.qs) || '');
-              if (_snapRaw) {
-                try {
-                  const _cam = JSON.parse(_snapRaw);
-                  SLIDER_GROUPS['Camera'][0].setter(_cam.cr);
-                  SLIDER_GROUPS['Camera'][1].setter(_cam.cth);
-                  SLIDER_GROUPS['Camera'][2].setter(_cam.cph);
-                } catch (_e) {}
-              }
+            if (e.data.type === 'state') {
+              // Apply ov/vv regardless of Ruby load state
               const _p = new URLSearchParams(e.data.qs);
               const _ov = parseFloat(_p.get('ov'));
               const _vv = parseFloat(_p.get('vv'));
               if (!isNaN(_ov)) { capOverlayOpacity = _ov; document.getElementById('tabOverlay').style.opacity = _ov; }
-              if (!isNaN(_vv)) { capVideoOpacity = _vv; document.getElementById('tabVideo').style.opacity = _vv; }
+              if (!isNaN(_vv)) { capVideoOpacity = _vv; document.getElementById('captureVideoMirror').style.opacity = _vv; }
+              // Apply camera snapshot only when Ruby is ready
+              if (window.rubySnapshotApply) {
+                const _snapRaw = String(window.rubySnapshotApply(e.data.qs) || '');
+                if (_snapRaw) {
+                  try {
+                    const _cam = JSON.parse(_snapRaw);
+                    SLIDER_GROUPS['Camera'][0].setter(_cam.cr);
+                    SLIDER_GROUPS['Camera'][1].setter(_cam.cth);
+                    SLIDER_GROUPS['Camera'][2].setter(_cam.cph);
+                  } catch (_e) {}
+                }
+              }
             }
             if (e.data.type === 'vj_log' && e.data.cmd) {
               const _disp = document.getElementById('perfCmdDisplay');
