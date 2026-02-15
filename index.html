@@ -555,6 +555,12 @@
           if (renderer && renderer.domElement) {
             renderer.domElement.style.mixBlendMode = 'screen';
           }
+          if (_perfWindow && !_perfWindow.closed) {
+            try {
+              const _cv = _perfWindow.document.getElementById('captureVideoMirror');
+              if (_cv) { _cv.srcObject = videoEl.srcObject; _cv.play().catch(() => {}); }
+            } catch (_e) {}
+          }
           console.log('[JS] Tab video overlay active');
         }
 
@@ -565,12 +571,6 @@
 
         document.getElementById('cpSrcTab')?.classList.add('active');
         document.getElementById('cpCaptureTabBtn')?.classList.add('active');
-        if (_perfWindow && !_perfWindow.closed) {
-          try {
-            const _cv = _perfWindow.document.getElementById('captureVideoMirror');
-            if (_cv) { _cv.srcObject = videoEl.srcObject; _cv.play().catch(() => {}); }
-          } catch (_e) {}
-        }
         if (window.rubyOnTabToggle) window.rubyOnTabToggle(true);
         console.log('[JS] Tab capture started');
       } catch (error) {
@@ -979,9 +979,17 @@
 
     // Open performance view window (single/multi monitor)
     async function togglePerfView() {
-      // If already open, focus existing window
+      // If already open, close it and toggle off
       if (_perfWindow && !_perfWindow.closed) {
-        _perfWindow.focus();
+        _perfWindow.close();
+        _perfWindow = null;
+        document.getElementById('cpPerfViewBtn')?.classList.remove('active');
+        return;
+      }
+      // If window was closed externally, just clear state and toggle off
+      if (_perfWindow && _perfWindow.closed) {
+        _perfWindow = null;
+        document.getElementById('cpPerfViewBtn')?.classList.remove('active');
         return;
       }
 
