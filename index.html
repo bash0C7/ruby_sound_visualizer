@@ -828,6 +828,7 @@
     let _serialGain = null;
     let _serialOutputGain = null;
     let _serialAudioActive = false;
+    let _serialAudioVolume = 30;
 
     // Create PWM-like PeriodicWave from duty cycle (0-100)
     function createPWMWave(dutyCycle) {
@@ -877,6 +878,15 @@
 
     // Called from Ruby each frame when serial audio state changes
     window.updateSerialAudio = function(freq, duty, active, volume) {
+      // Sync slider display when volume changes from Ruby side
+      const volPercent = Math.round(volume * 100);
+      if (volPercent !== _serialAudioVolume) {
+        _serialAudioVolume = volPercent;
+        const slider = document.getElementById('cpSlider_serial_audio_volume');
+        const valEl = document.getElementById('cpVal_serial_audio_volume');
+        if (slider) slider.value = volPercent;
+        if (valEl) valEl.textContent = volPercent;
+      }
       if (active && freq > 0) {
         if (!_serialAudioActive) {
           startSerialAudio(freq, duty, volume);
@@ -1929,6 +1939,11 @@
         { key: 'cap_video_opacity', label: 'Video Opacity', min: 0, max: 1, step: 0.01, default: 1.0,
           setter: v => { capVideoOpacity = v; document.getElementById('tabVideo').style.opacity = v; },
           getter: () => capVideoOpacity },
+      ],
+      'Serial Audio': [
+        { key: 'serial_audio_volume', label: 'PWM Volume', min: 0, max: 100, step: 1, default: 30,
+          setter: v => { _serialAudioVolume = v; if (window.rubyExecPrompt) window.rubyExecPrompt('sav ' + Math.round(v)); },
+          getter: () => _serialAudioVolume },
       ],
     };
 
