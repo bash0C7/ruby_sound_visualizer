@@ -61,3 +61,6 @@ build-iPhoneSimulator/
 # Rake server task files
 server.pid
 server.log
+
+# macOS Finder metadata
+.DS_Store
