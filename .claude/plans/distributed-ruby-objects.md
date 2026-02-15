@@ -14,7 +14,7 @@ independent of the existing visualizer's SerialProtocol/SerialManager.
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
 | Library structure | Standalone | Reusable, separate transport layer, integrate later |
-| PicoRuby compatibility | Shared interface definition | Static method/var declarations, no metaprogramming |
+| PicoRuby compatibility | Shared interface definition | Static method/var declarations; dual strategy for metaprogramming |
 | Call semantics | Synchronous | PicoRuby: blocking UART wait. Browser: Fiber-based pseudo-sync |
 | Initial scope (v0.1) | RPC + variable sharing | Method calls + instance variable get/set |
 | Serialization | Minimal JSON subset | No gems needed, hand-written parser for both platforms |
@@ -154,7 +154,7 @@ Top-level commas in strings must be escaped or the string must be quoted.
 ## Shared Interface Definition
 
 Both sides load the same interface module to declare available methods and
-variables. This enables static dispatch without metaprogramming.
+variables. This enables static dispatch and validation on both platforms.
 
 ### Interface DSL
 
@@ -175,6 +175,17 @@ module LedService
   dro_var :colors,      type: :array
 end
 ```
+
+### Loading Interface on Each Platform
+
+| Platform | Method | Notes |
+|----------|--------|-------|
+| ruby.wasm (browser) | `require 'shared/led_service'` | Bundled in src/ruby/, loaded at startup |
+| PicoRuby (mrbgem) | `require 'led_service'` | Interface file included in mrbgem, require works |
+| PicoRuby (hardcoded) | Copy-paste into source | Fallback: inline the module definition directly |
+
+The interface file uses only basic Ruby (module, include, method calls with
+symbol/array args) — no syntax that would differ between CRuby and PicoRuby.
 
 ### Server Side (Object Host)
 
@@ -227,22 +238,55 @@ led.brightness                # → Get: {G|4|led|brightness}
 led.brightness = 200          # → Put: {P|6|led|brightness|200}
 ```
 
-### How the Proxy Works (PicoRuby Compatible)
+### How the Proxy Works (Dual Strategy)
 
-Since PicoRuby likely lacks `method_missing` and `define_method`, the
-interface module generates methods at `include` time using class_eval or
-equivalent. If even that is unavailable, fall back to explicit `call` API:
+The proxy has two strategies depending on platform metaprogramming support.
+Both strategies are implemented; runtime detection selects the appropriate one.
+
+#### Strategy A: Generated Methods (when class_eval/define_method available)
+
+When `class_eval` or `define_method` is available (CRuby, ruby.wasm, and
+possibly PicoRuby), the interface module generates real methods on the
+proxy class at `include` time:
 
 ```ruby
-# Fallback explicit API (always works)
+# Interface DSL internally does:
+# define_method(:set_color) { |*args| call(:set_color, *args) }
+# define_method(:brightness) { get_var(:brightness) }
+# define_method(:brightness=) { |v| set_var(:brightness, v) }
+
+led = @node.proxy("led", LedService)
+led.set_color(255, 0, 128)    # generated method → RPC call
+led.brightness                  # generated getter → variable get
+led.brightness = 200            # generated setter → variable set
+```
+
+#### Strategy B: Explicit call API (when metaprogramming unavailable)
+
+When `define_method` is not available, the proxy provides an explicit API
+that requires no metaprogramming:
+
+```ruby
 led = @node.proxy("led", LedService)
 led.call(:set_color, 255, 0, 128)
 led.get_var(:brightness)
 led.set_var(:brightness, 200)
 ```
 
-The interface definition provides validation: calling an undeclared method
-or setting an undeclared variable raises an error locally before sending.
+#### Detection
+
+```ruby
+# In MicroDRb::Proxy or Interface
+METAPROGRAMMING_AVAILABLE = begin
+  Module.method_defined?(:define_method)
+rescue
+  false
+end
+```
+
+Both strategies validate against the interface definition: calling an
+undeclared method or accessing an undeclared variable raises an error
+locally before sending any frame.
 
 ## Component Design
 
@@ -456,7 +500,6 @@ Deliverables:
 
 ### Future (v0.4+)
 
-- Proxy method generation (if PicoRuby supports define_method)
 - Change notification / observer pattern for shared variables
 - Batch calls (multiple RPC in single frame)
 - Binary encoding option for performance
@@ -466,10 +509,11 @@ Deliverables:
 
 | Risk | Impact | Mitigation |
 |------|--------|------------|
-| PicoRuby lacks Fiber | Blocking client still works | PicoRuby uses simple blocking UART wait |
-| PicoRuby lacks define_method | No generated proxy methods | Explicit call() API as fallback |
-| Frame exceeds UART buffer | Truncated messages | Length limit check + error response |
-| Serial latency > 100ms | Slow RPC round-trip | Timeout mechanism, async option for non-critical calls |
+| PicoRuby lacks Fiber | Blocking client still works | PicoRuby uses simple blocking UART wait (not Fiber) |
+| PicoRuby lacks define_method | No generated proxy methods | Dual strategy: detect at runtime, fall back to call() API |
+| PicoRuby has define_method | Need to test compatibility | Strategy A auto-enabled; interface DSL generates methods |
+| Frame exceeds 256-byte UART buffer | Truncated messages | Length limit check + error response; 256 bytes safe on ESP32 |
+| Serial latency > 100ms | Slow RPC round-trip | Default 1000ms timeout, configurable per-call |
 | ruby.wasm Fiber edge cases | Yield from wrong context | Clear documentation, context validation |
 | Frame delimiter collision | Parse errors | `{...}` distinct from `<...>`, escape `}` in strings |
 | Concurrent requests from both sides | Interleaved frames | Frame extraction handles interleaving, msg_id matching |
@@ -508,13 +552,15 @@ end
 
 Both protocols share the same physical serial connection without conflict.
 
-## Open Questions
+## Resolved Questions
 
-1. Does PicoRuby support `class_eval` or `define_method`? If yes, proxy
-   can generate methods from interface at include time. If no, explicit
-   call() API is the only option.
-2. Maximum UART buffer size on ESP32 for PicoRuby? Need to verify 256-byte
-   buffer is safe.
-3. Should interface definitions live in a shared/ directory or be defined
-   inline? Depends on how PicoRuby loads files (require support).
-4. Timeout default: 500ms? 1000ms? Needs tuning with real hardware.
+1. **PicoRuby class_eval/define_method support**: Unknown at design time.
+   Dual strategy implemented: detect at runtime. Strategy A (generated methods)
+   when available, Strategy B (explicit call API) as fallback. Both are
+   first-class supported paths with full test coverage.
+2. **ESP32 UART buffer size**: 256 bytes confirmed safe. ESP32 has ~520KB SRAM.
+3. **Interface definition loading**: PicoRuby supports require via mrbgem
+   inclusion. Hardcoding (copy-paste into source) is also an option.
+   Interface files use only basic Ruby syntax for cross-platform compatibility.
+4. **Timeout default**: 1000ms. Configurable per-call for latency-sensitive
+   operations. Can be tuned with real hardware in v0.2+.
