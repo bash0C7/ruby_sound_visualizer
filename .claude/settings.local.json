@@ -24,7 +24,8 @@
       "Bash(gh pr list:*)",
       "Bash(gh pr checkout:*)",
       "Bash(git checkout:*)",
-      "WebFetch(domain:bash0c7.github.io)"
+      "WebFetch(domain:bash0c7.github.io)",
+      "Bash(git fetch:*)"
     ]
   }
 }
