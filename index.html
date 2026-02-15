@@ -57,38 +57,6 @@
       font-size: 12px;
       color: #888;
     }
-    /* VJ Pad prompt overlay */
-    #vjPrompt {
-      display: none;
-      position: fixed;
-      bottom: 55px;
-      left: 20px;
-      right: 20px;
-      z-index: 60;
-      font-family: monospace;
-      font-size: 12px;
-    }
-    #vjPrompt.active { display: flex; align-items: center; gap: 6px; }
-    #vjPromptInput {
-      flex: 1;
-      background: rgba(0, 0, 0, 0.25);
-      color: #0f0;
-      border: none;
-      border-radius: 3px;
-      padding: 4px 8px;
-      font-family: monospace;
-      font-size: 12px;
-      outline: none;
-    }
-    #vjPromptInput::placeholder { color: #060; }
-    #vjPromptResult {
-      color: #0f0;
-      white-space: nowrap;
-      max-width: 40%;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    #vjPromptResult.error { color: #f44; }
     /* Control Panel overlay */
     #controlPanel {
       display: none;
@@ -104,7 +72,7 @@
       z-index: 80;
       overflow-y: auto;
       border-left: 1px solid #333;
-      padding: 8px 12px;
+      padding: 6px 10px;
       box-sizing: border-box;
     }
     #controlPanel.active { display: block; }
@@ -134,12 +102,12 @@
     #controlPanel .cp-close:hover { color: #fff; border-color: #fff; }
     #controlPanel #cpResetBtn:hover { background: #f44; color: #000; border-color: #f44; }
     #controlPanel .cp-group {
-      margin-bottom: 10px;
+      margin-bottom: 5px;
     }
     #controlPanel .cp-group-title {
       color: #0cc;
       font-size: 11px;
-      margin: 0 0 4px 0;
+      margin: 0 0 2px 0;
       cursor: pointer;
       user-select: none;
     }
@@ -148,7 +116,7 @@
       display: flex;
       align-items: center;
       gap: 4px;
-      margin-bottom: 3px;
+      margin-bottom: 1px;
     }
     #controlPanel .cp-label {
       width: 100px;
@@ -167,7 +135,7 @@
     }
     #controlPanel input[type="range"] {
       flex: 1;
-      height: 14px;
+      height: 10px;
       -webkit-appearance: none;
       appearance: none;
       background: #333;
@@ -178,7 +146,7 @@
       -webkit-appearance: none;
       appearance: none;
       width: 10px;
-      height: 14px;
+      height: 10px;
       background: #0f0;
       border-radius: 2px;
       cursor: pointer;
@@ -186,8 +154,8 @@
     #controlPanel .cp-actions {
       display: flex;
       gap: 6px;
-      margin-top: 8px;
-      padding-top: 8px;
+      margin-top: 4px;
+      padding-top: 4px;
       border-top: 1px solid #444;
     }
     #controlPanel .cp-btn {
@@ -231,6 +199,12 @@
   <!-- Perf View mirror: shows VJ canvas stream in performance window -->
   <video id="perfMirror" autoplay playsinline
          style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;object-fit:cover;z-index:1;background:#000"></video>
+  <!-- Perf View command display overlay -->
+  <div id="perfCmdDisplay"
+       style="display:none;position:fixed;bottom:20px;left:20px;
+              font-family:monospace;font-size:12px;color:#0f0;
+              background:rgba(0,0,0,0.5);padding:4px 10px;border-radius:3px;
+              z-index:10;max-width:80%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></div>
   <div id="tabOverlay"
        style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:-1;"></div>
 
@@ -250,7 +224,7 @@
     <div class="cp-group" id="cpColorGroup">
       <div class="cp-group-title">Color</div>
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-        <canvas id="hueWheel" width="120" height="120"
+        <canvas id="hueWheel" width="80" height="80"
                 style="cursor:crosshair;flex-shrink:0;"></canvas>
         <div>
           <div style="color:#aaa;font-size:10px;">Hue</div>
@@ -273,6 +247,33 @@
       </div>
     </div>
     <div id="cpSliders"></div>
+    <div class="cp-group" id="cpVJPadGroup" style="border-top:1px solid #444;padding-top:6px;">
+      <div class="cp-group-title">VJ Pad</div>
+      <div style="display:flex;gap:3px;margin-bottom:3px;">
+        <input id="cpVJInput" type="text" placeholder="c 1; s 2.0; wa text"
+               autocomplete="off" spellcheck="false"
+               style="flex:1;background:rgba(0,0,0,0.25);color:#0f0;border:none;border-radius:3px;
+                      padding:2px 6px;font-family:monospace;font-size:10px;outline:none;">
+        <button class="cp-btn" id="cpVJExecBtn"
+                style="flex:0 0 auto;padding:2px 8px;font-size:10px;">Go</button>
+      </div>
+      <span id="vjPromptResult"
+            style="color:#0f0;font-size:9px;font-family:monospace;display:block;
+                   min-height:12px;margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+      <div style="display:flex;align-items:center;gap:4px;margin-bottom:3px;">
+        <span style="color:#888;font-size:9px;flex-shrink:0;">param:</span>
+        <input id="cpVJParam" type="text" value="1.0"
+               style="width:44px;background:rgba(0,0,0,0.25);color:#0f0;border:none;border-radius:3px;
+                      padding:2px 4px;font-family:monospace;font-size:10px;outline:none;text-align:center;">
+      </div>
+      <div style="display:flex;gap:3px;flex-wrap:wrap;">
+        <button class="cp-btn cp-vj-btn" data-cmd="burst"     style="flex:1;padding:2px 0;font-size:9px;">burst</button>
+        <button class="cp-btn cp-vj-btn" data-cmd="flash"     style="flex:1;padding:2px 0;font-size:9px;">flash</button>
+        <button class="cp-btn cp-vj-btn" data-cmd="shockwave" style="flex:1;padding:2px 0;font-size:9px;">shock</button>
+        <button class="cp-btn cp-vj-btn" data-cmd="strobe"    style="flex:1;padding:2px 0;font-size:9px;">strobe</button>
+        <button class="cp-btn cp-vj-btn" data-cmd="rave"      style="flex:1;padding:2px 0;font-size:9px;">rave</button>
+      </div>
+    </div>
     <div class="cp-actions">
       <button class="cp-btn" id="cpLoadVrmBtn" title="Toggle VRM (Alt+V)">VRM</button>
       <button class="cp-btn" id="cpCaptureTabBtn" title="Toggle Tab Capture (Alt+T)">Capture Tab</button>
@@ -287,6 +288,7 @@
         <option value="38400">38400</option>
       </select>
       <label style="margin-left:4px;"><input type="checkbox" id="cpSerialAuto" style="margin-right:2px;">Auto TX</label>
+      <span id="serialRxDisplay" style="color:#0ff;font-size:10px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-left:4px;display:block;"></span>
     </div>
     <div class="cp-audio-source" id="cpAudioSource" style="display:flex;align-items:center;gap:4px;padding:4px 8px;border-top:1px solid #444;margin-top:4px;">
       <span style="color:#888;font-size:10px;">Audio:</span>
@@ -294,12 +296,6 @@
       <button class="cp-btn cp-src-btn" id="cpSrcCamera" style="padding:2px 6px;font-size:10px;">Cam Mic</button>
       <button class="cp-btn cp-src-btn" id="cpSrcTab" style="padding:2px 6px;font-size:10px;">Tab</button>
     </div>
-  </div>
-  <div id="vjPrompt">
-    <span style="color: #0f0;">&gt;</span>
-    <input id="vjPromptInput" type="text" placeholder="c 1; s 2.0; bm 4.0" autocomplete="off" spellcheck="false">
-    <span id="vjPromptResult"></span>
-    <span id="serialRxDisplay" style="color:#0ff;font-size:10px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
   </div>
   <div id="status">
     <div style="line-height: 1.0;"><span id="fpsCounter">FPS: 0</span>  |  <span id="paramInfo"></span></div>
@@ -1553,7 +1549,7 @@
 
         // Pen input mouse event handlers (delegate to Ruby PenInput)
         document.addEventListener('mousedown', (e) => {
-          if (e.target.closest('#controlPanel') || e.target.closest('#vjPrompt')) return;
+          if (e.target.closest('#controlPanel')) return;
           if (window.rubyPenDown) window.rubyPenDown(e.clientX, e.clientY, e.buttons);
           _penCanvas.style.pointerEvents = 'auto';
         });
@@ -1577,13 +1573,12 @@
           if (_mirrorVideo) _mirrorVideo.style.display = 'block';
           if (renderer && renderer.domElement) renderer.domElement.style.display = 'none';
           console.log('[JS] Performance view mode active');
+          // Show Perf View command display overlay
+          const _perfCmd = document.getElementById('perfCmdDisplay');
+          if (_perfCmd) _perfCmd.style.display = 'block';
           // Hide all UI overlays: control panel, VJ prompt, status/FPS/debug info
           document.getElementById('controlPanel').style.display = 'none';
           document.getElementById('status').style.display = 'none';
-          const vjInputEl = document.getElementById('vjPromptInput');
-          if (vjInputEl) vjInputEl.style.display = 'none';
-          const vjPromptEl = document.getElementById('vjPrompt');
-          if (vjPromptEl) { vjPromptEl.style.display = 'none'; vjPromptEl.style.pointerEvents = 'none'; }
 
           // BroadcastChannel receiver
           _perfChannel = new BroadcastChannel('visualizer-sync');
@@ -1605,8 +1600,12 @@
               if (!isNaN(_vv)) { capVideoOpacity = _vv; document.getElementById('tabVideo').style.opacity = _vv; }
             }
             if (e.data.type === 'vj_log' && e.data.cmd) {
-              const vjResult = document.getElementById('vjPromptResult');
-              if (vjResult) vjResult.textContent = '> ' + e.data.cmd + (e.data.result ? ' → ' + e.data.result : '');
+              const _disp = document.getElementById('perfCmdDisplay');
+              if (_disp) {
+                _disp.textContent = '> ' + e.data.cmd + (e.data.result ? ' → ' + e.data.result : '');
+                clearTimeout(_disp._clearTimer);
+                _disp._clearTimer = setTimeout(() => { _disp.textContent = ''; }, 3000);
+              }
             }
           });
           console.log('[JS] BroadcastChannel receiver started');
@@ -1617,6 +1616,54 @@
         buildControlPanel();
         document.getElementById('controlPanel').classList.add('active');
         controlPanelOpen = true;
+
+        // VJ Pad section: minimal JS, all logic delegated to window.rubyExecPrompt (Ruby)
+        const vjResult = document.getElementById('vjPromptResult');
+        const vjHistory = [];
+        let vjHistoryIdx = -1;
+
+        function vjExec(cmd) {
+          cmd = (cmd || '').trim();
+          if (!cmd) return;
+          vjHistory.unshift(cmd);
+          if (vjHistory.length > 50) vjHistory.pop();
+          vjHistoryIdx = -1;
+          let result = '';
+          if (window.rubyExecPrompt) {
+            try { result = window.rubyExecPrompt(cmd); } catch (e) { result = 'ERR: ' + e.message; }
+          } else { result = 'ERR: Ruby VM not ready'; }
+          const isErr = typeof result === 'string' && result.startsWith('ERR:');
+          vjResult.textContent = result || '';
+          vjResult.style.color = isErr ? '#f44' : '#0f0';
+          if (_perfChannel) _perfChannel.postMessage({ type: 'vj_log', cmd, result: String(result || '') });
+          clearTimeout(vjResult._clearTimer);
+          vjResult._clearTimer = setTimeout(() => { vjResult.textContent = ''; vjResult.style.color = '#0f0'; }, 3000);
+        }
+
+        const cpVJInput = document.getElementById('cpVJInput');
+        cpVJInput.addEventListener('keydown', function(e) {
+          e.stopPropagation();
+          if (e.key === 'Enter') { vjExec(this.value); this.value = ''; }
+          else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (vjHistory.length > 0 && vjHistoryIdx < vjHistory.length - 1) {
+              vjHistoryIdx++; this.value = vjHistory[vjHistoryIdx];
+            }
+          } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (vjHistoryIdx > 0) { vjHistoryIdx--; this.value = vjHistory[vjHistoryIdx]; }
+            else { vjHistoryIdx = -1; this.value = ''; }
+          }
+        });
+        document.getElementById('cpVJExecBtn').addEventListener('click', () => {
+          vjExec(cpVJInput.value); cpVJInput.value = '';
+        });
+        document.querySelectorAll('.cp-vj-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const param = document.getElementById('cpVJParam').value.trim();
+            vjExec(param ? btn.dataset.cmd + ' ' + param : btn.dataset.cmd);
+          });
+        });
 
         // Apply URL snapshot before audio init (restores Ruby params + camera)
         const _snapRaw = String(window.rubySnapshotApply?.(window.location.search) || '');
@@ -1672,86 +1719,9 @@
       document.removeEventListener('click', resumeAudio);
     });
 
-    // VJ Pad prompt management
-    const vjPrompt = document.getElementById('vjPrompt');
-    const vjInput = document.getElementById('vjPromptInput');
-    const vjResult = document.getElementById('vjPromptResult');
-    const vjHistory = [];
-    let vjHistoryIdx = -1;
-    let vjPromptOpen = false;
-
-    function vjPromptToggle() {
-      vjPromptOpen = !vjPromptOpen;
-      if (vjPromptOpen) {
-        vjPrompt.classList.add('active');
-        vjInput.value = '';
-        vjResult.textContent = '';
-        vjResult.className = '';
-        vjHistoryIdx = -1;
-        vjInput.focus();
-      } else {
-        vjPrompt.classList.remove('active');
-        vjInput.blur();
-      }
-    }
-
-    function vjPromptExec() {
-      const cmd = vjInput.value.trim();
-      if (!cmd) return;
-      vjHistory.unshift(cmd);
-      if (vjHistory.length > 50) vjHistory.pop();
-      vjHistoryIdx = -1;
-      let result = '';
-      if (window.rubyExecPrompt) {
-        try { result = window.rubyExecPrompt(cmd); } catch (e) { result = 'ERR: ' + e.message; }
-      } else {
-        result = 'ERR: Ruby VM not ready';
-      }
-      const isErr = typeof result === 'string' && result.startsWith('ERR:');
-      vjResult.textContent = result || '';
-      vjResult.className = isErr ? 'error' : '';
-      vjInput.value = '';
-      if (_perfChannel) _perfChannel.postMessage({ type: 'vj_log', cmd, result: String(result || '') });
-      // Auto-clear result after 3s
-      clearTimeout(vjResult._clearTimer);
-      vjResult._clearTimer = setTimeout(() => {
-        vjResult.textContent = '';
-        vjResult.className = '';
-      }, 3000);
-    }
-
-    // Prompt input key handling
-    vjInput.addEventListener('keydown', function(e) {
-      e.stopPropagation();
-      if (e.key === 'Enter') { vjPromptExec(); }
-      else if (e.key === 'Escape' || e.key === '`') { e.preventDefault(); vjPromptToggle(); }
-      else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        if (vjHistory.length > 0 && vjHistoryIdx < vjHistory.length - 1) {
-          vjHistoryIdx++;
-          vjInput.value = vjHistory[vjHistoryIdx];
-        }
-      } else if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        if (vjHistoryIdx > 0) { vjHistoryIdx--; vjInput.value = vjHistory[vjHistoryIdx]; }
-        else { vjHistoryIdx = -1; vjInput.value = ''; }
-      }
-    });
-
     // Keyboard handler: Ruby handles config/color keys, JS handles camera (WebGL direct)
     window.addEventListener('keydown', function(event) {
-      // When prompt is open, restore focus if lost, then let input handler process the key
-      if (vjPromptOpen) {
-        if (document.activeElement !== vjInput) {
-          vjInput.focus();
-        }
-        return;
-      }
-
       const key = event.key;
-
-      // Backtick toggles VJ Pad prompt
-      if (key === '`') { event.preventDefault(); vjPromptToggle(); return; }
 
       // Control panel toggle (disabled in perf view)
       if (key === 'p' && !IS_PERF_VIEW) { toggleControlPanel(); return; }
@@ -1854,8 +1824,8 @@
       const ctx = canvas.getContext('2d');
       const cx = canvas.width / 2;
       const cy = canvas.height / 2;
-      const outerR = 56;
-      const innerR = 34;
+      const outerR = 37;
+      const innerR = 22;
 
       function drawWheel(currentHue) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
