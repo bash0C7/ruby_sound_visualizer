@@ -61,6 +61,8 @@ Real-time audio visualizer that analyzes microphone input and generates vivid 3D
 6. Apply minimal fix
 7. Verify with Chrome MCP tools
 
+**Key rules**: max 3 hypotheses, verify one at a time, use `console.log` to confirm facts before fixing.
+
 See [.claude/INVESTIGATION-PROTOCOL.md](.claude/INVESTIGATION-PROTOCOL.md) for detailed workflow.
 
 ### Browser Testing & Debugging

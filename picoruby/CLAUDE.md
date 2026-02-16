@@ -62,6 +62,49 @@ led.show_hsb_hex(index, hue, saturation, brightness)
 led.show  # flush to hardware
 ```
 
+## PicoRuby Compatibility Restrictions
+
+PicoRuby (mruby-based) has a limited subset of Ruby. Always check compatibility before use.
+
+### Prohibited Methods / Syntax
+
+| Feature | Status | Alternative |
+|---------|--------|-------------|
+| `defined?` | NOT supported | Use explicit nil check: `if var != nil` |
+| `Hash#fetch` | NOT supported | Use `hash[key] \|\| default` |
+| `String#reverse` | NOT supported | Manual loop |
+| `String#rjust` | NOT supported | Manual padding with `" " * (n - str.length) + str` |
+| Inline `rescue` | NOT supported | Use full `begin/rescue/end` block |
+| `proc` / `lambda` | NOT supported | Use method definitions |
+| `Comparable` module | NOT supported | Implement comparison methods directly |
+
+### Safe Patterns
+
+```ruby
+# nil check (NOT defined?)
+if value != nil
+  # use value
+end
+
+# Hash default (NOT Hash#fetch)
+result = hash[key] || "default"
+
+# String padding (NOT rjust)
+padded = (" " * (3 - val.to_s.length)) + val.to_s
+
+# Error handling (NOT inline rescue)
+begin
+  risky_operation
+rescue => e
+  handle_error
+end
+```
+
+### Build Verification
+
+Human-operated: build PicoRuby firmware using R2P2 toolchain to verify syntax compatibility.
+Syntax errors may only appear at build time, not from standard `ruby -c`.
+
 ## Build and Flash
 
 Human-operated: build and flash PicoRuby firmware using R2P2 toolchain. Claude Code does not execute build/flash commands.
