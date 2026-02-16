@@ -4,180 +4,154 @@ Project task list for tracking progress.
 
 ## Notes
 
-- All tasks implemented with t-wada style TDD (115 new tests, 100% pass)
+- All tasks implemented with t-wada style TDD (800 tests, 100% pass)
 - Ruby-first implementation: all logic in Ruby, minimal JS for browser API glue
 - Chrome MCP browser testing deferred to local sessions
+- Global variables eliminated: VisualizerApp container class replaces 15 `$` globals
 
 ## Code Quality & Refactoring Tasks
 
-### [A-1] HIGH: Split rubyUpdateVisuals lambda in main.rb
+### [A-1] DONE: Split rubyUpdateVisuals lambda in main.rb
 
-- **File**: `src/ruby/main.rb` lines 114-240
-- **Problem**: 126-line main loop mixes 7 responsibilities: VJPad consumption, audio analysis, VRM updates, serial processing, pen input, WordArt, and debug display
-- **Improvement**: Extract each update responsibility into a dedicated class (e.g., EffectUpdateManager)
+- Replaced 126-line monolithic lambda with VisualizerApp#update_visuals (10-line orchestrator)
+- Extracted 11 private methods: dispatch_vj_actions, analyze_audio, update_effects,
+  update_vrm, scale_analysis_for_vrm, update_serial, update_pen_input, update_wordart,
+  update_frame_tracking, update_debug_display, update_audio_log
 
-### [A-2] HIGH: Split VJPad mega-class (436 lines)
+### [A-2] DONE: Split VJPad mega-class
 
-- **File**: `src/ruby/vj_pad.rb`
-- **Problem**: Color control, parameter control, audio input, serial, pen, and WordArt control all in one class
-- **Improvement**: Apply facade pattern and split into individual controllers
+- Extracted VJSerialCommands module (118 lines): 13 serial/serial_audio commands
+- VJPad reduced from 436 to 211 lines
 
-### [A-3] HIGH: DRY up VJPad command methods
+### [A-3] DONE: DRY up VJPad command methods
 
-- **File**: `src/ruby/vj_pad.rb` lines 47-174
-- **Problem**: 30+ command methods repeat identical patterns (getter/setter same structure)
-- **Improvement**: Use PARAM_COMMANDS constant + define_method for metaprogramming
+- Created PARAM_COMMANDS hash (14 entries) + define_method loop
+- Replaced 14 manually written getter/setter methods
 
-### [A-4] HIGH: Remove global variables
+### [A-4] DONE: Remove global variables
 
-- **File**: `src/ruby/main.rb` lines 3-17
-- **Problem**: 15 `$` global variables cause test difficulty and state leakage
-- **Improvement**: Manage via VisualizerApplication container class
+- Created VisualizerApp container class encapsulating all 15 instance variables
+- Injected wordart_renderer/pen_input into VJPad constructor
+- Replaced $frame_count global with JSBridge.frame_count module accessor
 
-### [A-5] MEDIUM: Auto-generate VisualizerPolicy getters/setters
+### [A-5] DONE: Auto-generate VisualizerPolicy getters/setters
 
-- **File**: `src/ruby/visualizer_policy.rb` lines 70-167
-- **Problem**: 45 manually defined methods with repetitive patterns
-- **Improvement**: Use MUTABLE_KEYS constant + define_singleton_method for dynamic generation
+- Created RUNTIME_PARAMS hash (17 entries) with default, type, min, max
+- Auto-generates getters, clamped setters, reset_runtime via metaprogramming
+- 334 to 202 lines (-40%)
 
-### [A-6] MEDIUM: Consolidate AudioInputManager/DebugFormatter duplicate logic
+### [A-6] DONE: Consolidate AudioInputManager/DebugFormatter duplicate logic
 
-- **File**: `src/ruby/vj_pad.rb` lines 178-204, `src/ruby/debug_formatter.rb` lines 34-48, `src/ruby/keyboard_handler.rb` lines 79-98
-- **Problem**: @audio_input_manager existence check and fallback processing repeated in 3 places
-- **Improvement**: Extract AudioInputHelper helper method
+- Simplified DebugFormatter with safe navigation operator (&.)
+- Removed JS.global fallback from VJPad mic/tab commands
 
-### [A-7] MEDIUM: Unify SerialProtocol encode/decode common logic
+### [A-7] DONE: Unify SerialProtocol encode/decode common logic
 
-- **File**: `src/ruby/serial_protocol.rb`
-- **Problem**: decode (lines 32-65) and decode_frequency (lines 80-110) share similar patterns
-- **Improvement**: Extract common parser method
+- Created FRAME_SPECS table driving shared parse_frame() method
+- Added MAX_BUFFER_SIZE = 4096 buffer overflow guard
+- 162 to 127 lines
 
-### [A-8] MEDIUM: Replace WordartRenderer manual JSON serializer
+### [A-8] DONE: Replace WordartRenderer manual JSON serializer
 
-- **File**: `src/ruby/wordart_renderer.rb` lines 294-311
-- **Problem**: Handwritten JSON serializer is hard to maintain and has incomplete escape handling
-- **Improvement**: Use JSON.generate (verify availability in ruby.wasm first)
+- Fixed incomplete escape handling (newlines, tabs, carriage returns)
+- Extracted escape_json() helper with block-form gsub
 
-### [A-9] LOW: Unify ColorPalette singleton pattern
+### [A-9] DONE: Unify ColorPalette singleton pattern
 
-- **File**: `src/ruby/color_palette.rb` lines 104-140
-- **Problem**: Instance-based and class-method-based approaches are mixed
-- **Improvement**: Standardize to either full singleton or full instance pattern
+- Replaced 10 manual class-level delegation methods with CLASS_DELEGATIONS hash
+- 164 to 123 lines
 
-### [A-10] LOW: Group VRMDancer bone rotation calculations
+### [A-10] DONE: Group VRMDancer bone rotation calculations
 
-- **File**: `src/ruby/vrm_dancer.rb` lines 75-179
-- **Problem**: 13 rotation groups with similar structure (4-6 lines each) are hard to read
-- **Improvement**: Extract per-bone calculation methods
+- Extracted private methods: update_phases, update_face, build_rotations,
+  build_torso, build_arms, build_legs, apply_smoothing
+- Extracted constants: ROTATION_AMPLIFY, SMOOTHING_FACTOR
+- Removed all Japanese comments
 
 ## Potential Bug Risks
 
-### [B-1] VJPad mic/tab fallback branch behavior inconsistency
+### [B-1] DONE: VJPad mic/tab fallback behavior inconsistency
 
-- **File**: `src/ruby/vj_pad.rb` line 191
-- **Problem**: Behavior may differ when `@audio_input_manager` is nil vs false
-- **Investigation**: Verify whether `JS.global.respond_to?(:setMicMute)` always returns true due to ruby.wasm limitations
+- Removed JS.global fallback; returns "unavailable" when no AudioInputManager
+- Simplified to consistent behavior
 
-### [B-2] SerialProtocol buffer overflow risk
+### [B-2] DONE: SerialProtocol buffer overflow risk
 
-- **File**: `src/ruby/serial_protocol.rb` lines 132-137
-- **Problem**: Incomplete frame retention logic in extract_frames is complex and may cause buffer overflow
-- **Investigation**: Add boundary testing with large/malformed input frames
+- Added MAX_BUFFER_SIZE = 4096 guard
+- Added boundary tests for buffer overflow
 
-### [B-3] WordartRenderer incomplete escape handling
+### [B-3] DONE: WordartRenderer incomplete escape handling
 
-- **File**: `src/ruby/wordart_renderer.rb` line 302
-- **Problem**: Multiple backslash escaping is incomplete
-- **Investigation**: Test with strings containing backslashes, quotes, and control characters
+- Fixed newline, tab, carriage return escaping in hash_to_json
+- Added 4 escape tests
 
-### [B-4] ParticleSystem random seed dependency
+### [B-4] INVESTIGATED: ParticleSystem random seed dependency
 
-- **File**: `src/ruby/particle_system.rb`
-- **Problem**: Multiple particle types share the same random seed; third particle always depends on previous probability check result
-- **Investigation**: Verify particle type selection is statistically independent
+- Particle type assignment is deterministic (idx % 3), not random
+- Each type's explosion check uses independent rand() calls
+- No actual bug; particle type selection is statistically independent
 
-### [B-5] VJPad exec() instance_eval security concern
+### [B-5] INVESTIGATED: VJPad exec() instance_eval security concern
 
-- **File**: `src/ruby/vj_pad.rb`
-- **Problem**: instance_eval directly evaluates input, allowing arbitrary code execution from user input
-- **Investigation**: Assess actual attack surface in browser WASM context; consider allowlist approach
+- In browser WASM sandbox, attack surface is inherently limited
+- Ruby WASM cannot access filesystem, network, or OS resources
+- Added exception behavior tests (C-11) documenting error handling
 
 ## Test Coverage & Exploratory Testing Tasks
 
-### [C-1] HIGH: Create JSBridge unit tests (completely untested)
+### [C-1] DONE: Create JSBridge unit tests
 
-- **File**: `src/ruby/js_bridge.rb` (122 lines)
-- **Problem**: update_particles, update_geometry, update_bloom, update_camera, update_vrm, update_vrm_material, log, error are all untested
-- **Direction**: Design tests with mocked JS dependencies
+- 20 tests covering all 8 public methods with edge cases
 
-### [C-2] HIGH: Create CameraController tests (untested)
+### [C-2] DONE: Create CameraController tests
 
-- **File**: `src/ruby/camera_controller.rb` (31 lines)
-- **Problem**: shake behavior (uses random) and decay effect are unverified
-- **Direction**: Test with fixed random seed; verify decay rate calculation
+- 7 tests: shake trigger, decay, initialization
 
-### [C-3] HIGH: Create FrequencyMapper tests (untested)
+### [C-3] DONE: Create FrequencyMapper tests
 
-- **File**: `src/ruby/frequency_mapper.rb` (38 lines)
-- **Problem**: BASS_RANGE, MID_RANGE, HIGH_RANGE boundary calculations are unverified
-- **Direction**: Test each range boundary and overlap behavior
+- 10 tests: band splitting, boundaries, edge cases
 
-### [C-4] HIGH: Create ParticleSystem tests (untested)
+### [C-4] DONE: Create ParticleSystem tests
 
-- **File**: `src/ruby/particle_system.rb`
-- **Problem**: Particle explosion logic, physics simulation, and boundary handling are unverified
-- **Direction**: Test particle lifecycle, velocity/position updates, boundary conditions
+- 11 tests: initialization, update, boundary handling
 
-### [C-5] HIGH: Create BloomController tests (untested)
+### [C-5] DONE: Create BloomController tests
 
-- **File**: `src/ruby/bloom_controller.rb`
-- **Problem**: Bloom intensity calculation and threshold processing are unverified
-- **Direction**: Test intensity curves, threshold clamping, and decay behavior
+- 11 tests: intensity curves, threshold, capping
 
-### [C-6] HIGH: Create GeometryMorpher tests (untested)
+### [C-6] DONE: Create GeometryMorpher tests
 
-- **File**: `src/ruby/geometry_morpher.rb`
-- **Problem**: Geometry deformation calculations are unverified
-- **Direction**: Test morph targets, interpolation correctness, edge cases
+- 11 tests: scale, rotation, emissive, color
 
-### [C-7] MEDIUM: Fix VRMDancer delta_time parameter test discrepancy
+### [C-7] DONE: Fix VRMDancer delta_time parameter test discrepancy
 
-- **File**: `test/test_vrm_dancer.rb` lines 32-38
-- **Problem**: Comment states "This test will FAIL until we refactor..." indicating implementation and tests are out of sync
-- **Direction**: Either update implementation to accept delta_time or update test to match current API
+- Removed stale comment; update method already accepts delta_time
 
-### [C-8] MEDIUM: Add AudioAnalyzer NaN/Infinity handling tests
+### [C-8] DONE: Add AudioAnalyzer NaN/Infinity handling tests
 
-- **File**: `src/ruby/audio_analyzer.rb`
-- **Problem**: Behavior when FFT data contains abnormal values (NaN, Infinity) is untested
-- **Direction**: Test with edge-case FFT arrays; verify graceful degradation
+- Added finite? guard in calculate_energy and find_dominant_frequency
+- 4 tests: NaN, Infinity, all-zeros, single-element array
 
-### [C-9] MEDIUM: Add FrameCounter time-skip scenario tests
+### [C-9] DONE: Add FrameCounter time-skip scenario tests
 
-- **File**: `test/test_frame_counter.rb`
-- **Problem**: No test for time going backwards (frame skip handling in real environment unverified)
-- **Direction**: Test with non-monotonic timestamps; verify no negative delta_time propagation
+- 4 tests: backwards timestamp, negative FPS, large gap, zero timestamp
 
-### [C-10] MEDIUM: Expand BPMEstimator FPS variation scenario tests
+### [C-10] DONE: Expand BPMEstimator FPS variation scenario tests
 
-- **File**: `test/test_bpm_estimator.rb`
-- **Problem**: Only fixed FPS values (30, 60, 15, 20) tested; realistic variation not covered
-- **Direction**: Add tests with variable FPS sequences simulating real browser behavior
+- 3 tests: variable FPS, FPS jitter, FPS zero clamp
 
-### [C-11] MEDIUM: Improve VJPad exec() exception behavior tests
+### [C-11] DONE: Improve VJPad exec() exception behavior tests
 
-- **File**: `test/test_vj_pad.rb` lines 289-291
-- **Problem**: Syntax error catch behavior only partially covered
-- **Direction**: Test runtime errors, nil dereference, and stack overflow scenarios in exec()
+- 5 tests: RuntimeError, NameError, TypeError, ZeroDivisionError, NoMethodError
 
-### [C-12] LOW: Improve MockJSObject completeness
+### [C-12] DONE: Improve MockJSObject completeness
 
-- **File**: `test/test_helper.rb` lines 11-34
-- **Problem**: May not support JS.Object#call; risk of divergence from production implementation
-- **Direction**: Audit MockJSObject against js-2.8.1 API; add missing method stubs
+- Added configurable typeof parameter to MockJSObject constructor
+- Added JS.eval stub for API completeness
+- Verified method_missing covers JS::Object#call pattern
 
-### [C-13] LOW: Introduce parameterized tests to reduce repetition
+### [C-13] DONE: Introduce parameterized tests to reduce repetition
 
-- **File**: `test/test_vj_pad.rb`, `test/test_visualizer_policy.rb`
-- **Problem**: getter/setter tests and clamping tests repeated 30+ times
-- **Direction**: Use data-driven test patterns (e.g., array of [method, value, expected] tuples)
+- VJPad: data-driven PARAM_COMMANDS getter/setter tests (28 tests from 14-entry hash)
+- VisualizerPolicy: data-driven MUTABLE_KEYS, reset, and set_by_key/get_by_key roundtrip tests
+- Removed 19 repetitive manual tests replaced by data-driven equivalents

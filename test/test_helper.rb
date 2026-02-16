@@ -9,8 +9,12 @@ $LOADED_FEATURES << 'js.rb'
 # Here we simulate them so that Ruby classes can be loaded and tested.
 module JS
   class MockJSObject
+    def initialize(typeof: "undefined")
+      @typeof = typeof
+    end
+
     def typeof
-      "undefined"
+      @typeof
     end
 
     def to_s
@@ -71,6 +75,10 @@ module JS
   def self.reset_global!
     @global = MockGlobal.new
   end
+
+  def self.eval(_code)
+    MockJSObject.new
+  end
 end
 
 # Load Ruby source files directly (standard require_relative).
@@ -96,6 +104,7 @@ require_relative '../src/ruby/vrm_material_controller'
 require_relative '../src/ruby/keyboard_handler'
 require_relative '../src/ruby/audio_input_manager'
 require_relative '../src/ruby/vj_plugin'
+require_relative '../src/ruby/vj_serial_commands'
 require_relative '../src/ruby/vj_pad'
 require_relative '../src/ruby/serial_protocol'
 require_relative '../src/ruby/serial_manager'

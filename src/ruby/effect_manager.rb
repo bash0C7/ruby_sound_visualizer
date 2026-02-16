@@ -29,13 +29,11 @@ class EffectManager
   def update(analysis, sensitivity = 1.0)
     beat = analysis[:beat] || {}
 
-    # ビート検出時に impulse を 1.0 にセット
     @impulse_bass = 1.0 if beat[:bass]
     @impulse_mid = 1.0 if beat[:mid]
     @impulse_high = 1.0 if beat[:high]
     @impulse_overall = 1.0 if beat[:overall]
 
-    # 感度スケーリング + impulse を渡す
     scaled_analysis = {
       bass: [analysis[:bass] * sensitivity, 1.0].min,
       mid: [analysis[:mid] * sensitivity, 1.0].min,
@@ -61,7 +59,6 @@ class EffectManager
     @bloom_data = @bloom_controller.get_data
     @camera_data = @camera_controller.get_data
 
-    # impulse decay per frame
     @impulse_bass *= VisualizerPolicy.impulse_decay
     @impulse_mid *= VisualizerPolicy.impulse_decay
     @impulse_high *= VisualizerPolicy.impulse_decay
@@ -69,4 +66,3 @@ class EffectManager
     @bloom_flash *= VisualizerPolicy.impulse_decay
   end
 end
-  

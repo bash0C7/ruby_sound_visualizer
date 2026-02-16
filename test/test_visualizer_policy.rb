@@ -339,49 +339,47 @@ class TestVisualizerPolicy < Test::Unit::TestCase
     assert_equal 0.50, VisualizerPolicy.impulse_decay
   end
 
-  def test_new_mutable_keys_in_mutable_keys
-    %w[
-      bloom_base_strength bloom_energy_scale bloom_impulse_scale
-      particle_explosion_base_prob particle_explosion_energy_scale
-      particle_explosion_force_scale particle_friction
-      visual_smoothing impulse_decay
-    ].each do |key|
-      assert VisualizerPolicy::MUTABLE_KEYS.key?(key), "MUTABLE_KEYS should contain '#{key}'"
+  # Data-driven: all RUNTIME_PARAMS have MUTABLE_KEYS entry
+  VisualizerPolicy::RUNTIME_PARAMS.each_key do |name|
+    define_method("test_#{name}_in_mutable_keys") do
+      assert VisualizerPolicy::MUTABLE_KEYS.key?(name.to_s),
+        "MUTABLE_KEYS should contain '#{name}'"
     end
   end
 
-  def test_set_by_key_new_params
-    VisualizerPolicy.set_by_key('bloom_base_strength', 2.0)
-    assert_equal 2.0, VisualizerPolicy.bloom_base_strength
-
-    VisualizerPolicy.set_by_key('particle_friction', 0.75)
-    assert_equal 0.75, VisualizerPolicy.particle_friction
-
-    VisualizerPolicy.set_by_key('visual_smoothing', 0.85)
-    assert_equal 0.85, VisualizerPolicy.visual_smoothing
+  # Data-driven: all RUNTIME_PARAMS reset to default
+  VisualizerPolicy::RUNTIME_PARAMS.each do |name, spec|
+    define_method("test_#{name}_resets_to_default") do
+      VisualizerPolicy.reset_runtime
+      assert_equal spec[:default], VisualizerPolicy.send(name),
+        "#{name} should reset to #{spec[:default]}"
+    end
   end
 
-  def test_get_by_key_new_params
-    VisualizerPolicy.bloom_base_strength = 3.0
-    assert_equal 3.0, VisualizerPolicy.get_by_key('bloom_base_strength')
+  # Data-driven: set_by_key/get_by_key roundtrip for all params
+  # Values within MUTABLE_KEYS slider ranges (set_by_key clamps to these)
+  ROUNDTRIP_VALUES = {
+    sensitivity: 1.5, input_gain: 5.0, max_brightness: 200, max_lightness: 200,
+    max_emissive: 1.5, max_bloom: 3.0, max_saturation: 70, exclude_max: true,
+    bloom_base_strength: 2.0, bloom_energy_scale: 3.0, bloom_impulse_scale: 2.0,
+    particle_explosion_base_prob: 0.3, particle_explosion_energy_scale: 0.8,
+    particle_explosion_force_scale: 0.8, particle_friction: 0.85,
+    visual_smoothing: 0.85, impulse_decay: 0.90
+  }.freeze
 
-    VisualizerPolicy.particle_friction = 0.75
-    assert_equal 0.75, VisualizerPolicy.get_by_key('particle_friction')
+  ROUNDTRIP_VALUES.each do |name, val|
+    define_method("test_#{name}_set_get_by_key_roundtrip") do
+      VisualizerPolicy.set_by_key(name.to_s, val)
+      result = VisualizerPolicy.get_by_key(name.to_s)
+      if val.is_a?(TrueClass) || val.is_a?(FalseClass)
+        assert_equal val, result
+      else
+        assert_in_delta val, result, 0.01,
+          "set_by_key/get_by_key roundtrip for #{name}"
+      end
+    end
   end
 
-  def test_reset_runtime_resets_new_params
-    VisualizerPolicy.bloom_base_strength = 3.0
-    VisualizerPolicy.particle_friction = 0.75
-    VisualizerPolicy.visual_smoothing = 0.85
-    VisualizerPolicy.impulse_decay = 0.90
-
-    VisualizerPolicy.reset_runtime
-
-    assert_equal 1.5, VisualizerPolicy.bloom_base_strength
-    assert_equal 0.86, VisualizerPolicy.particle_friction
-    assert_equal 0.70, VisualizerPolicy.visual_smoothing
-    assert_equal 0.82, VisualizerPolicy.impulse_decay
-  end
 
   # max_saturation tests
   def test_max_saturation_default
@@ -399,19 +397,6 @@ class TestVisualizerPolicy < Test::Unit::TestCase
     assert_equal 0, VisualizerPolicy.max_saturation, "max_saturation should be clamped to 0"
   end
 
-  def test_max_saturation_in_mutable_keys
-    assert VisualizerPolicy::MUTABLE_KEYS.key?('max_saturation')
-  end
-
-  def test_set_by_key_max_saturation
-    VisualizerPolicy.set_by_key('max_saturation', 70)
-    assert_equal 70, VisualizerPolicy.max_saturation
-  end
-
-  def test_get_by_key_max_saturation
-    VisualizerPolicy.max_saturation = 80
-    assert_equal 80, VisualizerPolicy.get_by_key('max_saturation')
-  end
 
   def test_cap_saturation_applies_scale
     VisualizerPolicy.max_saturation = 50

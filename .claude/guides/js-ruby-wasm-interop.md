@@ -159,7 +159,9 @@ end
 
 ### JSBridge guard pattern
 
-`JSBridge` methods wrap JS calls with `rescue` and log to browser console to avoid hard crashes in the loop.
+`JSBridge` update methods (`update_particles`, `update_bloom`, etc.) wrap JS calls with `rescue => e` and log to browser console to avoid hard crashes in the loop.
+
+`JSBridge.log` and `JSBridge.error` themselves also catch exceptions, but fall back to `$stderr.puts` instead of console since the console may be unavailable when these methods fail.
 
 ## Debugging Techniques
 

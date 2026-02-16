@@ -1,7 +1,3 @@
-# WordartRenderer: 90s Microsoft WordArt style text animation.
-# Manages animation state machine (entrance, sustain, exit) and generates
-# render data for JavaScript canvas drawing.
-# Inspired by PowerPoint cheesy-cool animation effects.
 class WordartRenderer
   # Animation phases
   PHASE_NONE = :none
@@ -290,23 +286,34 @@ class WordartRenderer
     t ** 3
   end
 
-  # Minimal JSON serializer (no external deps in WASM)
   def hash_to_json(obj)
     case obj
     when Hash
-      pairs = obj.map { |k, v| "\"#{k}\":#{hash_to_json(v)}" }
+      pairs = obj.map { |k, v| "\"#{escape_json(k.to_s)}\":#{hash_to_json(v)}" }
       "{#{pairs.join(',')}}"
     when Array
       "[#{obj.map { |v| hash_to_json(v) }.join(',')}]"
     when String
-      "\"#{obj.gsub('\\', '\\\\\\\\').gsub('"', '\\"')}\""
+      "\"#{escape_json(obj)}\""
     when true then 'true'
     when false then 'false'
     when nil then 'null'
     when Numeric then obj.to_s
-    when Symbol then "\"#{obj}\""
+    when Symbol then "\"#{escape_json(obj.to_s)}\""
     else
-      "\"#{obj}\""
+      "\"#{escape_json(obj.to_s)}\""
+    end
+  end
+
+  def escape_json(s)
+    s.gsub(/[\\"\n\r\t]/) do |c|
+      case c
+      when '\\' then '\\\\'
+      when '"'  then '\\"'
+      when "\n" then '\\n'
+      when "\r" then '\\r'
+      when "\t" then '\\t'
+      end
     end
   end
 end

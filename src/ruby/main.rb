@@ -1,23 +1,267 @@
 require 'js'
 
-$initialized = false
-$audio_analyzer = nil
-$audio_input_manager = nil
-$effect_manager = nil
-$vrm_dancer = nil
-$vrm_material_controller = nil
-$keyboard_handler = nil
-$debug_formatter = nil
-$bpm_estimator = nil
-$frame_counter = nil
-$vj_pad = nil
-$serial_manager = nil
-$serial_audio_source = nil
-$pen_input = nil
-$wordart_renderer = nil
-$frame_count = 0  # Kept for JSBridge debug logging throttle
+class VisualizerApp
+  def initialize
+    @initialized = false
+    @vrm_data = nil
+    @audio_analyzer = AudioAnalyzer.new
+    @audio_input_manager = AudioInputManager.new
+    @effect_manager = EffectManager.new
+    @effect_dispatcher = EffectDispatcher.new(@effect_manager)
+    @vrm_dancer = VRMDancer.new
+    @vrm_material_controller = VRMMaterialController.new
+    @keyboard_handler = KeyboardHandler.new(@audio_input_manager)
+    @debug_formatter = DebugFormatter.new(@audio_input_manager)
+    @bpm_estimator = BPMEstimator.new
+    @frame_counter = FrameCounter.new
+    @serial_manager = SerialManager.new
+    @serial_audio_source = SerialAudioSource.new
+    @pen_input = PenInput.new
+    @wordart_renderer = WordartRenderer.new
+    @vj_pad = VJPad.new(@audio_input_manager,
+                        serial_manager: @serial_manager,
+                        serial_audio_source: @serial_audio_source,
+                        wordart_renderer: @wordart_renderer,
+                        pen_input: @pen_input)
+  end
 
-# URL parameter parsing -> Config
+  def register_callbacks
+    app = self
+
+    JS.global[:rubySerialOnConnect] = lambda do |baud|
+      app.on_serial_connect(baud)
+    end
+
+    JS.global[:rubySerialOnDisconnect] = lambda do
+      app.on_serial_disconnect
+    end
+
+    JS.global[:rubySerialOnReceive] = lambda do |data|
+      app.on_serial_receive(data)
+    end
+
+    JS.global[:rubyPenDown] = lambda do |x, y, buttons|
+      app.on_pen_down(x, y, buttons)
+    end
+
+    JS.global[:rubyPenMove] = lambda do |x, y|
+      app.on_pen_move(x, y)
+    end
+
+    JS.global[:rubyPenUp] = lambda do
+      app.on_pen_up
+    end
+
+    JS.global[:rubyExecPrompt] = lambda do |input|
+      app.on_exec_prompt(input)
+    end
+
+    JS.global[:rubyUpdateVisuals] = lambda do |freq_array, timestamp|
+      app.update_visuals(freq_array, timestamp)
+    end
+  end
+
+  def on_serial_connect(baud)
+    @serial_manager.on_connect(baud.to_i)
+    JSBridge.log "Serial connected at #{baud}bps"
+  end
+
+  def on_serial_disconnect
+    @serial_manager.on_disconnect
+    JSBridge.log "Serial disconnected"
+  end
+
+  def on_serial_receive(data)
+    frames = @serial_manager.receive_data(data.to_s)
+    if frames && @serial_audio_source
+      frames.each do |frame|
+        if frame[:type] == :frequency
+          @serial_audio_source.update(frame[:frequency], frame[:duty])
+        end
+      end
+    end
+    last_line = @serial_manager.rx_log.last
+    JS.global[:document].getElementById('serialRxDisplay')[:textContent] = last_line.to_s if last_line
+  end
+
+  def on_pen_down(x, y, buttons)
+    @pen_input.start_stroke(x.to_f, y.to_f) if buttons.to_i & 1 != 0
+  end
+
+  def on_pen_move(x, y)
+    @pen_input.add_point(x.to_f, y.to_f)
+  end
+
+  def on_pen_up
+    @pen_input.end_stroke
+  end
+
+  def on_exec_prompt(input)
+    result = @vj_pad.exec(input.to_s)
+    if result[:ok]
+      JSBridge.log "VJPad: #{result[:msg]}" unless result[:msg].empty?
+      result[:msg]
+    else
+      JSBridge.error "VJPad: #{result[:msg]}"
+      "ERR: #{result[:msg]}"
+    end
+  rescue => e
+    JSBridge.error "VJPad error: #{e.message}"
+    "ERR: #{e.message}"
+  end
+
+  def update_visuals(freq_array, timestamp)
+    unless @initialized
+      JSBridge.log "First update received, initializing effect system..."
+      @initialized = true
+    end
+
+    dispatch_vj_actions
+    analysis = analyze_audio(freq_array)
+    update_effects(analysis)
+    update_vrm(analysis)
+    update_serial(analysis)
+    update_pen_input
+    update_wordart(analysis)
+    update_frame_tracking(analysis, timestamp)
+    update_debug_display(analysis)
+  rescue => e
+    JSBridge.error "Error in rubyUpdateVisuals: #{e.class} #{e.message}"
+    JSBridge.error e.backtrace[0..4].join(", ")
+  end
+
+  private
+
+  def dispatch_vj_actions
+    @vj_pad.consume_actions.each do |action|
+      @effect_dispatcher.dispatch(action[:effects]) if action[:effects]
+    end
+  end
+
+  def analyze_audio(freq_array)
+    analysis = @audio_analyzer.analyze(freq_array, VisualizerPolicy.sensitivity)
+    @effect_manager.update(analysis, VisualizerPolicy.sensitivity)
+    analysis
+  end
+
+  def update_effects(analysis)
+    JSBridge.update_particles(@effect_manager.particle_data)
+    JSBridge.update_geometry(@effect_manager.geometry_data)
+    JSBridge.update_bloom(@effect_manager.bloom_data)
+    JSBridge.update_camera(@effect_manager.camera_data)
+    JSBridge.update_particle_rotation(@effect_manager.geometry_data[:rotation])
+  end
+
+  def update_vrm(analysis)
+    has_vrm = JS.global[:currentVRM].typeof.to_s != "undefined"
+    return unless has_vrm
+
+    scaled = scale_analysis_for_vrm(analysis)
+    @vrm_data = @vrm_dancer.update(scaled)
+    JSBridge.update_vrm(@vrm_data)
+
+    vrm_material_config = @vrm_material_controller.apply_emissive(scaled[:overall_energy])
+    JSBridge.update_vrm_material(vrm_material_config)
+  end
+
+  def scale_analysis_for_vrm(analysis)
+    sens = VisualizerPolicy.sensitivity
+    {
+      bass: [analysis[:bass] * sens, 1.0].min,
+      mid: [analysis[:mid] * sens, 1.0].min,
+      high: [analysis[:high] * sens, 1.0].min,
+      overall_energy: [analysis[:overall_energy] * sens, 1.0].min,
+      beat: analysis[:beat],
+      impulse: {
+        overall: @effect_manager.impulse_overall || 0.0,
+        bass: @effect_manager.impulse_bass || 0.0,
+        mid: @effect_manager.impulse_mid || 0.0,
+        high: @effect_manager.impulse_high || 0.0
+      }
+    }
+  end
+
+  def update_serial(analysis)
+    if @vj_pad.serial_auto_send? && @serial_manager.connected?
+      frame = @serial_manager.send_audio_frame(analysis)
+      JS.global.serialSend(frame) if frame
+    end
+
+    if @serial_audio_source.pending_update?
+      sa_data = @serial_audio_source.consume_update
+      JS.global.updateSerialAudio(
+        sa_data[:frequency],
+        sa_data[:duty],
+        sa_data[:active] ? 1 : 0,
+        sa_data[:volume]
+      )
+    end
+  end
+
+  def update_pen_input
+    @pen_input.update
+    JS.global.penDrawStrokes(@pen_input.to_render_json)
+  end
+
+  def update_wordart(analysis)
+    return unless @wordart_renderer.active?
+    @wordart_renderer.update(analysis)
+    JS.global.wordartRender(@wordart_renderer.to_render_json)
+  end
+
+  def update_frame_tracking(analysis, timestamp)
+    @bpm_estimator.tick
+    ts = timestamp.typeof == "number" ? timestamp.to_f : 0.0
+    @frame_counter.tick(ts) if ts > 0
+    frame_count = @bpm_estimator.frame_count
+    JSBridge.frame_count = frame_count
+
+    beat = analysis[:beat] || {}
+    if beat[:bass]
+      @bpm_estimator.record_beat(frame_count, fps: @frame_counter.current_fps.to_f)
+    end
+
+    if @frame_counter.report_ready?
+      JS.global[:fpsText] = @frame_counter.fps_text
+      @frame_counter.clear_report
+    end
+
+    update_vrm_debug(frame_count)
+    update_audio_log(analysis, frame_count)
+  end
+
+  def update_vrm_debug(frame_count)
+    has_vrm = JS.global[:currentVRM].typeof.to_s != "undefined"
+    return unless has_vrm && frame_count % 60 == 0
+
+    rotations = (@vrm_data && @vrm_data[:rotations]) || []
+    return unless rotations.length >= 9
+
+    hips_rot_max = rotations[0..2].map(&:abs).max.round(3)
+    spine_rot_max = rotations[3..5].map(&:abs).max.round(3)
+    chest_rot_max = rotations[6..8].map(&:abs).max.round(3)
+    hips_y = (@vrm_data[:hips_position_y] || 0.0).round(3)
+    JS.global[:vrmDebugText] = "VRM rot: h=#{hips_rot_max} s=#{spine_rot_max} c=#{chest_rot_max} hY=#{hips_y}"
+  end
+
+  def update_debug_display(analysis)
+    beat = analysis[:beat] || {}
+    JS.global[:debugInfoText] = @debug_formatter.format_debug_text(analysis, beat, bpm: @bpm_estimator.estimated_bpm)
+    JS.global[:paramInfoText] = @debug_formatter.format_param_text
+    JS.global[:keyGuideText] = @debug_formatter.format_key_guide
+  end
+
+  def update_audio_log(analysis, frame_count)
+    return unless frame_count % 60 == 0
+    bass = (analysis[:bass] * 100).round(1)
+    mid = (analysis[:mid] * 100).round(1)
+    high = (analysis[:high] * 100).round(1)
+    overall = (analysis[:overall_energy] * 100).round(1)
+    JSBridge.log "Audio: Bass=#{bass}% Mid=#{mid}% High=#{high}% Overall=#{overall}% | Sensitivity: #{VisualizerPolicy.sensitivity.round(2)}x"
+  end
+end
+
+# URL parameter parsing
 begin
   search_str = JS.global[:location][:search].to_s
   if search_str.is_a?(String) && search_str.length > 0
@@ -35,209 +279,10 @@ end
 begin
   JSBridge.log "Ruby VM started, initializing... (Sensitivity: #{VisualizerPolicy.sensitivity})"
 
-  $audio_analyzer = AudioAnalyzer.new
-  $audio_input_manager = AudioInputManager.new
-  $effect_manager = EffectManager.new
-  $effect_dispatcher = EffectDispatcher.new($effect_manager)
-  $vrm_dancer = VRMDancer.new
-  $vrm_material_controller = VRMMaterialController.new
-  $keyboard_handler = KeyboardHandler.new($audio_input_manager)
-  $debug_formatter = DebugFormatter.new($audio_input_manager)
-  $bpm_estimator = BPMEstimator.new
-  $frame_counter = FrameCounter.new
-  $serial_manager = SerialManager.new
-  $serial_audio_source = SerialAudioSource.new
-  $pen_input = PenInput.new
-  $wordart_renderer = WordartRenderer.new
-  $vj_pad = VJPad.new($audio_input_manager, serial_manager: $serial_manager, serial_audio_source: $serial_audio_source)
+  app = VisualizerApp.new
+  app.register_callbacks
   VisualizerPolicy.register_devtool_callbacks
   SnapshotManager.register_callbacks
-
-  # Web Serial callbacks (called from JavaScript)
-  JS.global[:rubySerialOnConnect] = lambda do |baud|
-    $serial_manager.on_connect(baud.to_i)
-    JSBridge.log "Serial connected at #{baud}bps"
-  end
-
-  JS.global[:rubySerialOnDisconnect] = lambda do
-    $serial_manager.on_disconnect
-    JSBridge.log "Serial disconnected"
-  end
-
-  JS.global[:rubySerialOnReceive] = lambda do |data|
-    frames = $serial_manager.receive_data(data.to_s)
-    # Route frequency frames to serial audio source
-    if frames && $serial_audio_source
-      frames.each do |frame|
-        if frame[:type] == :frequency
-          $serial_audio_source.update(frame[:frequency], frame[:duty])
-        end
-      end
-    end
-    # Update serial RX display
-    last_line = $serial_manager.rx_log.last
-    JS.global[:document].getElementById('serialRxDisplay')[:textContent] = last_line.to_s if last_line
-  end
-
-  # Pen input callbacks (called from JavaScript mouse events)
-  JS.global[:rubyPenDown] = lambda do |x, y, buttons|
-    # Only primary button (left click) for drawing
-    $pen_input.start_stroke(x.to_f, y.to_f) if buttons.to_i & 1 != 0
-  end
-
-  JS.global[:rubyPenMove] = lambda do |x, y|
-    $pen_input.add_point(x.to_f, y.to_f)
-  end
-
-  JS.global[:rubyPenUp] = lambda do
-    $pen_input.end_stroke
-  end
-
-  # VJ Pad prompt callback: receives command string from browser prompt UI
-  JS.global[:rubyExecPrompt] = lambda do |input|
-    begin
-      result = $vj_pad.exec(input.to_s)
-      if result[:ok]
-        JSBridge.log "VJPad: #{result[:msg]}" unless result[:msg].empty?
-        result[:msg]
-      else
-        JSBridge.error "VJPad: #{result[:msg]}"
-        "ERR: #{result[:msg]}"
-      end
-    rescue => e
-      JSBridge.error "VJPad error: #{e.message}"
-      "ERR: #{e.message}"
-    end
-  end
-
-  # Main update callback: receives frequency data and timestamp from JS
-  JS.global[:rubyUpdateVisuals] = lambda do |freq_array, timestamp|
-    begin
-      unless $initialized
-        JSBridge.log "First update received, initializing effect system..."
-        $initialized = true
-      end
-
-      # Consume VJPad pending actions (plugin-dispatched effects)
-      if $vj_pad
-        $vj_pad.consume_actions.each do |action|
-          $effect_dispatcher.dispatch(action[:effects]) if action[:effects]
-        end
-      end
-
-      analysis = $audio_analyzer.analyze(freq_array, VisualizerPolicy.sensitivity)
-      $effect_manager.update(analysis, VisualizerPolicy.sensitivity)
-
-      # Send visual data to JavaScript
-      JSBridge.update_particles($effect_manager.particle_data)
-      JSBridge.update_geometry($effect_manager.geometry_data)
-      JSBridge.update_bloom($effect_manager.bloom_data)
-      JSBridge.update_camera($effect_manager.camera_data)
-      JSBridge.update_particle_rotation($effect_manager.geometry_data[:rotation])
-
-      # VRM dance update (only if VRM is loaded)
-      has_vrm = JS.global[:currentVRM].typeof.to_s != "undefined"
-
-      if has_vrm
-        scaled_for_vrm = {
-          bass: [analysis[:bass] * VisualizerPolicy.sensitivity, 1.0].min,
-          mid: [analysis[:mid] * VisualizerPolicy.sensitivity, 1.0].min,
-          high: [analysis[:high] * VisualizerPolicy.sensitivity, 1.0].min,
-          overall_energy: [analysis[:overall_energy] * VisualizerPolicy.sensitivity, 1.0].min,
-          beat: analysis[:beat],
-          impulse: {
-            overall: $effect_manager.impulse_overall || 0.0,
-            bass: $effect_manager.impulse_bass || 0.0,
-            mid: $effect_manager.impulse_mid || 0.0,
-            high: $effect_manager.impulse_high || 0.0
-          }
-        }
-        vrm_data = $vrm_dancer.update(scaled_for_vrm)
-        JSBridge.update_vrm(vrm_data)
-
-        vrm_material_config = $vrm_material_controller.apply_emissive(scaled_for_vrm[:overall_energy])
-        JSBridge.update_vrm_material(vrm_material_config)
-      end
-
-      # Serial auto-send: transmit audio analysis frame each update
-      if $vj_pad&.serial_auto_send? && $serial_manager&.connected?
-        frame = $serial_manager.send_audio_frame(analysis)
-        JS.global.serialSend(frame) if frame
-      end
-
-      # Serial audio: update PWM oscillator when frequency/duty changes
-      if $serial_audio_source&.pending_update?
-        sa_data = $serial_audio_source.consume_update
-        JS.global.updateSerialAudio(
-          sa_data[:frequency],
-          sa_data[:duty],
-          sa_data[:active] ? 1 : 0,
-          sa_data[:volume]
-        )
-      end
-
-      # Pen input: update fade-out and render strokes
-      # Always call penDrawStrokes so JS clears canvas even when all strokes faded
-      if $pen_input
-        $pen_input.update
-        JS.global.penDrawStrokes($pen_input.to_render_json)
-      end
-
-      # WordArt: update animation and render
-      if $wordart_renderer&.active?
-        $wordart_renderer.update(analysis)
-        JS.global.wordartRender($wordart_renderer.to_render_json)
-      end
-
-      # Frame tracking (Ruby-side FPS calculation)
-      $bpm_estimator.tick
-      ts = timestamp.typeof == "number" ? timestamp.to_f : 0.0
-      $frame_counter.tick(ts) if ts > 0
-      frame_count = $bpm_estimator.frame_count
-      $frame_count = frame_count  # Sync for JSBridge debug logging
-
-      # BPM estimation
-      beat = analysis[:beat] || {}
-      if beat[:bass]
-        $bpm_estimator.record_beat(frame_count, fps: $frame_counter.current_fps.to_f)
-      end
-
-      # Debug display update (once per second when FPS report is ready)
-      if $frame_counter.report_ready?
-        JS.global[:fpsText] = $frame_counter.fps_text
-        $frame_counter.clear_report
-      end
-
-      # VRM debug info (every 60 frames, only if VRM loaded)
-      if has_vrm && frame_count % 60 == 0
-        rotations = vrm_data[:rotations] || []
-        if rotations.length >= 9
-          hips_rot_max = rotations[0..2].map(&:abs).max.round(3)
-          spine_rot_max = rotations[3..5].map(&:abs).max.round(3)
-          chest_rot_max = rotations[6..8].map(&:abs).max.round(3)
-          hips_y = (vrm_data[:hips_position_y] || 0.0).round(3)
-          JS.global[:vrmDebugText] = "VRM rot: h=#{hips_rot_max} s=#{spine_rot_max} c=#{chest_rot_max} hY=#{hips_y}"
-        end
-      end
-
-      # Debug info (formatted in Ruby, displayed every frame for responsiveness)
-      JS.global[:debugInfoText] = $debug_formatter.format_debug_text(analysis, beat, bpm: $bpm_estimator.estimated_bpm)
-      JS.global[:paramInfoText] = $debug_formatter.format_param_text
-      JS.global[:keyGuideText] = $debug_formatter.format_key_guide
-
-      # Periodic audio log
-      if frame_count % 60 == 0
-        bass = (analysis[:bass] * 100).round(1)
-        mid = (analysis[:mid] * 100).round(1)
-        high = (analysis[:high] * 100).round(1)
-        overall = (analysis[:overall_energy] * 100).round(1)
-        JSBridge.log "Audio: Bass=#{bass}% Mid=#{mid}% High=#{high}% Overall=#{overall}% | Sensitivity: #{VisualizerPolicy.sensitivity.round(2)}x"
-      end
-    rescue => e
-      JSBridge.error "Error in rubyUpdateVisuals: #{e.class} #{e.message}"
-      JSBridge.error e.backtrace[0..4].join(", ")
-    end
-  end
 
   JSBridge.log "Keyboard controls ready (0-3: color, 4/5: hue shift, 6/7: brightness, 8/9: lightness, +/-: sensitivity)"
   JSBridge.log "Ruby initialization complete!"

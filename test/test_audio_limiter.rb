@@ -53,9 +53,9 @@ class TestAudioLimiter < Test::Unit::TestCase
 
   def test_soft_knee_gradual_near_threshold
     # Values near threshold should transition smoothly (not hard clip)
-    below = @limiter.process(0.7)
-    at = @limiter.process(0.85)
-    above = @limiter.process(1.0)
+    @limiter.process(0.7)
+    @limiter.process(0.85)
+    @limiter.process(1.0)
 
     # Reset for clean test
     limiter2 = AudioLimiter.new

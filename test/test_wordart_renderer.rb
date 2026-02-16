@@ -190,6 +190,37 @@ class TestWordartRenderer < Test::Unit::TestCase
     assert json.include?('"text":"Hello World"')
   end
 
+  # --- JSON escape handling (B-3) ---
+
+  def test_to_render_json_escapes_newlines
+    @renderer.trigger("Hello\nWorld")
+    @renderer.update
+    json = @renderer.to_render_json
+    assert json.include?('\\n'), "newlines should be escaped"
+    assert !json.include?("\n" + '"'), "raw newlines should not appear in JSON values"
+  end
+
+  def test_to_render_json_escapes_tabs
+    @renderer.trigger("Hello\tWorld")
+    @renderer.update
+    json = @renderer.to_render_json
+    assert json.include?('\\t'), "tabs should be escaped"
+  end
+
+  def test_to_render_json_escapes_quotes
+    @renderer.trigger('Say "Hello"')
+    @renderer.update
+    json = @renderer.to_render_json
+    assert json.include?('\\"Hello\\"'), "quotes should be escaped"
+  end
+
+  def test_to_render_json_escapes_backslash
+    @renderer.trigger('path\\to\\file')
+    @renderer.update
+    json = @renderer.to_render_json
+    assert json.include?('\\\\'), "backslashes should be escaped"
+  end
+
   # --- Style cycling ---
 
   def test_styles_cycle_through_all
