@@ -1,6 +1,6 @@
 class ColorPalette
   attr_reader :hue_offset, :last_hsv
-  attr_accessor :hue_mode
+  attr_reader :hue_mode
 
   BASE_HUES = { 1 => 0.0, 2 => 60.0, 3 => 180.0 }
   HUE_RANGE = 140.0

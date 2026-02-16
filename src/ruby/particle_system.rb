@@ -23,8 +23,6 @@ class ParticleSystem
     imp_mid = impulse[:mid] || 0.0
     imp_high = impulse[:high] || 0.0
 
-    base_color = ColorPalette.frequency_to_color(analysis)
-
     brightness = 0.3 + Math.tanh(energy * 1.5) * 1.2
     brightness += 0.3 * imp_overall
     brightness = [brightness, 1.5].min

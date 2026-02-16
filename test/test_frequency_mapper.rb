@@ -14,8 +14,6 @@ class TestFrequencyMapper < Test::Unit::TestCase
   end
 
   def test_bass_range_covers_0_to_250hz
-    bin_size = 48000.0 / 2048.0  # ~23.44 Hz per bin
-    expected_bins = (250.0 / bin_size).ceil + 1  # bins 0 through ceil(250/23.44)
     data = Array.new(1024, 50.0)
     result = @mapper.split_bands(data)
     assert_operator result[:bass].length, :>=, 10

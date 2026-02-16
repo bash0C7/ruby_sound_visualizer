@@ -112,7 +112,7 @@ class TestSerialProtocol < Test::Unit::TestCase
 
   def test_extract_frames_multiple_frames
     buffer = "<L:255,B:0,M:0,H:0>\n<L:0,B:255,M:0,H:0>\n"
-    frames, remaining = SerialProtocol.extract_frames(buffer)
+    frames, _remaining = SerialProtocol.extract_frames(buffer)
     assert_equal 2, frames.length
     assert_in_delta 1.0, frames[0][:level], 0.01
     assert_in_delta 1.0, frames[1][:bass], 0.01
@@ -139,7 +139,7 @@ class TestSerialProtocol < Test::Unit::TestCase
 
   def test_extract_frames_skips_invalid_frames
     buffer = "<INVALID>\n<L:128,B:64,M:32,H:0>\n"
-    frames, remaining = SerialProtocol.extract_frames(buffer)
+    frames, _remaining = SerialProtocol.extract_frames(buffer)
     assert_equal 1, frames.length
     assert_in_delta 0.502, frames[0][:level], 0.01
   end
@@ -256,7 +256,7 @@ class TestSerialProtocol < Test::Unit::TestCase
 
   def test_extract_frames_frequency_frame
     buffer = "<F:440,D:50>\n"
-    frames, remaining = SerialProtocol.extract_frames(buffer)
+    frames, _remaining = SerialProtocol.extract_frames(buffer)
     assert_equal 1, frames.length
     assert_equal :frequency, frames[0][:type]
     assert_equal 440, frames[0][:frequency]
@@ -265,7 +265,7 @@ class TestSerialProtocol < Test::Unit::TestCase
 
   def test_extract_frames_audio_level_has_type
     buffer = "<L:128,B:64,M:32,H:0>\n"
-    frames, remaining = SerialProtocol.extract_frames(buffer)
+    frames, _remaining = SerialProtocol.extract_frames(buffer)
     assert_equal 1, frames.length
     assert_equal :audio_level, frames[0][:type]
     assert frames[0].key?(:level)
@@ -273,7 +273,7 @@ class TestSerialProtocol < Test::Unit::TestCase
 
   def test_extract_frames_mixed_frame_types
     buffer = "<L:128,B:64,M:32,H:0>\n<F:440,D:50>\n<L:255,B:0,M:0,H:0>\n"
-    frames, remaining = SerialProtocol.extract_frames(buffer)
+    frames, _remaining = SerialProtocol.extract_frames(buffer)
     assert_equal 3, frames.length
     assert_equal :audio_level, frames[0][:type]
     assert_equal :frequency, frames[1][:type]
