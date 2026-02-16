@@ -46,6 +46,7 @@ The app relies on deterministic script order. `main.rb` must be last.
 <script type="text/ruby" src="src/ruby/math_helper.rb"></script>
 <script type="text/ruby" src="src/ruby/js_bridge.rb"></script>
 <script type="text/ruby" src="src/ruby/frequency_mapper.rb"></script>
+<script type="text/ruby" src="src/ruby/audio_limiter.rb"></script>
 <script type="text/ruby" src="src/ruby/audio_analyzer.rb"></script>
 <script type="text/ruby" src="src/ruby/color_palette.rb"></script>
 <script type="text/ruby" src="src/ruby/particle_system.rb"></script>
@@ -57,6 +58,7 @@ The app relies on deterministic script order. `main.rb` must be last.
 <script type="text/ruby" src="src/ruby/audio_input_manager.rb"></script>
 <script type="text/ruby" src="src/ruby/keyboard_handler.rb"></script>
 <script type="text/ruby" src="src/ruby/vj_plugin.rb"></script>
+<script type="text/ruby" src="src/ruby/vj_serial_commands.rb"></script>
 <script type="text/ruby" src="src/ruby/vj_pad.rb"></script>
 <script type="text/ruby" src="src/ruby/plugins/vj_burst.rb"></script>
 <script type="text/ruby" src="src/ruby/plugins/vj_flash.rb"></script>
