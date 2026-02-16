@@ -648,33 +648,30 @@ class TestVJPad < Test::Unit::TestCase
   # --- WordArt unquoted text preprocessing ---
 
   def test_wa_with_unquoted_text_works
-    $wordart_renderer = Object.new
-    $wordart_renderer.define_singleton_method(:trigger) { |text| text }
-    result = @pad.exec('wa hello')
+    renderer = Object.new
+    renderer.define_singleton_method(:trigger) { |text| text }
+    pad = VJPad.new(nil, wordart_renderer: renderer)
+    result = pad.exec('wa hello')
     assert result[:ok], "wa hello should succeed, got: #{result[:msg]}"
     assert_match(/hello/, result[:msg])
-  ensure
-    $wordart_renderer = nil
   end
 
   def test_wa_with_unquoted_multiword_text_works
-    $wordart_renderer = Object.new
-    $wordart_renderer.define_singleton_method(:trigger) { |text| text }
-    result = @pad.exec('wa hello world')
+    renderer = Object.new
+    renderer.define_singleton_method(:trigger) { |text| text }
+    pad = VJPad.new(nil, wordart_renderer: renderer)
+    result = pad.exec('wa hello world')
     assert result[:ok], "wa 'hello world' should succeed, got: #{result[:msg]}"
     assert_match(/hello world/, result[:msg])
-  ensure
-    $wordart_renderer = nil
   end
 
   def test_wa_with_quoted_text_still_works
-    $wordart_renderer = Object.new
-    $wordart_renderer.define_singleton_method(:trigger) { |text| text }
-    result = @pad.exec('wa "hello"')
+    renderer = Object.new
+    renderer.define_singleton_method(:trigger) { |text| text }
+    pad = VJPad.new(nil, wordart_renderer: renderer)
+    result = pad.exec('wa "hello"')
     assert result[:ok], "wa \"hello\" should succeed, got: #{result[:msg]}"
     assert_match(/hello/, result[:msg])
-  ensure
-    $wordart_renderer = nil
   end
 
   # === C-11: exec() exception behavior tests ===

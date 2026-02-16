@@ -1,6 +1,16 @@
 require 'js'
 
 module JSBridge
+  @frame_count = 0
+
+  def self.frame_count
+    @frame_count
+  end
+
+  def self.frame_count=(val)
+    @frame_count = val
+  end
+
   def self.update_particles(data)
     begin
       positions = data[:positions]
@@ -21,7 +31,7 @@ module JSBridge
       scale = data[:scale].to_f
       rotation = data[:rotation]
       emissive = data[:emissive_intensity].to_f
-      color = data[:color] || [0.3, 0.3, 0.3]  # デフォルト値で安全
+      color = data[:color] || [0.3, 0.3, 0.3]
 
       if rotation.is_a?(Array)
         JS.global.updateGeometry(scale, rotation, emissive, color)
@@ -36,8 +46,7 @@ module JSBridge
       strength = data[:strength].to_f
       threshold = data[:threshold].to_f
 
-      # Debug: log every 120 frames
-      if defined?($frame_count) && $frame_count % 120 == 0
+      if @frame_count % 120 == 0
         JS.global[:console].log("[DEBUG BLOOM Ruby] strength=#{strength.round(2)} threshold=#{threshold.round(2)}")
       end
 
@@ -63,7 +72,6 @@ module JSBridge
   def self.update_particle_rotation(geometry_rotation)
     begin
       if geometry_rotation.is_a?(Array) && geometry_rotation.length >= 3
-        # パーティクルをトーラスの半分の速さで回転（星空が流れる効果）
         particle_rotation = geometry_rotation.map { |r| r * 0.5 }
         JS.global.updateParticleRotation(particle_rotation)
       end
@@ -93,8 +101,7 @@ module JSBridge
       intensity = config[:intensity] || 1.0
       color = config[:color] || [1.0, 1.0, 1.0]
 
-      # Debug: log every 60 frames
-      if defined?($frame_count) && $frame_count % 60 == 0
+      if @frame_count % 60 == 0
         JS.global[:console].log("[DEBUG VRM] intensity=#{intensity.round(2)} color=#{color.map{|c| c.round(2)}.inspect}")
       end
 
@@ -120,4 +127,3 @@ module JSBridge
     end
   end
 end
-  
