@@ -1506,10 +1506,6 @@
         }
       });
 
-      if (frameCount % 60 === 0) {
-        console.log('[DEBUG JS VRM] intensity=' + emissiveIntensity.toFixed(2) +
-                    ' materials=' + materialCount + ' updated=' + updatedCount);
-      }
     };
 
     // Update functions called from Ruby
@@ -1594,11 +1590,6 @@
       bloomPass.strength = strength !== undefined ? Number(strength) : 1.5;
       bloomPass.threshold = threshold !== undefined ? Number(threshold) : 0.0;
 
-      // Debug: log every 120 frames
-      if (frameCount % 120 === 0) {
-        console.log('[DEBUG BLOOM] strength=' + bloomPass.strength.toFixed(2) +
-                    ' threshold=' + bloomPass.threshold.toFixed(2));
-      }
     };
 
     window.updateCamera = function(position, shake) {
