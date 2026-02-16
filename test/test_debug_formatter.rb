@@ -129,29 +129,25 @@ class TestDebugFormatter < Test::Unit::TestCase
     assert_match(/-60\.0dB/, result)
   end
 
-  def test_format_param_text_contains_mic_status
+  def test_format_param_text_without_manager_shows_on
     formatter = DebugFormatter.new
-    JS.set_global('micMuted', false)
     result = formatter.format_param_text
     assert_match(/MIC:ON/, result)
+    assert_match(/TAB:OFF/, result)
   end
 
-  def test_format_param_text_mic_muted
-    formatter = DebugFormatter.new
-    JS.set_global('micMuted', true)
+  def test_format_param_text_with_manager_mic_muted
+    manager = AudioInputManager.new
+    manager.mute_mic
+    formatter = DebugFormatter.new(manager)
     result = formatter.format_param_text
     assert_match(/MIC:OFF/, result)
   end
 
-  def test_format_param_text_contains_tab_status
-    formatter = DebugFormatter.new
-    result = formatter.format_param_text
-    assert_match(/TAB:OFF/, result)
-  end
-
-  def test_format_param_text_tab_active
-    formatter = DebugFormatter.new
-    JS.set_global('tabStream', 'active')
+  def test_format_param_text_with_manager_tab_active
+    manager = AudioInputManager.new
+    manager.switch_to_tab
+    formatter = DebugFormatter.new(manager)
     result = formatter.format_param_text
     assert_match(/TAB:ON/, result)
   end

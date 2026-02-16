@@ -115,49 +115,26 @@ class VJPad
   # --- Audio Input Commands ---
 
   def mic(val = :_get)
-    if @audio_input_manager
-      is_muted = @audio_input_manager.mic_muted?
-      if val == :_get
-        return "mic: #{is_muted ? 'muted' : 'on'}"
-      end
-      target_mute = val.to_i == 0
-      if target_mute
-        @audio_input_manager.mute_mic
-      else
-        @audio_input_manager.unmute_mic
-      end
-      JS.global.setMicMute(target_mute) if JS.global.respond_to?(:setMicMute)
-      "mic: #{target_mute ? 'muted' : 'on'}"
-    else
-      muted = JS.global[:micMuted]
-      is_muted = muted == true
-      if val == :_get
-        return "mic: #{is_muted ? 'muted' : 'on'}"
-      end
-      target_mute = val.to_i == 0
-      JS.global.setMicMute(target_mute)
-      "mic: #{target_mute ? 'muted' : 'on'}"
+    return "mic: unavailable" unless @audio_input_manager
+
+    if val == :_get
+      return "mic: #{@audio_input_manager.mic_muted? ? 'muted' : 'on'}"
     end
+    target_mute = val.to_i == 0
+    target_mute ? @audio_input_manager.mute_mic : @audio_input_manager.unmute_mic
+    JS.global.setMicMute(target_mute) if JS.global.respond_to?(:setMicMute)
+    "mic: #{target_mute ? 'muted' : 'on'}"
   end
 
   def tab(val = :_get)
-    if @audio_input_manager
-      is_active = @audio_input_manager.tab_capture?
-      if val == :_get
-        return "tab: #{is_active ? 'on' : 'off'}"
-      end
-      @audio_input_manager.switch_to_tab
-      JS.global.toggleTabCapture() if JS.global.respond_to?(:toggleTabCapture)
-      "tab: toggled"
-    else
-      stream = JS.global[:tabStream]
-      is_active = stream.respond_to?(:typeof) ? stream.typeof.to_s != "undefined" && stream.typeof.to_s != "null" : !!stream
-      if val == :_get
-        return "tab: #{is_active ? 'on' : 'off'}"
-      end
-      JS.global.toggleTabCapture()
-      "tab: toggled"
+    return "tab: unavailable" unless @audio_input_manager
+
+    if val == :_get
+      return "tab: #{@audio_input_manager.tab_capture? ? 'on' : 'off'}"
     end
+    @audio_input_manager.switch_to_tab
+    JS.global.toggleTabCapture() if JS.global.respond_to?(:toggleTabCapture)
+    "tab: toggled"
   end
 
   # --- WordArt Commands ---
