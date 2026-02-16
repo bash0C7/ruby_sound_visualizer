@@ -1,5 +1,3 @@
-# VJ Pad: In-browser prompt DSL for real-time visualizer control.
-# Commands are evaluated via instance_eval for minimal-keystroke VJ workflow.
 class VJPad
   attr_reader :history, :last_result, :pending_actions
 
@@ -11,6 +9,34 @@ class VJPad
   }.freeze
 
   COLOR_NAMES = { 0 => 'gray', 1 => 'red', 2 => 'yellow', 3 => 'blue' }.freeze
+
+  # VisualizerPolicy parameter commands: { command => { label:, policy:, cast:, suffix: } }
+  PARAM_COMMANDS = {
+    s:   { label: 'sens',           policy: :sensitivity,                    cast: :to_f },
+    ig:  { label: 'gain',           policy: :input_gain,         suffix: 'dB', cast: :to_f },
+    br:  { label: 'bright',         policy: :max_brightness,                 cast: :to_i },
+    lt:  { label: 'light',          policy: :max_lightness,                  cast: :to_i },
+    em:  { label: 'emissive',       policy: :max_emissive,                   cast: :to_f },
+    bm:  { label: 'bloom',          policy: :max_bloom,                      cast: :to_f },
+    bbs: { label: 'bloom_base',     policy: :bloom_base_strength,            cast: :to_f },
+    bes: { label: 'bloom_energy',   policy: :bloom_energy_scale,             cast: :to_f },
+    bis: { label: 'bloom_impulse',  policy: :bloom_impulse_scale,            cast: :to_f },
+    pp:  { label: 'particle_prob',  policy: :particle_explosion_base_prob,   cast: :to_f },
+    pf:  { label: 'particle_force', policy: :particle_explosion_force_scale, cast: :to_f },
+    fr:  { label: 'friction',       policy: :particle_friction,              cast: :to_f },
+    vs:  { label: 'smoothing',      policy: :visual_smoothing,               cast: :to_f },
+    id:  { label: 'impulse_decay',  policy: :impulse_decay,                  cast: :to_f },
+  }.freeze
+
+  PARAM_COMMANDS.each do |cmd, spec|
+    define_method(cmd) do |val = :_get|
+      if val == :_get
+        return "#{spec[:label]}: #{VisualizerPolicy.send(spec[:policy])}#{spec[:suffix]}"
+      end
+      VisualizerPolicy.send(:"#{spec[:policy]}=", val.send(spec[:cast]))
+      "#{spec[:label]}: #{VisualizerPolicy.send(spec[:policy])}#{spec[:suffix]}"
+    end
+  end
 
   def initialize(audio_input_manager = nil, serial_manager: nil, serial_audio_source: nil)
     @audio_input_manager = audio_input_manager
@@ -25,7 +51,6 @@ class VJPad
   def exec(input)
     input = input.to_s.strip
     return { ok: true, msg: '' } if input.empty?
-    # Preprocess: wa/was with unquoted text -> quote the argument
     input = preprocess_text_command(input)
     @history << input
     result = instance_eval(input)
@@ -42,7 +67,7 @@ class VJPad
     actions
   end
 
-  # --- DSL Commands ---
+  # --- Color & Hue Commands ---
 
   def c(mode = :_get)
     if mode == :_get
@@ -61,42 +86,6 @@ class VJPad
     end
     ColorPalette.set_hue_offset(deg.to_f)
     "hue: #{ColorPalette.get_hue_offset.round(1)}"
-  end
-
-  def s(val = :_get)
-    return "sens: #{VisualizerPolicy.sensitivity}" if val == :_get
-    VisualizerPolicy.sensitivity = val.to_f
-    "sens: #{VisualizerPolicy.sensitivity}"
-  end
-
-  def ig(val = :_get)
-    return "gain: #{VisualizerPolicy.input_gain}dB" if val == :_get
-    VisualizerPolicy.input_gain = val.to_f
-    "gain: #{VisualizerPolicy.input_gain}dB"
-  end
-
-  def br(val = :_get)
-    return "bright: #{VisualizerPolicy.max_brightness}" if val == :_get
-    VisualizerPolicy.max_brightness = val.to_i
-    "bright: #{VisualizerPolicy.max_brightness}"
-  end
-
-  def lt(val = :_get)
-    return "light: #{VisualizerPolicy.max_lightness}" if val == :_get
-    VisualizerPolicy.max_lightness = val.to_i
-    "light: #{VisualizerPolicy.max_lightness}"
-  end
-
-  def em(val = :_get)
-    return "emissive: #{VisualizerPolicy.max_emissive}" if val == :_get
-    VisualizerPolicy.max_emissive = val.to_f
-    "emissive: #{VisualizerPolicy.max_emissive}"
-  end
-
-  def bm(val = :_get)
-    return "bloom: #{VisualizerPolicy.max_bloom}" if val == :_get
-    VisualizerPolicy.max_bloom = val.to_f
-    "bloom: #{VisualizerPolicy.max_bloom}"
   end
 
   def x
@@ -123,61 +112,10 @@ class VJPad
     "c:#{cn} h:#{ho} | s:#{se} ig:#{ig}dB br:#{b} lt:#{l} | em:#{e} bm:#{bl} x:#{ex}"
   end
 
-  # --- Audio-reactive Parameter Commands ---
-
-  def bbs(val = :_get)
-    return "bloom_base: #{VisualizerPolicy.bloom_base_strength}" if val == :_get
-    VisualizerPolicy.bloom_base_strength = val.to_f
-    "bloom_base: #{VisualizerPolicy.bloom_base_strength}"
-  end
-
-  def bes(val = :_get)
-    return "bloom_energy: #{VisualizerPolicy.bloom_energy_scale}" if val == :_get
-    VisualizerPolicy.bloom_energy_scale = val.to_f
-    "bloom_energy: #{VisualizerPolicy.bloom_energy_scale}"
-  end
-
-  def bis(val = :_get)
-    return "bloom_impulse: #{VisualizerPolicy.bloom_impulse_scale}" if val == :_get
-    VisualizerPolicy.bloom_impulse_scale = val.to_f
-    "bloom_impulse: #{VisualizerPolicy.bloom_impulse_scale}"
-  end
-
-  def pp(val = :_get)
-    return "particle_prob: #{VisualizerPolicy.particle_explosion_base_prob}" if val == :_get
-    VisualizerPolicy.particle_explosion_base_prob = val.to_f
-    "particle_prob: #{VisualizerPolicy.particle_explosion_base_prob}"
-  end
-
-  def pf(val = :_get)
-    return "particle_force: #{VisualizerPolicy.particle_explosion_force_scale}" if val == :_get
-    VisualizerPolicy.particle_explosion_force_scale = val.to_f
-    "particle_force: #{VisualizerPolicy.particle_explosion_force_scale}"
-  end
-
-  def fr(val = :_get)
-    return "friction: #{VisualizerPolicy.particle_friction}" if val == :_get
-    VisualizerPolicy.particle_friction = val.to_f
-    "friction: #{VisualizerPolicy.particle_friction}"
-  end
-
-  def vs(val = :_get)
-    return "smoothing: #{VisualizerPolicy.visual_smoothing}" if val == :_get
-    VisualizerPolicy.visual_smoothing = val.to_f
-    "smoothing: #{VisualizerPolicy.visual_smoothing}"
-  end
-
-  def id(val = :_get)
-    return "impulse_decay: #{VisualizerPolicy.impulse_decay}" if val == :_get
-    VisualizerPolicy.impulse_decay = val.to_f
-    "impulse_decay: #{VisualizerPolicy.impulse_decay}"
-  end
-
   # --- Audio Input Commands ---
 
   def mic(val = :_get)
     if @audio_input_manager
-      # Use AudioInputManager for state management
       is_muted = @audio_input_manager.mic_muted?
       if val == :_get
         return "mic: #{is_muted ? 'muted' : 'on'}"
@@ -191,7 +129,6 @@ class VJPad
       JS.global.setMicMute(target_mute) if JS.global.respond_to?(:setMicMute)
       "mic: #{target_mute ? 'muted' : 'on'}"
     else
-      # Fallback to JS.global for backward compatibility
       muted = JS.global[:micMuted]
       is_muted = muted == true
       if val == :_get
@@ -205,17 +142,14 @@ class VJPad
 
   def tab(val = :_get)
     if @audio_input_manager
-      # Use AudioInputManager for state management
       is_active = @audio_input_manager.tab_capture?
       if val == :_get
         return "tab: #{is_active ? 'on' : 'off'}"
       end
-      # val is non-:_get, so we're setting/toggling
       @audio_input_manager.switch_to_tab
       JS.global.toggleTabCapture() if JS.global.respond_to?(:toggleTabCapture)
       "tab: toggled"
     else
-      # Fallback to JS.global for backward compatibility
       stream = JS.global[:tabStream]
       is_active = stream.respond_to?(:typeof) ? stream.typeof.to_s != "undefined" && stream.typeof.to_s != "null" : !!stream
       if val == :_get
@@ -228,7 +162,6 @@ class VJPad
 
   # --- WordArt Commands ---
 
-  # wa "text" - display 90s WordArt text animation
   def wa(text = '')
     return "wordart: not available" unless $wordart_renderer
     return "wordart: empty text" if text.to_s.strip.empty?
@@ -236,7 +169,6 @@ class VJPad
     "wordart: #{text}"
   end
 
-  # was - stop current WordArt animation
   def was
     return "wordart: not available" unless $wordart_renderer
     $wordart_renderer.stop
@@ -245,7 +177,6 @@ class VJPad
 
   # --- Pen Input Commands ---
 
-  # pc - clear all pen strokes
   def pc
     return "pen: not available" unless $pen_input
     $pen_input.clear
@@ -262,7 +193,6 @@ class VJPad
     @serial_auto_send
   end
 
-  # sc - serial connect (triggers JS requestPort + open)
   def sc
     return "serial: not available" unless @serial_manager
     baud = @serial_manager.baud_rate
@@ -270,14 +200,12 @@ class VJPad
     "serial: connecting at #{baud}bps..."
   end
 
-  # sd - serial disconnect
   def sd
     return "serial: not available" unless @serial_manager
     JS.global.serialDisconnect()
     @serial_manager.on_disconnect
   end
 
-  # ss "text" - serial send text
   def ss(text = '')
     return "serial: not available" unless @serial_manager
     msg = @serial_manager.send_text(text.to_s)
@@ -289,7 +217,6 @@ class VJPad
     end
   end
 
-  # sr - show received log (last 10 lines)
   def sr(count = 10)
     return "serial: not available" unless @serial_manager
     lines = @serial_manager.rx_log.last(count.to_i)
@@ -297,7 +224,6 @@ class VJPad
     "serial RX:\n#{lines.join("\n")}"
   end
 
-  # st - show transmit log (last 10 lines)
   def st(count = 10)
     return "serial: not available" unless @serial_manager
     lines = @serial_manager.tx_log.last(count.to_i)
@@ -305,7 +231,6 @@ class VJPad
     "serial TX:\n#{lines.join("\n")}"
   end
 
-  # sb rate - set baud rate (38400 or 115200)
   def sb(rate = :_get)
     return "serial: not available" unless @serial_manager
     if rate == :_get
@@ -314,13 +239,11 @@ class VJPad
     @serial_manager.set_baud(rate.to_i)
   end
 
-  # si - serial info/status
   def si
     return "serial: not available" unless @serial_manager
     @serial_manager.status
   end
 
-  # sa 1/0 - enable/disable auto-send of audio frames per visualizer frame
   def sa(val = :_get)
     return "serial: not available" unless @serial_manager
     if val == :_get
@@ -330,7 +253,6 @@ class VJPad
     "serial auto: #{@serial_auto_send ? 'on' : 'off'}"
   end
 
-  # scl - clear serial logs
   def scl(target = 'all')
     return "serial: not available" unless @serial_manager
     case target.to_s
@@ -347,7 +269,6 @@ class VJPad
 
   # --- Serial Audio Commands ---
 
-  # sao [1/0] - serial audio on/off
   def sao(val = :_get)
     return "serial_audio: not available" unless @serial_audio_source
     if val == :_get
@@ -361,7 +282,6 @@ class VJPad
     "serial_audio: #{@serial_audio_source.active? ? 'on' : 'off'}"
   end
 
-  # sav [0-100] - serial audio volume (percentage)
   def sav(val = :_get)
     return "serial_audio: not available" unless @serial_audio_source
     if val == :_get
@@ -371,13 +291,11 @@ class VJPad
     "serial_audio vol: #{(@serial_audio_source.volume * 100).round}%"
   end
 
-  # sai - serial audio info/status
   def sai
     return "serial_audio: not available" unless @serial_audio_source
     @serial_audio_source.status
   end
 
-  # sad - serial audio output device picker
   def sad
     return "serial_audio: not available" unless @serial_audio_source
     JS.global.showSerialAudioDevicePicker()
@@ -396,10 +314,6 @@ class VJPad
     }.join("\n")
   end
 
-  # --- Plugin Commands ---
-  # Plugin-defined commands (burst, flash, etc.) are resolved via method_missing.
-  # Plugins register themselves via VJPlugin.define(:name) { ... }.
-
   def method_missing(name, *args, &block)
     plugin = VJPlugin.find(name)
     if plugin
@@ -415,8 +329,6 @@ class VJPad
 
   private
 
-  # Preprocess text commands (wa) to auto-quote unquoted string arguments.
-  # Allows `wa hello world` instead of requiring `wa "hello world"`.
   def preprocess_text_command(input)
     input.sub(/\A(wa)\s+(?!["'])(.+)/) { "#{$1} \"#{$2.gsub('\\', '\\\\\\\\').gsub('"', '\\"')}\"" }
   end
