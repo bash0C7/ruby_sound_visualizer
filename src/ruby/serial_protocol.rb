@@ -52,7 +52,7 @@ module SerialProtocol
   end
 
   def self.extract_frames(buffer)
-    remaining = buffer.length > MAX_BUFFER_SIZE ? buffer[-MAX_BUFFER_SIZE..] : buffer.dup
+    remaining = buffer.dup
     frames = []
 
     while (start_idx = remaining.index(START_MARKER))
@@ -71,6 +71,8 @@ module SerialProtocol
     else
       remaining = ''
     end
+
+    remaining = remaining[-MAX_BUFFER_SIZE..] if remaining.length > MAX_BUFFER_SIZE
 
     [frames, remaining]
   end

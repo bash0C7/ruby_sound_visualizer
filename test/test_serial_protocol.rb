@@ -305,4 +305,15 @@ class TestSerialProtocol < Test::Unit::TestCase
     assert_equal 0, frames.length
     assert_equal '', remaining
   end
+
+  def test_extract_frames_does_not_discard_leading_complete_frames_in_large_buffer
+    # Build a buffer larger than MAX_BUFFER_SIZE where complete frames appear before the 4096-byte boundary.
+    # The bug: truncating upfront discards frames in the leading portion.
+    leading_frame = "<L:255,B:0,M:0,H:0>\n"
+    padding = "x" * (SerialProtocol::MAX_BUFFER_SIZE + 100)
+    buffer = leading_frame + padding
+    frames, _remaining = SerialProtocol.extract_frames(buffer)
+    assert_equal 1, frames.length, "Complete frames before the buffer size boundary must not be discarded"
+    assert_in_delta 1.0, frames[0][:level], 0.01
+  end
 end
