@@ -33,45 +33,34 @@ class TestVJPad < Test::Unit::TestCase
     assert_equal "hue: 45.0", result
   end
 
-  def test_s_getter_default
-    result = @pad.s
-    assert_equal "sens: 1.0", result
+  # Data-driven PARAM_COMMANDS getter defaults
+  VJPad::PARAM_COMMANDS.each do |cmd, spec|
+    define_method("test_#{cmd}_getter_default") do
+      default_val = VisualizerPolicy::RUNTIME_PARAMS[spec[:policy]][:default]
+      expected = "#{spec[:label]}: #{default_val}#{spec[:suffix]}"
+      assert_equal expected, @pad.send(cmd)
+    end
   end
 
-  def test_ig_getter_default
-    result = @pad.ig
-    assert_equal "gain: 0.0dB", result
-  end
+  # Data-driven PARAM_COMMANDS setter roundtrip
+  PARAM_SET_VALUES = {
+    s: 1.5, ig: -6.0, br: 128, lt: 200, em: 1.5, bm: 3.0,
+    bbs: 2.0, bes: 3.0, bis: 2.0, pp: 0.5, pf: 0.8, fr: 0.75, vs: 0.85, id: 0.90
+  }.freeze
 
-  def test_ig_setter
-    result = @pad.ig(-6.0)
-    assert_equal "gain: -6.0dB", result
-    assert_in_delta(-6.0, VisualizerPolicy.input_gain, 0.001)
+  PARAM_SET_VALUES.each do |cmd, val|
+    define_method("test_#{cmd}_setter_roundtrip") do
+      spec = VJPad::PARAM_COMMANDS[cmd]
+      @pad.send(cmd, val)
+      actual = VisualizerPolicy.send(spec[:policy])
+      assert_in_delta val.send(spec[:cast]), actual, 0.001,
+        "#{cmd}(#{val}) should set #{spec[:policy]} to #{val}"
+    end
   end
 
   def test_ig_setter_clamped
     @pad.ig(25.0)
     assert_in_delta 20.0, VisualizerPolicy.input_gain, 0.001
-  end
-
-  def test_br_getter_default
-    result = @pad.br
-    assert_equal "bright: 255", result
-  end
-
-  def test_lt_getter_default
-    result = @pad.lt
-    assert_equal "light: 255", result
-  end
-
-  def test_em_getter_default
-    result = @pad.em
-    assert_equal "emissive: 2.0", result
-  end
-
-  def test_bm_getter_default
-    result = @pad.bm
-    assert_equal "bloom: 4.5", result
   end
 
   def test_i_shows_all_defaults
@@ -524,90 +513,6 @@ class TestVJPad < Test::Unit::TestCase
     # Should not raise on other commands
     result = pad.c(1)
     assert_equal "color: red", result
-  end
-
-  # === New audio-reactive parameter commands ===
-
-  def test_bbs_getter_default
-    result = @pad.bbs
-    assert_equal "bloom_base: 1.5", result
-  end
-
-  def test_bbs_setter
-    result = @pad.bbs(3.0)
-    assert_equal "bloom_base: 3.0", result
-    assert_in_delta 3.0, VisualizerPolicy.bloom_base_strength, 0.001
-  end
-
-  def test_bes_getter_default
-    result = @pad.bes
-    assert_equal "bloom_energy: 2.5", result
-  end
-
-  def test_bes_setter
-    result = @pad.bes(4.0)
-    assert_equal "bloom_energy: 4.0", result
-    assert_in_delta 4.0, VisualizerPolicy.bloom_energy_scale, 0.001
-  end
-
-  def test_bis_getter_default
-    result = @pad.bis
-    assert_equal "bloom_impulse: 1.5", result
-  end
-
-  def test_bis_setter
-    result = @pad.bis(2.5)
-    assert_equal "bloom_impulse: 2.5", result
-    assert_in_delta 2.5, VisualizerPolicy.bloom_impulse_scale, 0.001
-  end
-
-  def test_pp_getter_default
-    result = @pad.pp
-    assert_equal "particle_prob: 0.2", result
-  end
-
-  def test_pp_setter
-    result = @pad.pp(0.5)
-    assert_equal "particle_prob: 0.5", result
-    assert_in_delta 0.5, VisualizerPolicy.particle_explosion_base_prob, 0.001
-  end
-
-  def test_pf_getter_default
-    result = @pad.pf
-    assert_equal "particle_force: 0.55", result
-  end
-
-  def test_pf_setter
-    result = @pad.pf(1.0)
-    assert_equal "particle_force: 1.0", result
-    assert_in_delta 1.0, VisualizerPolicy.particle_explosion_force_scale, 0.001
-  end
-
-  def test_fr_getter_default
-    result = @pad.fr
-    assert_equal "friction: 0.86", result
-  end
-
-  def test_fr_setter
-    result = @pad.fr(0.75)
-    assert_equal "friction: 0.75", result
-    assert_in_delta 0.75, VisualizerPolicy.particle_friction, 0.001
-  end
-
-  def test_vs_getter_default
-    result = @pad.vs
-    assert_equal "smoothing: 0.7", result
-  end
-
-  def test_vs_setter
-    result = @pad.vs(0.85)
-    assert_equal "smoothing: 0.85", result
-    assert_in_delta 0.85, VisualizerPolicy.visual_smoothing, 0.001
-  end
-
-  def test_id_getter_default
-    result = @pad.id
-    assert_equal "impulse_decay: 0.82", result
   end
 
   def test_id_setter
