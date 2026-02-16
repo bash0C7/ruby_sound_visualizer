@@ -38,10 +38,13 @@ class VJPad
     end
   end
 
-  def initialize(audio_input_manager = nil, serial_manager: nil, serial_audio_source: nil)
+  def initialize(audio_input_manager = nil, serial_manager: nil, serial_audio_source: nil,
+                 wordart_renderer: nil, pen_input: nil)
     @audio_input_manager = audio_input_manager
     @serial_manager = serial_manager
     @serial_audio_source = serial_audio_source
+    @wordart_renderer = wordart_renderer
+    @pen_input = pen_input
     @history = []
     @last_result = nil
     @pending_actions = []
@@ -140,23 +143,23 @@ class VJPad
   # --- WordArt Commands ---
 
   def wa(text = '')
-    return "wordart: not available" unless $wordart_renderer
+    return "wordart: not available" unless @wordart_renderer
     return "wordart: empty text" if text.to_s.strip.empty?
-    $wordart_renderer.trigger(text.to_s)
+    @wordart_renderer.trigger(text.to_s)
     "wordart: #{text}"
   end
 
   def was
-    return "wordart: not available" unless $wordart_renderer
-    $wordart_renderer.stop
+    return "wordart: not available" unless @wordart_renderer
+    @wordart_renderer.stop
     "wordart: stopped"
   end
 
   # --- Pen Input Commands ---
 
   def pc
-    return "pen: not available" unless $pen_input
-    $pen_input.clear
+    return "pen: not available" unless @pen_input
+    @pen_input.clear
     "pen: cleared"
   end
 

@@ -3,42 +3,36 @@ class AudioAnalyzer
     @frequency_mapper = FrequencyMapper.new
     @limiter = AudioLimiter.new
 
-    # Beat detection smoothing (fast response)
     @smoothed_bass = 0.0
     @smoothed_mid = 0.0
     @smoothed_high = 0.0
 
-    # Visual smoothing (slow response, smooth motion)
     @visual_bass = 0.0
     @visual_mid = 0.0
     @visual_high = 0.0
     @visual_overall = 0.0
 
-    # Impulse values (spike on beat detection, decay over time)
     @impulse_overall = 0.0
     @impulse_bass = 0.0
     @impulse_mid = 0.0
     @impulse_high = 0.0
 
-    # ビート検出用: エネルギー履歴（リングバッファ）
     @energy_history = Array.new(VisualizerPolicy::HISTORY_SIZE, 0.0)
     @bass_history = Array.new(VisualizerPolicy::HISTORY_SIZE, 0.0)
     @mid_history = Array.new(VisualizerPolicy::HISTORY_SIZE, 0.0)
     @high_history = Array.new(VisualizerPolicy::HISTORY_SIZE, 0.0)
     @history_index = 0
 
-    # ベースライン（環境ノイズレベル）の追跡
     @baseline_bass = 0.0
     @baseline_mid = 0.0
     @baseline_high = 0.0
     @warmup_remaining = VisualizerPolicy::WARMUP_FRAMES
 
-    # ビート状態
     @beat_overall = false
     @beat_bass = false
     @beat_mid = false
     @beat_high = false
-    @beat_cooldown = 0  # 連続検出防止
+    @beat_cooldown = 0
   end
 
   def analyze(frequency_data, sensitivity = 1.0)
@@ -46,7 +40,6 @@ class AudioAnalyzer
 
     return empty_analysis if freq_array.empty?
 
-    # Apply input gain (amplifier/attenuator) to raw frequency data
     gain = VisualizerPolicy.input_gain_linear
     if gain != 1.0
       freq_array = freq_array.map { |v| [[v.to_f * gain, 0].max, 255].min }
@@ -59,7 +52,6 @@ class AudioAnalyzer
     high_energy = calculate_energy(bands[:high])
     overall_energy = calculate_energy(freq_array)
 
-    # Apply limiter to prevent transient whiteout (hand claps, etc.)
     limited = @limiter.process_bands(
       bass: bass_energy, mid: mid_energy, high: high_energy, overall: overall_energy
     )
@@ -68,30 +60,23 @@ class AudioAnalyzer
     high_energy = limited[:high]
     overall_energy = limited[:overall]
 
-    # Beat detection smoothing (fast response for accurate beat detection)
     @smoothed_bass = lerp(@smoothed_bass, bass_energy, 1.0 - VisualizerPolicy::AUDIO_SMOOTHING_FACTOR)
     @smoothed_mid = lerp(@smoothed_mid, mid_energy, 1.0 - VisualizerPolicy::AUDIO_SMOOTHING_FACTOR)
     @smoothed_high = lerp(@smoothed_high, high_energy, 1.0 - VisualizerPolicy::AUDIO_SMOOTHING_FACTOR)
 
-    # Visual smoothing (slow response for smooth visuals, no sudden jumps)
     @visual_bass = lerp(@visual_bass, bass_energy, 1.0 - VisualizerPolicy.visual_smoothing)
     @visual_mid = lerp(@visual_mid, mid_energy, 1.0 - VisualizerPolicy.visual_smoothing)
     @visual_high = lerp(@visual_high, high_energy, 1.0 - VisualizerPolicy.visual_smoothing)
     @visual_overall = lerp(@visual_overall, overall_energy, 1.0 - VisualizerPolicy.visual_smoothing)
 
-    # Exponential decay for noise reduction (natural decay, no hard cut)
     @visual_bass = exponential_decay(@visual_bass)
     @visual_mid = exponential_decay(@visual_mid)
     @visual_high = exponential_decay(@visual_high)
     @visual_overall = exponential_decay(@visual_overall)
 
-    # ビート検出（ベースライン適応型 + sensitivity 適用）
     detect_beats(overall_energy, bass_energy, mid_energy, high_energy, sensitivity)
-
-    # Generate impulse spikes on beat detection (decay over time)
     update_impulses
 
-    # 履歴に記録
     @energy_history[@history_index] = overall_energy
     @bass_history[@history_index] = bass_energy
     @mid_history[@history_index] = mid_energy
@@ -99,7 +84,7 @@ class AudioAnalyzer
     @history_index = (@history_index + 1) % VisualizerPolicy::HISTORY_SIZE
 
     {
-      bass: @visual_bass,           # Use visual values for smooth motion
+      bass: @visual_bass,
       mid: @visual_mid,
       high: @visual_high,
       overall_energy: @visual_overall,
@@ -110,7 +95,7 @@ class AudioAnalyzer
         mid: @beat_mid,
         high: @beat_high
       },
-      impulse: {                    # Impulse for instantaneous reactions
+      impulse: {
         overall: @impulse_overall,
         bass: @impulse_bass,
         mid: @impulse_mid,
@@ -127,19 +112,16 @@ class AudioAnalyzer
   private
 
   def detect_beats(overall, bass, mid, high, sensitivity)
-    # クールダウン中はビートを検出しない
     if @beat_cooldown > 0
       @beat_cooldown -= 1
       @beat_overall = false
       @beat_bass = false
       @beat_mid = false
       @beat_high = false
-      # クールダウン中もベースラインは更新（遅い追従）
       update_baseline(bass, mid, high, VisualizerPolicy::BASELINE_RATE)
       return
     end
 
-    # ウォームアップ中: ベースラインのキャリブレーションのみ
     if @warmup_remaining > 0
       @warmup_remaining -= 1
       update_baseline(bass, mid, high, VisualizerPolicy::WARMUP_RATE)
@@ -150,27 +132,20 @@ class AudioAnalyzer
       return
     end
 
-    # ベースライン（環境ノイズレベル）を移動平均で更新
-    # ビート中はベースラインを上げない（ビート値で汚染されるのを防ぐ）
     unless @beat_overall
       update_baseline(bass, mid, high, VisualizerPolicy::BASELINE_RATE)
     end
 
-    # ベースラインからの偏差に sensitivity を適用
     bass_dev = (bass - @baseline_bass) * sensitivity
     mid_dev = (mid - @baseline_mid) * sensitivity
     high_dev = (high - @baseline_high) * sensitivity
 
-    # バスドラム（bass）を主軸にビート検出
-    # 条件: ベースラインからの偏差が閾値以上 かつ 絶対値も最低レベル以上
     @beat_bass = bass_dev > VisualizerPolicy::BEAT_BASS_DEVIATION && bass > VisualizerPolicy::BEAT_MIN_BASS
     @beat_mid = mid_dev > VisualizerPolicy::BEAT_MID_DEVIATION && mid > VisualizerPolicy::BEAT_MIN_MID
     @beat_high = high_dev > VisualizerPolicy::BEAT_HIGH_DEVIATION && high > VisualizerPolicy::BEAT_MIN_HIGH
 
-    # overall は bass（バスドラム）がメイン。mid+high は補助的
     @beat_overall = @beat_bass
 
-    # ビート検出時はクールダウン（連続検出防止: 約3フレーム）
     if @beat_overall || @beat_bass
       @beat_cooldown = 3
     end
@@ -194,6 +169,7 @@ class AudioAnalyzer
     sum = 0.0
     data.each do |val|
       normalized = val.to_f / 255.0
+      normalized = 0.0 unless normalized.finite?
       sum += normalized * normalized
     end
 
@@ -207,7 +183,8 @@ class AudioAnalyzer
     max_value = 0
 
     data.length.times do |idx|
-      val = data[idx].to_i
+      raw = data[idx].to_f
+      val = raw.finite? ? raw.to_i : 0
       if val > max_value
         max_value = val
         max_index = idx
@@ -222,10 +199,7 @@ class AudioAnalyzer
   end
 
   def exponential_decay(value)
-    # Apply exponential decay for values below threshold (natural noise reduction)
-    # This avoids hard-cut noise gate and provides smooth decay to zero
     if value < VisualizerPolicy::EXPONENTIAL_THRESHOLD
-      # Quadratic decay: value^2 / threshold (approaches 0 smoothly)
       value * value / VisualizerPolicy::EXPONENTIAL_THRESHOLD
     else
       value
@@ -233,9 +207,6 @@ class AudioAnalyzer
   end
 
   def update_impulses
-    # Generate impulse spike on beat detection, then decay exponentially
-    # Impulse provides instantaneous reactions while visual values stay smooth
-
     if @beat_bass
       @impulse_bass = 1.0
     else

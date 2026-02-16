@@ -30,9 +30,6 @@ class TestVRMDancer < Test::Unit::TestCase
   # --- update() interface tests ---
 
   def test_update_accepts_delta_time_parameter
-    # VRMDancer#update should accept (analysis, delta_time) so it can be
-    # tested without JS.global dependency. This test will FAIL until
-    # we refactor update to accept delta_time as a parameter.
     analysis = make_analysis
     result = @dancer.update(analysis, 0.016)
     assert_kind_of Hash, result

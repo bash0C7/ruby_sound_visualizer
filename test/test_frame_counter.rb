@@ -54,4 +54,40 @@ class TestFrameCounter < Test::Unit::TestCase
     text = counter.fps_text
     assert_match(/FPS: \d+/, text)
   end
+
+  # === C-9: Time-skip scenario tests ===
+
+  def test_backwards_timestamp_does_not_crash
+    counter = FrameCounter.new
+    counter.tick(1000.0)
+    counter.tick(500.0)
+    counter.tick(2000.0)
+    assert_kind_of Integer, counter.current_fps
+  end
+
+  def test_backwards_timestamp_does_not_report_negative_fps
+    counter = FrameCounter.new
+    counter.tick(1000.0)
+    counter.tick(500.0)
+    counter.tick(2500.0)
+    if counter.report_ready?
+      assert counter.current_fps >= 0, "FPS should never be negative"
+    end
+  end
+
+  def test_large_time_gap_produces_low_fps
+    counter = FrameCounter.new
+    counter.tick(1000.0)
+    counter.tick(11000.0)
+    if counter.report_ready?
+      assert counter.current_fps <= 1, "FPS should be very low for large time gap"
+    end
+  end
+
+  def test_zero_timestamp_initializes_correctly
+    counter = FrameCounter.new
+    counter.tick(0.0)
+    counter.tick(16.0)
+    assert_equal false, counter.report_ready?
+  end
 end

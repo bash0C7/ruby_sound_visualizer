@@ -123,4 +123,36 @@ class TestBPMEstimator < Test::Unit::TestCase
     @estimator.record_beat(10, fps: 10.0)
     assert_equal 120, @estimator.estimated_bpm
   end
+
+  # === C-10: Variable FPS scenario tests ===
+
+  def test_bpm_with_varying_fps_between_beats
+    # Real browser FPS fluctuates between beats
+    @estimator.record_beat(0, fps: 55.0)
+    @estimator.record_beat(28, fps: 62.0)
+    @estimator.record_beat(58, fps: 58.0)
+    bpm = @estimator.estimated_bpm
+    # Should produce a reasonable BPM (around 120 with ~30 frame intervals at ~60fps)
+    assert bpm >= 100 && bpm <= 140, "BPM #{bpm} should be roughly 120 with variable FPS"
+  end
+
+  def test_bpm_stable_despite_fps_jitter
+    # Simulate consistent beats with jittering FPS
+    fps_values = [58, 62, 55, 65, 60]
+    5.times do |i|
+      @estimator.record_beat(i * 30, fps: fps_values[i].to_f)
+    end
+    bpm = @estimator.estimated_bpm
+    assert bpm > 0, "BPM should be calculable despite FPS jitter"
+    assert bpm >= 80 && bpm <= 160, "BPM #{bpm} should be reasonable despite FPS jitter"
+  end
+
+  def test_bpm_with_fps_zero_uses_clamp
+    @estimator.record_beat(0, fps: 0.0)
+    @estimator.record_beat(5, fps: 0.0)
+    @estimator.record_beat(10, fps: 0.0)
+    # Should not crash; FPS 0 gets clamped to 10
+    bpm = @estimator.estimated_bpm
+    assert_kind_of Integer, bpm
+  end
 end

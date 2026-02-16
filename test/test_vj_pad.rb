@@ -676,4 +676,36 @@ class TestVJPad < Test::Unit::TestCase
   ensure
     $wordart_renderer = nil
   end
+
+  # === C-11: exec() exception behavior tests ===
+
+  def test_exec_runtime_error_returns_error
+    result = @pad.exec("raise 'boom'")
+    assert_equal false, result[:ok]
+    assert_match(/boom/, result[:msg])
+  end
+
+  def test_exec_name_error_returns_error
+    result = @pad.exec("undefined_var_xyz")
+    assert_equal false, result[:ok]
+    assert_instance_of String, result[:msg]
+  end
+
+  def test_exec_type_error_returns_error
+    result = @pad.exec("1 + 'string'")
+    assert_equal false, result[:ok]
+    assert_instance_of String, result[:msg]
+  end
+
+  def test_exec_zero_division_returns_error
+    result = @pad.exec("1 / 0")
+    assert_equal false, result[:ok]
+    assert_instance_of String, result[:msg]
+  end
+
+  def test_exec_nil_method_call_returns_error
+    result = @pad.exec("nil.nonexistent_method")
+    assert_equal false, result[:ok]
+    assert_instance_of String, result[:msg]
+  end
 end

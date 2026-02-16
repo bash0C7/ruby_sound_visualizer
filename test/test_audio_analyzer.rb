@@ -428,6 +428,36 @@ class TestAudioAnalyzer < Test::Unit::TestCase
     assert_not_nil result_high_sens[:beat]
   end
 
+  # === Phase 9: C-8 NaN/Infinity handling tests ===
+
+  def test_analyze_handles_nan_in_frequency_data
+    freq_data = Array.new(128, 100)
+    freq_data[10] = Float::NAN
+    # Should not raise; NaN.to_f is NaN, NaN.to_i is 0
+    result = @analyzer.analyze(freq_data)
+    assert_instance_of Hash, result
+  end
+
+  def test_analyze_handles_infinity_in_frequency_data
+    freq_data = Array.new(128, 100)
+    freq_data[10] = Float::INFINITY
+    result = @analyzer.analyze(freq_data)
+    assert_instance_of Hash, result
+  end
+
+  def test_analyze_all_zeros_does_not_produce_nan
+    freq_data = Array.new(256, 0)
+    result = @analyzer.analyze(freq_data)
+    refute result[:bass].nan?, "Bass should not be NaN for zero input"
+    refute result[:overall_energy].nan?, "Overall energy should not be NaN for zero input"
+  end
+
+  def test_analyze_single_element_array
+    result = @analyzer.analyze([128])
+    assert_instance_of Hash, result
+    assert_kind_of Numeric, result[:overall_energy]
+  end
+
   def test_separate_band_beat_detection
     freq_data_silence = Array.new(128, 0)
 
