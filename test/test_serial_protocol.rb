@@ -287,4 +287,22 @@ class TestSerialProtocol < Test::Unit::TestCase
     assert_equal 1, frames.length
     assert_equal '<F:88', remaining
   end
+
+  # --- Buffer overflow protection (B-2) ---
+
+  def test_extract_frames_truncates_oversized_buffer
+    garbage = "x" * 5000
+    valid_frame = "<L:128,B:64,M:32,H:0>"
+    buffer = garbage + valid_frame
+    frames, _remaining = SerialProtocol.extract_frames(buffer)
+    assert_equal 1, frames.length
+    assert_in_delta 0.502, frames[0][:level], 0.01
+  end
+
+  def test_extract_frames_handles_max_buffer_boundary
+    buffer = "x" * (SerialProtocol::MAX_BUFFER_SIZE + 100)
+    frames, remaining = SerialProtocol.extract_frames(buffer)
+    assert_equal 0, frames.length
+    assert_equal '', remaining
+  end
 end
