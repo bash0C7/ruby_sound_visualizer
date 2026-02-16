@@ -106,16 +106,16 @@ module JSBridge
   def self.log(message)
     begin
       JS.global[:console].log("[Ruby] #{message}")
-    rescue
-      # Silent fail if console not available
+    rescue => e
+      $stderr.puts "[Ruby][WARN] console.log failed: #{e.message}"
     end
   end
 
   def self.error(message)
     begin
       JS.global[:console].error("[Ruby] #{message}")
-    rescue
-      # Silent fail if console not available
+    rescue => e
+      $stderr.puts "[Ruby][WARN] console.error failed: #{e.message}"
     end
   end
 end
