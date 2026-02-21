@@ -158,8 +158,8 @@ APP=led_visualizer rake monitor
 # Initial setup (setup_esp32 + build)
 cd picoruby && APP=led_visualizer rake buildall
 
-# Normal build workflow
-cd picoruby && APP=led_visualizer rake build && rake flash && rake monitor
+# Normal build workflow (chained tasks)
+cd picoruby && APP=led_visualizer rake build flash monitor
 
 # Check environment
 cd picoruby && rake check_env
@@ -167,6 +167,8 @@ cd picoruby && rake check_env
 # Clean rebuild
 cd picoruby && APP=led_visualizer rake cleanbuild
 ```
+
+**Note**: For large build logs, use the `/rake-picoruby` skill to filter and extract only key information (errors, warnings, completion status). This minimizes context window pollution during automation.
 
 ## File Structure
 
