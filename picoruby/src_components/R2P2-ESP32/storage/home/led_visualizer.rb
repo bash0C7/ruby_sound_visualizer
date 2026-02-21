@@ -7,6 +7,8 @@
 
 require 'ws2812'
 require 'uart'
+require 'gpio'
+require 'irq'
 
 LED_PIN = 27
 LED_COUNT = 25
@@ -33,6 +35,10 @@ COLUMN_BAND = [:bass, :bass, :mid, :high, :high]
 # Initialize hardware
 uart = UART.new(unit: :ESP32_UART0, baudrate: BAUD_RATE)
 led = WS2812.new(RMTDriver.new(LED_PIN))
+button = GPIO.new(39, GPIO::IN|GPIO::PULL_UP)
+irq = button.irq(GPIO::EDGE_FALL, debounce: 100, capture: {uart: uart}) do |btn, ev, cap|
+  cap[:uart].write("<F:440,D:50>\n")
+end
 
 # Parse a single byte value from "KEY:NNN" format
 def parse_field(pair)
@@ -136,6 +142,7 @@ sleep_ms 500
 clear_leds(led)
 
 while true
+  IRQ.process
   # Read available serial data
   while uart.bytes_available > 0
     byte = uart.read(1)
@@ -161,3 +168,4 @@ while true
 
   sleep_ms 1
 end
+irq.unregister
