@@ -24,6 +24,7 @@ HUE_BASS_C = 128    # Cyan (complement of Red)
 HUE_MID_C  = 213    # Magenta (complement of Green)
 HUE_HIGH_C = 42     # Yellow (complement of Blue)
 COMPLEMENT_MAX = 45  # Max brightness for complementary color fill
+COMPLEMENT_MIN = 5   # Minimum brightness - always lit even in silence
 
 # Column-to-band mapping
 # Columns 0,1 = Bass, Column 2 = Mid, Columns 3,4 = High
@@ -111,6 +112,7 @@ def render_leds(led, data)
         colors << pack_hsb(band_hue(band), SATURATION, brightness)
       else
         comp_bri = (COMPLEMENT_MAX * level / 255.0).to_i
+        comp_bri = COMPLEMENT_MIN if comp_bri < COMPLEMENT_MIN
         colors << pack_hsb(complement_hue(band), SATURATION, comp_bri)
       end
     end
