@@ -58,8 +58,15 @@ end
 ```ruby
 require 'ws2812'
 led = WS2812.new(RMTDriver.new(27))  # GPIO 27 for ATOM Matrix internal LEDs
-led.show_hsb_hex(index, hue, saturation, brightness)
-led.show  # flush to hardware
+
+# Pack HSB into single integer: (hue << 16) | (saturation << 8) | brightness
+def pack_hsb(hue, saturation, brightness)
+  (hue << 16) | (saturation << 8) | brightness
+end
+
+colors = []
+25.times { colors << pack_hsb(hue, 255, brightness) }
+led.show_hsb_hex(*colors)  # splat packed integer array; no led.show needed
 ```
 
 ## PicoRuby Compatibility Restrictions
