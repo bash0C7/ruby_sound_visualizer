@@ -121,7 +121,7 @@ while true
   # Read available serial data
   while uart.bytes_available > 0
     byte = uart.read(1)
-    next unless byte
+    next unless byte && byte.length == 1
 
     if byte == "\n" || byte == "\r"
       # Try to parse accumulated buffer as frame

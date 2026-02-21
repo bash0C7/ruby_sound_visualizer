@@ -30,6 +30,31 @@ cd picoruby && APP=<app_name> rake <task1> <task2> ...
 - `rake cleanbuild flash` - Clean rebuild and flash
 - `rake cleanbuild flash monitor` - Clean rebuild, flash, and monitor
 
+## Serial Port Release Before Flash
+
+**ALWAYS run this before any `flash` task** to prevent "port busy" errors.
+
+Chrome Web Serial may hold the port open. Release it first:
+
+```bash
+# macOS: release via AppleScript to Chrome
+osascript -e 'tell application "Google Chrome" to execute active tab of first window javascript "if(typeof serialDisconnect === \"function\") { serialDisconnect(); } navigator.serial.getPorts().then(async ports => { for(const p of ports) { try { if(p.readable) { const r = p.readable.getReader(); r.cancel(); r.releaseLock(); } if(p.writable) { p.writable.getWriter().releaseLock(); } await p.close(); } catch(e) {} } console.log(\"[PortRelease] Done\"); });"' 2>/dev/null
+
+sleep 2
+
+# Verify port is free
+PORT=$(ls /dev/cu.usbserial-* 2>/dev/null | head -1)
+if [ -n "$PORT" ]; then
+  HOLDER=$(lsof "$PORT" 2>/dev/null | awk 'NR>1 {print $1, $2}' | head -1)
+  if [ -n "$HOLDER" ]; then
+    echo "WARNING: Port $PORT still busy: $HOLDER"
+    echo "Manually disconnect Web Serial from the visualizer before flashing."
+    exit 1
+  fi
+fi
+echo "Port released OK"
+```
+
 ## Build + Flash Execution (60-120 seconds)
 
 When running `build flash`:
