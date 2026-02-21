@@ -20,7 +20,7 @@ SATURATION = 255
 
 # Column-to-band mapping
 # Columns 0,1 = Bass, Column 2 = Mid, Columns 3,4 = High
-COLUMN_BAND = [:bass, :bass, :mid, :high, :high].freeze
+COLUMN_BAND = [:bass, :bass, :mid, :high, :high]
 
 # Initialize hardware
 uart = UART.new(unit: :ESP32_UART0, baudrate: BAUD_RATE)
@@ -57,7 +57,7 @@ def parse_frame(frame)
     end
   end
 
-  return nil unless values.key?(:level) && values.key?(:bass) && values.key?(:mid) && values.key?(:high)
+  return nil unless values[:level] != nil && values[:bass] != nil && values[:mid] != nil && values[:high] != nil
   values
 end
 

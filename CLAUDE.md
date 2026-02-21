@@ -111,7 +111,19 @@ picoruby/               # PicoRuby firmware for ATOM Matrix
 ├── CLAUDE.md                 # PicoRuby project instructions
 ├── AGENTS.md                 # Symlink to CLAUDE.md
 ├── SERIAL_AUDIO_PROTOCOL.md  # Serial audio protocol spec (PicoRuby → Chrome)
-└── led_visualizer.rb         # LED VU meter firmware (5x5 WS2812)
+├── Rakefile                  # Build automation (rake build/flash/monitor)
+├── .claude/
+│   └── settings.local.json   # Rake command permissions
+└── src_components/           # Source components (git-tracked)
+    └── R2P2-ESP32/
+        ├── sdkconfig.defaults
+        ├── storage/home/
+        │   └── led_visualizer.rb   # LED VU meter firmware (5x5 WS2812, edit here)
+        └── components/picoruby-esp32/
+            ├── CMakeLists.txt
+            └── picoruby/
+                ├── build_config/xtensa-esp.rb
+                └── mrbgems/{picoruby-ws2812,picoruby-irq}/
 .claude/                # Project-specific configuration & documentation
 ├── ARCHITECTURE.md     # Architecture details
 ├── INVESTIGATION-PROTOCOL.md  # Investigation protocol
@@ -130,6 +142,7 @@ picoruby/               # PicoRuby firmware for ATOM Matrix
     ├── create-plugin/  # Scaffold new VJ Pad plugin
     ├── debug-browser/  # Browser debugging procedures
     ├── browser-clean-session/  # Clean browser session
+    ├── rake-picoruby/  # PicoRuby rake operations (build/flash/monitor)
     └── troubleshoot/   # Basic troubleshooting
 ```
 
@@ -141,9 +154,14 @@ Available skills:
 - **create-plugin**: Scaffold a new VJ Pad plugin with test file and registration
 - **debug-browser**: Detailed browser debugging procedure for ruby.wasm app using Chrome MCP tools
 - **browser-clean-session**: Open visualizer in clean browser session with full cache clear
+- **rake-picoruby**: Run PicoRuby build/flash/monitor operations (filters verbose rake output to key information only)
 - **troubleshoot**: Basic troubleshooting guide
 
 Skills are project-local and defined within this repository.
+
+### PicoRuby Build Operations
+
+For all PicoRuby build, flash, and monitor operations, delegate to `/rake-picoruby` skill to filter verbose logs and extract essential information. This minimizes context window pollution.
 
 ## Quick Start
 
