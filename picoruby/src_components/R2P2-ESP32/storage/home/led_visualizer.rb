@@ -19,6 +19,12 @@ HUE_MID  = 85    # Green
 HUE_HIGH = 170   # Blue
 SATURATION = 255
 
+# Complementary hue values (+128 on color wheel, mod 256)
+HUE_BASS_C = 128    # Cyan (complement of Red)
+HUE_MID_C  = 213    # Magenta (complement of Green)
+HUE_HIGH_C = 42     # Yellow (complement of Blue)
+COMPLEMENT_MAX = 45  # Max brightness for complementary color fill
+
 # Column-to-band mapping
 # Columns 0,1 = Bass, Column 2 = Mid, Columns 3,4 = High
 COLUMN_BAND = [:bass, :bass, :mid, :high, :high]
@@ -72,17 +78,13 @@ def band_hue(band)
   end
 end
 
-# Calculate LED brightness for a given row and band value
-# Bottom rows light up first (like a VU meter)
-def row_brightness(row, band_value, level)
-  # row 0 = top (hardest to light), row 4 = bottom (easiest)
-  threshold = (4 - row) * 51  # 0, 51, 102, 153, 204
-  if band_value > threshold
-    # Scale brightness by level (overall volume)
-    raw = [(band_value - threshold) * 5, 255].min
-    (raw * level / 255.0).to_i
-  else
-    0
+# Map band to complementary hue
+def complement_hue(band)
+  case band
+  when :bass then HUE_BASS_C
+  when :mid  then HUE_MID_C
+  when :high then HUE_HIGH_C
+  else 128
   end
 end
 
@@ -93,15 +95,24 @@ def pack_hsb(hue, saturation, brightness)
 end
 
 # Render audio data to LED matrix
+# Signal rows: main color (red/green/blue) by band level
+# Unlit rows: complementary color (cyan/magenta/yellow) as dim fill
 def render_leds(led, data)
   colors = []
+  level = data[:level] || 0
   MATRIX_SIZE.times do |row|
+    threshold = (4 - row) * 51  # row 4=0, row 3=51, row 2=102, row 1=153, row 0=204
     MATRIX_SIZE.times do |col|
       band = COLUMN_BAND[col]
-      hue = band_hue(band)
       band_val = data[band] || 0
-      brightness = row_brightness(row, band_val, data[:level] || 0)
-      colors << pack_hsb(hue, SATURATION, brightness)
+      if band_val > threshold
+        raw = [(band_val - threshold) * 5, 255].min
+        brightness = (raw * level / 255.0).to_i
+        colors << pack_hsb(band_hue(band), SATURATION, brightness)
+      else
+        comp_bri = (COMPLEMENT_MAX * level / 255.0).to_i
+        colors << pack_hsb(complement_hue(band), SATURATION, comp_bri)
+      end
     end
   end
   led.show_hsb_hex(*colors)
