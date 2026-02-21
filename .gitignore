@@ -64,3 +64,6 @@ server.log
 
 # macOS Finder metadata
 .DS_Store
+
+# PicoRuby components (generated, not tracked)
+/picoruby/components/
