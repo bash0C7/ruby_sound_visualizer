@@ -86,34 +86,39 @@ def row_brightness(row, band_value, level)
   end
 end
 
+# Pack HSB into single integer for show_hsb_hex
+# Format: (hue << 16) | (saturation << 8) | brightness
+def pack_hsb(hue, saturation, brightness)
+  (hue << 16) | (saturation << 8) | brightness
+end
+
 # Render audio data to LED matrix
 def render_leds(led, data)
+  colors = []
   MATRIX_SIZE.times do |row|
     MATRIX_SIZE.times do |col|
-      idx = row * MATRIX_SIZE + col
       band = COLUMN_BAND[col]
       hue = band_hue(band)
       band_val = data[band] || 0
       brightness = row_brightness(row, band_val, data[:level] || 0)
-      led.show_hsb_hex(idx, hue, SATURATION, brightness)
+      colors << pack_hsb(hue, SATURATION, brightness)
     end
   end
-  led.show
+  led.show_hsb_hex(*colors)
 end
 
 # Clear all LEDs
 def clear_leds(led)
-  LED_COUNT.times { |i| led.show_hsb_hex(i, 0, 0, 0) }
-  led.show
+  led.show_hsb_hex(*Array.new(LED_COUNT, 0))
 end
 
 # Main loop: read serial, parse frames, render LEDs
 rx_buffer = ''
 last_data = { level: 0, bass: 0, mid: 0, high: 0 }
 
-# Initial LED test: brief flash
-LED_COUNT.times { |i| led.show_hsb_hex(i, 85, 255, 30) }
-led.show
+# Initial LED test: brief flash (green)
+init_color = pack_hsb(85, 255, 30)
+led.show_hsb_hex(*Array.new(LED_COUNT, init_color))
 sleep_ms 500
 clear_leds(led)
 
