@@ -6,6 +6,7 @@
 # Brightness controlled by band magnitude.
 
 require 'ws2812'
+require 'uart'
 
 LED_PIN = 27
 LED_COUNT = 25
