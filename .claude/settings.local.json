@@ -27,7 +27,11 @@
       "WebFetch(domain:bash0c7.github.io)",
       "Bash(git fetch:*)",
       "Read(//Users/bash/src/Arduino/picoruby-ot/**)",
-      "Read(//Users/bash/src/Arduino/picoruby-ot/src_components/**)"
+      "Read(//Users/bash/src/Arduino/picoruby-ot/src_components/**)",
+      "Bash(timeout 10 bash:*)",
+      "Bash(APP=led_visualizer rake build:*)",
+      "Bash(tee:*)",
+      "Read(//private/tmp/**)"
     ]
   }
 }
