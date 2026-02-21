@@ -25,7 +25,9 @@
       "Bash(gh pr checkout:*)",
       "Bash(git checkout:*)",
       "WebFetch(domain:bash0c7.github.io)",
-      "Bash(git fetch:*)"
+      "Bash(git fetch:*)",
+      "Read(//Users/bash/src/Arduino/picoruby-ot/**)",
+      "Read(//Users/bash/src/Arduino/picoruby-ot/src_components/**)"
     ]
   }
 }

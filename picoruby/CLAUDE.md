@@ -105,9 +105,68 @@ end
 Human-operated: build PicoRuby firmware using R2P2 toolchain to verify syntax compatibility.
 Syntax errors may only appear at build time, not from standard `ruby -c`.
 
-## Build and Flash
+## Build System
 
-Human-operated: build and flash PicoRuby firmware using R2P2 toolchain. Claude Code does not execute build/flash commands.
+Build tasks are automated via `picoruby/Rakefile` (adapted from picoruby-ot).
+
+### Rake Task Permissions
+
+| Task | Permission | Reason |
+|------|-----------|--------|
+| `rake check_env` | Allowed | Read-only environment check |
+| `rake monitor` | Allowed | Read-only serial output monitoring |
+| `rake build` | Ask first | Time-consuming build operation |
+| `rake cleanbuild` | Ask first | Destructive clean + build |
+| `rake buildall` | Ask first | Setup + build (recommended for initial setup) |
+| `rake flash` | Ask first | Hardware write operation |
+| `rake init` | Denied | Contains `git reset --hard` operations |
+| `rake update` | Denied | Contains `git reset --hard` operations |
+
+### Build Workflow
+
+```
+src_components/R2P2-ESP32/storage/home/led_visualizer.rb  ← edit here (git-tracked)
+  ↓ copy_source_components
+components/R2P2-ESP32/storage/home/led_visualizer.rb
+  ↓ picorbc (compile .rb → .mrb)
+components/R2P2-ESP32/storage/home/app.mrb
+  ↓ idf.py build (in components/R2P2-ESP32/)
+  ↓ idf.py flash
+ATOM Matrix ESP32
+```
+
+### Environment Requirements
+
+- ESP-IDF: `$HOME/esp/esp-idf/`
+- Homebrew OpenSSL: `/opt/homebrew/opt/openssl`
+- Target: ESP32 (Xtensa architecture)
+
+### Application Selection
+
+Build a specific PicoRuby application by setting the `APP` environment variable:
+
+```bash
+# Specify the app name (required)
+APP=led_visualizer rake build
+APP=led_visualizer rake flash
+APP=led_visualizer rake monitor
+```
+
+### Usage Examples
+
+```bash
+# Initial setup (setup_esp32 + build)
+cd picoruby && APP=led_visualizer rake buildall
+
+# Normal build workflow
+cd picoruby && APP=led_visualizer rake build && rake flash && rake monitor
+
+# Check environment
+cd picoruby && rake check_env
+
+# Clean rebuild
+cd picoruby && APP=led_visualizer rake cleanbuild
+```
 
 ## File Structure
 
@@ -115,5 +174,23 @@ Human-operated: build and flash PicoRuby firmware using R2P2 toolchain. Claude C
 picoruby/
   CLAUDE.md          # This file (project instructions)
   AGENTS.md          # Symlink to CLAUDE.md
-  led_visualizer.rb  # Main firmware code
+  SERIAL_AUDIO_PROTOCOL.md  # Serial protocol spec
+  Rakefile           # Build automation
+  .claude/
+    settings.local.json  # Rake command permissions
+  src_components/    # Source components (git-tracked)
+    R2P2-ESP32/
+      sdkconfig.defaults
+      storage/home/
+        led_visualizer.rb    # Main firmware source (edit here)
+      components/picoruby-esp32/
+        CMakeLists.txt
+        picoruby/
+          build_config/
+            xtensa-esp.rb      # mruby cross-compile configuration
+          mrbgems/
+            picoruby-ws2812/   # WS2812 LED driver
+            picoruby-irq/      # Interrupt library
+  components/        # Build directory (git-ignored)
+    R2P2-ESP32/      # Cloned PicoRuby runtime
 ```

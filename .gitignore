@@ -55,8 +55,9 @@ build-iPhoneSimulator/
 # Used by RuboCop. Remote config files pulled in from inherit_from directive.
 # .rubocop-https?--*
 
-# PicoRuby compiled files (root only, subdirectories are tracked)
+# PicoRuby compiled files (root and src_components)
 /*.mrb
+/picoruby/src_components/**/*.mrb
 
 # Rake server task files
 server.pid

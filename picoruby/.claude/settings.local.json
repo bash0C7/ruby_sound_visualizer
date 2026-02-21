@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rake monitor)",
+      "Bash(rake check_env)"
+    ],
+    "deny": [
+      "Bash(rake init)",
+      "Bash(rake update)"
+    ]
+  }
+}
