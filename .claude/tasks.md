@@ -12,22 +12,6 @@ Project task list for tracking progress.
 
 ## PicoRuby LED Visualizer Tasks (ATOM Matrix)
 
-### DONE items (this session)
-
-- [P-1] DONE: Add `require 'uart'` to led_visualizer.rb (was causing NameError on boot)
-- [P-2] DONE: Fix `byte.length == 1` validation in serial receive loop (following otma.rb pattern)
-- [P-3] DONE: Fix WS2812 `show_hsb_hex` API usage — rewritten to packed HSB integer format
-  - `pack_hsb(hue, sat, bri)` helper + `led.show_hsb_hex(*colors)` splat call
-  - Old code passed 4 args treated as 4 LED colors (SATURATION=255 → white LED)
-- [P-4] DONE: Add complementary color fill to LED matrix
-  - Signal rows: main color (red/green/blue) by VU level
-  - Unlit rows: complementary color (cyan/magenta/yellow) at dim brightness
-  - `COMPLEMENT_MAX=45`, `COMPLEMENT_MIN=5` (always-on floor in silence)
-- [P-5] DONE: Update rake-picoruby skill with serial port disconnect + `$>` crash detection
-- [P-6] DONE: Update picoruby/CLAUDE.md with `rake build flash monitor` task chaining
-
-### Pending
-
 - [P-7] PENDING: Hardware verification of complementary color + silence floor
   - Need `rake build flash` then reconnect Chrome Web Serial + enable Auto TX
   - Verify: silence → faint complement glow; loud audio → vivid RGB VU meter
@@ -39,23 +23,6 @@ Project task list for tracking progress.
   - Currently complement brightness is static in silence (fixed at COMPLEMENT_MIN)
   - Could add slow sine-wave pulse for ambient glow when no audio detected
 
-- [P-10] DONE: Add button UART send to led_visualizer.rb
-  - File: picoruby/src_components/R2P2-ESP32/storage/home/led_visualizer.rb
-  - Step 1: Add at top of file (after existing requires):
-      require 'gpio'
-      require 'irq'
-  - Step 2: After `led = WS2812.new(RMTDriver.new(LED_PIN))` line, add:
-      button = GPIO.new(39, GPIO::IN|GPIO::PULL_UP)
-      irq = button.irq(GPIO::EDGE_FALL, debounce: 100, capture: {uart: uart}) do |btn, ev, cap|
-        cap[:uart].write("<F:440,D:50>\n")
-      end
-  - Step 3: First line inside `while true` loop, add:
-      IRQ.process
-  - Step 4: After `end` of `while true` block, add:
-      irq.unregister
-  - Pattern ref: otpwm.rb lines 273, 290-293 (in ~/src/Arduino/picoruby-ot — read-only ref OK)
-  - PicoRuby compat: no inline rescue, no defined?, no lambda/proc (see picoruby/CLAUDE.md)
-
 - [P-11] PENDING [Web/Local]: Hardware verify — button triggers Chrome 440Hz audio
   - APP=led_visualizer rake build flash, reconnect Chrome Web Serial + enable Auto TX
   - Press GPIO39 button → SerialRxDisplay shows `<F:440,D:50>` → Chrome plays 440Hz tone
@@ -64,25 +31,6 @@ Project task list for tracking progress.
 - [P-12] PENDING [Web/Local]: Button behavior tuning (optional/future)
   - Current: fixed 440Hz per press
   - Alternatives: toggle mute, level-derived frequency, hold-to-sustain
-
-## Documentation Update Tasks [Web/Local]
-
-- [D-1] DONE: Fix WS2812 Reference in picoruby/CLAUDE.md
-  - File: picoruby/CLAUDE.md — section "### WS2812 Reference"
-  - Replace the entire WS2812 Reference code block:
-    WRONG (current):
-      led.show_hsb_hex(index, hue, saturation, brightness)
-      led.show  # flush to hardware
-    CORRECT (replace with):
-      # Pack HSB into single integer: (hue << 16) | (saturation << 8) | brightness
-      def pack_hsb(hue, saturation, brightness)
-        (hue << 16) | (saturation << 8) | brightness
-      end
-
-      colors = []
-      25.times { colors << pack_hsb(hue, 255, brightness) }
-      led.show_hsb_hex(*colors)  # splat packed integer array; no led.show needed
-  - Confirmed correct API from led_visualizer.rb lines 94-96 and 120
 
 ## picoruby-ot Tasks [LOCAL ONLY]
 
@@ -167,15 +115,3 @@ NOTE: ~/src/Arduino/picoruby-ot は Claude Code on the Web からアクセス不
           ├── AmbientLEDVisualizer: LED visualization (reused from otpwm.rb)
           ├── UARTSender: UART <F:NNN,D:NNN> frame output (replaces PWM)
           └── WS2812 LED Strip (GPIO26)
-
-## Implementation Order
-
-| Step | Task | Environment |
-|------|------|-------------|
-| 1 | [D-1] Fix WS2812 Reference in picoruby/CLAUDE.md | Web/Local |
-| 2 | [P-10] Add button UART send to led_visualizer.rb | Web/Local |
-| 3 | Commit D-1 + P-10 via git subagent | Web/Local |
-| 4 | [P-11] Hardware verify (manual, human-operated) | Web/Local |
-| 5 | [OT-1] Create otv.rb | LOCAL ONLY |
-| 6 | [OT-2] Update picoruby-ot/README.md | LOCAL ONLY |
-| 7 | Commit OT-1 + OT-2 in picoruby-ot repo (local git) | LOCAL ONLY |
