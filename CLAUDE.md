@@ -97,16 +97,36 @@ src/ruby/               # Ruby source files
 │   ├── vj_rave.rb            # Rave preset (max energy + param boost)
 │   ├── vj_serial.rb          # Web Serial plugin (connect/send/receive)
 │   └── vj_wordart.rb         # WordArt text effect plugin
+├── main.rb                   # Application entry point and initialization
+├── js_bridge.rb              # Ruby-JavaScript interoperability bridge
 ├── vj_plugin.rb              # Plugin system core (VJPlugin + PluginDefinition)
-├── effect_dispatcher.rb      # Plugin effects → EffectManager translator
 ├── vj_pad.rb                 # VJ Pad DSL (delegates to plugins)
+├── vj_serial_commands.rb     # VJ Pad serial command handler
+├── effect_dispatcher.rb      # Plugin effects → EffectManager translator
 ├── effect_manager.rb         # Coordinates all visual effects
+├── audio_input_manager.rb    # Microphone input management
+├── audio_analyzer.rb         # Frequency spectrum analysis
+├── audio_limiter.rb          # Audio dynamic range control
+├── frequency_mapper.rb       # Frequency to visual parameter mapping
+├── bpm_estimator.rb          # BPM detection and tracking
+├── camera_controller.rb      # Three.js camera controls
+├── bloom_controller.rb       # Bloom post-processing effect control
+├── geometry_morpher.rb       # Mesh morphing and transformation
+├── particle_system.rb        # Particle effect system
+├── color_palette.rb          # Color management and palette operations
+├── vrm_dancer.rb             # VRM avatar animation control
+├── vrm_material_controller.rb # VRM model material management
 ├── serial_protocol.rb        # ASCII serial frame format (encode/decode)
 ├── serial_manager.rb         # Serial connection state machine
 ├── serial_audio_source.rb    # Serial PWM audio output state management
 ├── wordart_renderer.rb       # 90s WordArt text animation engine
 ├── pen_input.rb              # Mouse pen drawing with fade-out
-└── ...                       # Other core modules
+├── keyboard_handler.rb       # Keyboard input event handling
+├── snapshot_manager.rb       # Save/load visualizer state
+├── visualizer_policy.rb      # Visualization policy and mode management
+├── debug_formatter.rb        # Debug output formatting utilities
+├── frame_counter.rb          # Frame counting and timing
+└── math_helper.rb            # Mathematical utility functions
 picoruby/               # PicoRuby firmware for ATOM Matrix
 ├── CLAUDE.md                 # PicoRuby project instructions
 ├── AGENTS.md                 # Symlink to CLAUDE.md
