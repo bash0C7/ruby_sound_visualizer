@@ -291,6 +291,8 @@
         <option value="38400">38400</option>
       </select>
       <label style="margin-left:4px;"><input type="checkbox" id="cpSerialAuto" style="margin-right:2px;">Auto TX</label>
+      <span id="serialTxLed" title="TX" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#333;margin-left:6px;vertical-align:middle;"></span><span style="color:#555;font-size:9px;margin-left:1px;vertical-align:middle;">TX</span>
+      <span id="serialRxLed" title="RX" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#333;margin-left:4px;vertical-align:middle;"></span><span style="color:#555;font-size:9px;margin-left:1px;vertical-align:middle;">RX</span>
       <span id="serialRxDisplay" style="color:#0ff;font-size:10px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-left:4px;display:block;"></span>
     </div>
     <div class="cp-audio-source" id="cpAudioSource" style="display:flex;align-items:center;gap:4px;padding:4px 8px;border-top:1px solid #444;margin-top:4px;">
@@ -829,7 +831,7 @@
             while (_serialPort) {
               const { value, done } = await _serialReader.read();
               if (done) break;
-              if (value && window.rubySerialOnReceive) window.rubySerialOnReceive(value);
+              if (value && window.rubySerialOnReceive) { flashSerialLed('serialRxLed', '#00aaff'); window.rubySerialOnReceive(value); }
             }
           } catch (e) {
             console.error('[Serial] Read error:', e);
@@ -855,10 +857,20 @@
       } catch (e) { console.error('[Serial] Disconnect error:', e); }
     };
 
+    function flashSerialLed(id, color) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.style.background = color;
+      el.style.boxShadow = '0 0 4px ' + color;
+      clearTimeout(el._flashTimer);
+      el._flashTimer = setTimeout(() => { el.style.background = '#333'; el.style.boxShadow = 'none'; }, 150);
+    }
+
     window.serialSend = async function(text) {
       if (!_serialWriter) { console.warn('[Serial] Not connected'); return; }
       try {
         const encoder = new TextEncoder();
+        flashSerialLed('serialTxLed', '#00ff88');
         await _serialWriter.write(encoder.encode(text));
       } catch (e) { console.error('[Serial] Send error:', e); }
     };

@@ -81,10 +81,12 @@ class TestSerialAudioSource < Test::Unit::TestCase
     assert_equal 0, @source.duty
   end
 
-  def test_update_ignored_when_inactive
+  def test_update_auto_starts_when_inactive
+    assert_equal false, @source.active?
     @source.update(880, 75)
-    assert_equal 440, @source.frequency
-    assert_equal 50, @source.duty
+    assert_equal true, @source.active?
+    assert_equal 880, @source.frequency
+    assert_equal 75, @source.duty
   end
 
   def test_update_sets_pending

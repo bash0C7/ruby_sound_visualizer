@@ -33,9 +33,9 @@ class SerialAudioSource
   end
 
   # Update frequency and duty from received serial data.
-  # Ignored when inactive.
+  # Auto-starts on first call so PicoRuby button press triggers audio immediately.
   def update(freq, duty)
-    return unless @active
+    start unless @active
     @frequency = [[freq.to_i, FREQ_MIN].max, FREQ_MAX].min
     @duty = [[duty.to_i, DUTY_MIN].max, DUTY_MAX].min
     @pending_update = true
