@@ -112,7 +112,7 @@ class SynthEngine
     f = clamp(freq.to_i, FREQ_MIN, FREQ_MAX)
     d = clamp(duty.to_i, DUTY_MIN, DUTY_MAX)
 
-    if f == 0 && d == 0
+    if f == 0 || d == 0
       note_off
       return
     end

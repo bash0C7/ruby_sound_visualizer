@@ -38,6 +38,26 @@ class TestSynthIntegration < Test::Unit::TestCase
     assert_equal false, synth.active?
   end
 
+  def test_serial_mute_duty_zero_stops_synth
+    synth = SynthEngine.new
+    manager = SerialManager.new
+    manager.on_connect(115200)
+
+    # Start: normal frequency frame
+    frames = manager.receive_data("<F:440,D:50>\n")
+    synth.note_on(frames[0][:frequency], frames[0][:duty])
+    assert_equal true, synth.active?
+
+    # Mute: otv.rb toggle_mute sends D:0 with same frequency
+    frames = manager.receive_data("<F:440,D:0>\n")
+    assert_equal :frequency, frames[0][:type]
+    assert_equal 440, frames[0][:frequency]
+    assert_equal 0, frames[0][:duty]
+
+    synth.note_on(frames[0][:frequency], frames[0][:duty])
+    assert_equal false, synth.active?
+  end
+
   def test_serial_protocol_to_synth_flow
     synth = SynthEngine.new
     manager = SerialManager.new

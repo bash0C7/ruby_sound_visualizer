@@ -310,6 +310,13 @@ class TestSynthEngine < Test::Unit::TestCase
     assert_equal false, @engine.active?
   end
 
+  def test_note_on_nonzero_freq_zero_duty_triggers_note_off
+    # otv.rb mute case: <F:440,D:0> - duty=0 means muted/off
+    @engine.note_on(440, 50)
+    @engine.note_on(440, 0)
+    assert_equal false, @engine.active?
+  end
+
   # --- Gain ---
 
   def test_set_gain
