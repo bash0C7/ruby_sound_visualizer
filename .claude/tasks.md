@@ -39,7 +39,7 @@ Project task list for tracking progress.
   - Currently complement brightness is static in silence (fixed at COMPLEMENT_MIN)
   - Could add slow sine-wave pulse for ambient glow when no audio detected
 
-- [P-10] PENDING [Web/Local]: Add button UART send to led_visualizer.rb
+- [P-10] DONE: Add button UART send to led_visualizer.rb
   - File: picoruby/src_components/R2P2-ESP32/storage/home/led_visualizer.rb
   - Step 1: Add at top of file (after existing requires):
       require 'gpio'
@@ -67,7 +67,7 @@ Project task list for tracking progress.
 
 ## Documentation Update Tasks [Web/Local]
 
-- [D-1] PENDING [Web/Local]: Fix WS2812 Reference in picoruby/CLAUDE.md
+- [D-1] DONE: Fix WS2812 Reference in picoruby/CLAUDE.md
   - File: picoruby/CLAUDE.md — section "### WS2812 Reference"
   - Replace the entire WS2812 Reference code block:
     WRONG (current):
