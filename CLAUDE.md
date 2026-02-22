@@ -36,6 +36,7 @@ Real-time audio visualizer that analyzes microphone input and generates vivid 3D
 - **Use subagent**: Delegate git operations to Task tool subagent (exception: Claude Code Web allows direct git operations via skills including git push)
 - **Push policy**: Push allowed from Claude Code on web only. Local sessions stop at commit (manual push by humans).
 - **Commit message format**: English only, follow conventional commits style
+- **File moves**: Always use `git mv` instead of copy+delete. After renaming/moving files, update ALL referencing files (index.html, require statements, etc.) and verify with browser testing.
 
 ### Implementation Approach
 
@@ -69,7 +70,12 @@ See [.claude/INVESTIGATION-PROTOCOL.md](.claude/INVESTIGATION-PROTOCOL.md) for d
 
 **Chrome MCP tools required**: ALWAYS use Chrome MCP tools (`mcp__claude-in-chrome__*`) for browser verification.
 
-Use `/debug-browser` skill for detailed procedures.
+**CRITICAL: Never claim something works without actual Chrome MCP verification. Do not report completion until screenshot and console check confirm it.**
+
+- **Cache busting**: ruby.wasm aggressively caches. Always use `?nocache=<random>` in URL when testing. If changes seem invisible, suspect caching first.
+- **JS::Object nil? prohibition**: Never use `.nil?` on `JS::Object` instances — it always returns `false` (BasicObject). Use `.typeof == "undefined"` instead.
+
+Use `/debug-browser` skill for detailed procedures. Use `/verify` skill for the full TDD + browser confirmation loop.
 
 ## Technical Specifications
 
@@ -163,7 +169,8 @@ picoruby/               # PicoRuby firmware for ATOM Matrix
     ├── debug-browser/  # Browser debugging procedures
     ├── browser-clean-session/  # Clean browser session
     ├── rake-picoruby/  # PicoRuby rake operations (build/flash/monitor)
-    └── troubleshoot/   # Basic troubleshooting
+    ├── troubleshoot/   # Basic troubleshooting
+    └── verify/         # TDD + Chrome browser confirmation loop
 ```
 
 ## Project Skills
@@ -176,6 +183,7 @@ Available skills:
 - **browser-clean-session**: Open visualizer in clean browser session with full cache clear
 - **rake-picoruby**: Run PicoRuby build/flash/monitor operations (filters verbose rake output to key information only)
 - **troubleshoot**: Basic troubleshooting guide
+- **verify**: Full TDD + Chrome browser confirmation loop (rake test → hard refresh → screenshot → console check)
 
 Skills are project-local and defined within this repository.
 
