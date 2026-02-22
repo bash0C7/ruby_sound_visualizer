@@ -108,6 +108,7 @@ src/ruby/               # Ruby source files
 ├── vj_plugin.rb              # Plugin system core (VJPlugin + PluginDefinition)
 ├── vj_pad.rb                 # VJ Pad DSL (delegates to plugins)
 ├── vj_serial_commands.rb     # VJ Pad serial command handler
+├── vj_synth_commands.rb      # VJ Pad synth/oscilloscope command handler
 ├── effect_dispatcher.rb      # Plugin effects → EffectManager translator
 ├── effect_manager.rb         # Coordinates all visual effects
 ├── audio_input_manager.rb    # Microphone input management
@@ -125,6 +126,8 @@ src/ruby/               # Ruby source files
 ├── serial_protocol.rb        # ASCII serial frame format (encode/decode)
 ├── serial_manager.rb         # Serial connection state machine
 ├── serial_audio_source.rb    # Serial PWM audio output state management
+├── synth_engine.rb           # Analog monophonic synthesizer state management
+├── oscilloscope_renderer.rb  # 3D oscilloscope waveform visualization state
 ├── wordart_renderer.rb       # 90s WordArt text animation engine
 ├── pen_input.rb              # Mouse pen drawing with fade-out
 ├── keyboard_handler.rb       # Keyboard input event handling

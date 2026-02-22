@@ -45,6 +45,60 @@ Web Audio API
   └→ AudioContext.destination (speaker output)
 ```
 
+## Synth Audio Data Flow (PicoRuby → Chrome → Oscilloscope)
+
+```
+PicoRuby (ESP32)
+  ↓ USB Serial: <F:NNNNN,D:NNN>\n
+Chrome Web Serial read loop
+  ↓ rubySerialOnReceive(data)
+Ruby WASM VM
+  - SerialManager.receive_data → SerialProtocol.extract_frames
+  - Frequency frame detected (type: :frequency)
+  - SerialAudioSource.update(freq, duty)  [legacy PWM path]
+  - SynthEngine.note_on(freq, duty)       [synth path]
+  ↓ pending_update? in main loop
+JavaScript
+  - updateSynthAudio(freq, duty, active, gain, waveform, attack, decay,
+                     sustain, release, cutoff, resonance, filterType)
+  - OscillatorNode → BiquadFilterNode → GainNode (ADSR) → AnalyserNode
+  ↓
+Web Audio API
+  ├→ AnalyserNode (visualization + oscilloscope waveform capture)
+  └→ AudioContext.destination (speaker output)
+  ↓
+JavaScript (oscilloscope)
+  - updateOscilloscope(waveform, scrollOffset, intensity, color, zPos, yPos)
+  - 256-segment THREE.Line + 48-line history ring buffer
+  - Positioned at z=8, y=-2 (in front of VRM/particles)
+  ↓
+Three.js Rendering (renderOrder=999, foreground layer)
+```
+
+## Synth Engine (Ruby)
+
+`SynthEngine` manages analog monophonic synthesizer state:
+
+- **Waveform**: sine, square, sawtooth, triangle
+- **ADSR Envelope**: attack (0.001-5s), decay (0.001-5s), sustain (0-1), release (0.001-5s)
+- **Filter**: cutoff (20-20000 Hz), resonance/Q (0-30), type (lowpass/highpass/bandpass)
+- **Note control**: note_on(freq, duty) from serial, note_off on zero duty
+- **Pending update pattern**: same as SerialAudioSource for efficient JS bridge calls
+
+VJ Pad commands: syn_w, syn_a, syn_d, syn_s, syn_r, syn_fc, syn_fq, syn_ft, syn_g, syn_i
+
+## Oscilloscope Renderer (Ruby)
+
+`OscilloscopeRenderer` manages 3D oscilloscope visualization state:
+
+- **Waveform buffer**: 256 samples, clamped to [-1, 1]
+- **History ring buffer**: 64 depth for 3D ribbon trail effect
+- **Scroll animation**: left-to-right flow, configurable speed (0.1-10)
+- **Position**: z=8 (in front of VRM/particles), y=-2
+- **Intensity**: driven by synth duty cycle when active
+
+VJ Pad commands: osc (toggle), osc_sp (scroll speed)
+
 ## Technical Stack
 
 - **Ruby 3.4.7** (via @ruby/4.0-wasm-wasi 2.8.1)
@@ -229,6 +283,8 @@ HTML/CSS (lines 1-X)
 JavaScript (lines X-Y)
   ├── Three.js setup
   ├── Web Audio API
+  ├── Synth Audio Engine (OscillatorNode + BiquadFilter + ADSR GainNode)
+  ├── Oscilloscope 3D Mesh (THREE.Line + history ring buffer)
   ├── Rendering loop
   └── Communication with Ruby WASM
 
@@ -244,7 +300,9 @@ Ruby Code (lines Y-Z)
   ├── BloomController
   ├── AudioInputManager
   ├── SerialAudioSource
+  ├── SynthEngine (analog monophonic synth state)
+  ├── OscilloscopeRenderer (3D waveform visualization state)
   ├── VisualizerPolicy (constants + mutable params)
-  ├── VJPad (DSL commands)
+  ├── VJPad (DSL commands + VJSynthCommands)
   └── Main (initialization & main loop)
 ```
