@@ -80,8 +80,6 @@ class KeyboardHandler
     return unless @audio_input_manager
 
     @audio_input_manager.toggle_mic
-    volume = @audio_input_manager.mic_volume
-    JS.global.call(:setMicVolume, volume) if JS.global.respond_to?(:call)
 
     status = @audio_input_manager.mic_muted? ? "OFF" : "ON"
     JSBridge.log "Mic: #{status}"
@@ -91,7 +89,6 @@ class KeyboardHandler
     return unless @audio_input_manager
 
     @audio_input_manager.switch_to_tab
-    JS.global.call(:captureTab, true) if JS.global.respond_to?(:call)
 
     status = @audio_input_manager.tab_capture? ? "ON" : "OFF"
     JSBridge.log "Tab Capture: #{status}"
