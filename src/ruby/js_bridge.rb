@@ -134,7 +134,10 @@ module JSBridge
         data[:intensity],
         data[:color],
         data[:z_position],
-        data[:y_position]
+        data[:y_position],
+        data[:tube_radius],
+        data[:spark_intensity],
+        data[:spark_color]
       )
     rescue => e
       JS.global[:console].error("JSBridge error updating oscilloscope: #{e.message}")

@@ -178,13 +178,77 @@ class TestOscilloscopeRenderer < Test::Unit::TestCase
   end
 
   def test_ribbon_z_position_default
-    # Should be in front of other objects (closer to camera)
+    # Camera is at z=5 looking toward z=0. Oscilloscope at z=3 is
+    # in front of main geometry (z=0) and visible from camera (near=4.9).
     assert @renderer.z_position > 0
-    assert_in_delta 8.0, @renderer.z_position, 0.1
+    assert_in_delta 3.0, @renderer.z_position, 0.1
   end
 
   def test_ribbon_y_position_default
-    assert_in_delta(-2.0, @renderer.y_position, 0.1)
+    assert_in_delta 0.0, @renderer.y_position, 0.1
+  end
+
+  def test_set_y_position
+    @renderer.set_y_position(2.5)
+    assert_in_delta 2.5, @renderer.y_position, 0.01
+  end
+
+  def test_set_y_position_negative
+    @renderer.set_y_position(-3.0)
+    assert_in_delta(-3.0, @renderer.y_position, 0.01)
+  end
+
+  # --- Tube radius ---
+
+  def test_initial_tube_radius
+    assert_in_delta 0.3, @renderer.tube_radius, 0.01
+  end
+
+  def test_set_tube_radius
+    @renderer.set_tube_radius(0.7)
+    assert_in_delta 0.7, @renderer.tube_radius, 0.01
+  end
+
+  def test_set_tube_radius_clamps_min
+    @renderer.set_tube_radius(0.0)
+    assert @renderer.tube_radius > 0.0
+  end
+
+  def test_set_tube_radius_clamps_max
+    @renderer.set_tube_radius(99.0)
+    assert @renderer.tube_radius <= 2.0
+  end
+
+  # --- Spark intensity ---
+
+  def test_initial_spark_intensity
+    assert_in_delta 0.5, @renderer.spark_intensity, 0.01
+  end
+
+  def test_set_spark_intensity
+    @renderer.set_spark_intensity(0.8)
+    assert_in_delta 0.8, @renderer.spark_intensity, 0.01
+  end
+
+  def test_set_spark_intensity_clamps_min
+    @renderer.set_spark_intensity(-1.0)
+    assert_in_delta 0.0, @renderer.spark_intensity, 0.001
+  end
+
+  def test_set_spark_intensity_clamps_max
+    @renderer.set_spark_intensity(2.0)
+    assert_in_delta 1.0, @renderer.spark_intensity, 0.001
+  end
+
+  # --- Spark color ---
+
+  def test_initial_spark_color
+    c = @renderer.spark_color
+    assert_equal 3, c.length
+    # Default hot orange
+    assert_in_delta 1.0, c[0], 0.01
+    assert_in_delta 0.5, c[1], 0.01
+    assert_in_delta 0.0, c[2], 0.01
   end
 
   # --- Render data ---
@@ -201,6 +265,9 @@ class TestOscilloscopeRenderer < Test::Unit::TestCase
     assert data.key?(:z_position)
     assert data.key?(:y_position)
     assert data.key?(:enabled)
+    assert data.key?(:tube_radius)
+    assert data.key?(:spark_intensity)
+    assert data.key?(:spark_color)
   end
 
   def test_render_data_waveform_is_array

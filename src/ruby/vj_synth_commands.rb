@@ -120,4 +120,34 @@ module VJSynthCommands
     @oscilloscope_renderer.set_scroll_speed(val.to_f)
     "osc speed: #{@oscilloscope_renderer.scroll_speed}"
   end
+
+  # Oscilloscope tube radius (line thickness): osc_r [radius]
+  def osc_r(val = :_get)
+    return "oscilloscope: not available" unless @oscilloscope_renderer
+    if val == :_get
+      return "osc radius: #{@oscilloscope_renderer.tube_radius}"
+    end
+    @oscilloscope_renderer.set_tube_radius(val.to_f)
+    "osc radius: #{@oscilloscope_renderer.tube_radius}"
+  end
+
+  # Oscilloscope Y position: osc_y [position]
+  def osc_y(val = :_get)
+    return "oscilloscope: not available" unless @oscilloscope_renderer
+    if val == :_get
+      return "osc y: #{@oscilloscope_renderer.y_position}"
+    end
+    @oscilloscope_renderer.set_y_position(val.to_f)
+    "osc y: #{@oscilloscope_renderer.y_position}"
+  end
+
+  # Oscilloscope spark intensity: osc_spark [0.0-1.0]
+  def osc_spark(val = :_get)
+    return "oscilloscope: not available" unless @oscilloscope_renderer
+    if val == :_get
+      return "osc spark: #{@oscilloscope_renderer.spark_intensity}"
+    end
+    @oscilloscope_renderer.set_spark_intensity(val.to_f)
+    "osc spark: #{@oscilloscope_renderer.spark_intensity}"
+  end
 end

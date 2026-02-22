@@ -136,7 +136,7 @@ src/ruby/               # Ruby source files
 ├── debug_formatter.rb        # Debug output formatting utilities
 ├── frame_counter.rb          # Frame counting and timing
 └── math_helper.rb            # Mathematical utility functions
-picoruby/               # PicoRuby firmware for ATOM Matrix
+picoruby/               # PicoRuby firmware (two apps)
 ├── CLAUDE.md                 # PicoRuby project instructions
 ├── AGENTS.md                 # Symlink to CLAUDE.md
 ├── SERIAL_AUDIO_PROTOCOL.md  # Serial audio protocol spec (PicoRuby → Chrome)
@@ -147,7 +147,8 @@ picoruby/               # PicoRuby firmware for ATOM Matrix
     └── R2P2-ESP32/
         ├── sdkconfig.defaults
         ├── storage/home/
-        │   └── led_visualizer.rb   # LED VU meter firmware (5x5 WS2812, edit here)
+        │   ├── led_visualizer.rb   # LED VU meter firmware (ATOM Matrix 5x5 WS2812, APP=led_visualizer)
+        │   └── otv.rb              # Theremin instrument firmware (R2P2-ESP32, APP=otv)
         └── components/picoruby-esp32/
             ├── CMakeLists.txt
             └── picoruby/
@@ -234,6 +235,7 @@ Reference guides for technologies used in this project (located in `.claude/guid
 - [VRM Guide](.claude/guides/vrm.md) - VRM model loading, bones, expressions
 - [JS-Ruby Interop](.claude/guides/js-ruby-wasm-interop.md) - JavaScript & ruby.wasm integration
 - [ruby.wasm Technical](.claude/guides/ruby-wasm-technical.md) - ruby.wasm platform specifics
+- [PicoRuby Theremin Instrument](.claude/guides/picoruby-instrument.md) - otv.rb signal flow, hardware, and key classes
 
 ## References
 

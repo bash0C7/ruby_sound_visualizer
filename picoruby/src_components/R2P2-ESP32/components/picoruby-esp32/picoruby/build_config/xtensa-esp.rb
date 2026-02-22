@@ -46,9 +46,11 @@ MRuby::CrossBuild.new("esp32") do |conf|
   # Interrupt support
   conf.gem core: 'picoruby-irq'
 
+
+  conf.gem core: 'picoruby-irq'
   # 削除: picoruby-mpu6886 (ATOM Matrixの加速度センサー: 未使用)
-  # 削除: picoruby-vl53l0x (距離センサー: 未使用)
   # 削除: picoruby-iir_filter (フィルタライブラリ: 未使用)
+  conf.gem github: 'bash0C7/picoruby-vl53l0x', branch: 'main'
 
   conf.picoruby(alloc_libc: false)
 end

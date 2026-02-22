@@ -10,14 +10,21 @@ class OscilloscopeRenderer
   SCROLL_SPEED_MAX = 10.0
   DEFAULT_RIBBON_WIDTH = 20.0
   DEFAULT_RIBBON_HEIGHT = 3.0
-  DEFAULT_Z_POSITION = 8.0
-  DEFAULT_Y_POSITION = -2.0
+  DEFAULT_Z_POSITION = 3.0
+  DEFAULT_Y_POSITION = 0.0
+  DEFAULT_TUBE_RADIUS = 0.3
+  TUBE_RADIUS_MIN = 0.01
+  TUBE_RADIUS_MAX = 2.0
+  DEFAULT_SPARK_INTENSITY = 0.5
+  # Default hot orange spark color
+  DEFAULT_SPARK_COLOR = [1.0, 0.5, 0.0].freeze
   # Default green oscilloscope color
   DEFAULT_COLOR = [0.0, 1.0, 0.4].freeze
 
   attr_reader :buffer_size, :waveform_buffer, :scroll_offset, :intensity
   attr_reader :color, :scroll_speed, :ribbon_width, :ribbon_height
   attr_reader :z_position, :y_position, :history_depth
+  attr_reader :tube_radius, :spark_intensity, :spark_color
 
   def initialize(buffer_size: DEFAULT_BUFFER_SIZE, history_depth: DEFAULT_HISTORY_DEPTH)
     @buffer_size = buffer_size
@@ -31,6 +38,9 @@ class OscilloscopeRenderer
     @ribbon_height = DEFAULT_RIBBON_HEIGHT
     @z_position = DEFAULT_Z_POSITION
     @y_position = DEFAULT_Y_POSITION
+    @tube_radius = DEFAULT_TUBE_RADIUS
+    @spark_intensity = DEFAULT_SPARK_INTENSITY
+    @spark_color = DEFAULT_SPARK_COLOR.dup
     @enabled = true
     @history = []
   end
@@ -86,6 +96,22 @@ class OscilloscopeRenderer
     @color = [clamp(r.to_f, 0.0, 1.0), clamp(g.to_f, 0.0, 1.0), clamp(b.to_f, 0.0, 1.0)]
   end
 
+  def set_tube_radius(val)
+    @tube_radius = clamp(val.to_f, TUBE_RADIUS_MIN, TUBE_RADIUS_MAX)
+  end
+
+  def set_y_position(val)
+    @y_position = val.to_f
+  end
+
+  def set_spark_intensity(val)
+    @spark_intensity = clamp(val.to_f, 0.0, 1.0)
+  end
+
+  def set_spark_color(r, g, b)
+    @spark_color = [clamp(r.to_f, 0.0, 1.0), clamp(g.to_f, 0.0, 1.0), clamp(b.to_f, 0.0, 1.0)]
+  end
+
   # Return all data needed by JS bridge for Three.js rendering.
   def render_data
     {
@@ -98,6 +124,9 @@ class OscilloscopeRenderer
       ribbon_height: @ribbon_height,
       z_position: @z_position,
       y_position: @y_position,
+      tube_radius: @tube_radius,
+      spark_intensity: @spark_intensity,
+      spark_color: @spark_color,
       enabled: @enabled
     }
   end

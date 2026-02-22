@@ -351,6 +351,21 @@
         <input type="range" id="cpOscSpeed" min="1" max="100" step="1" value="20" style="flex:1;">
         <span class="cp-value" id="cpOscSpeedVal">2.0</span>
       </div>
+      <div class="cp-slider-row">
+        <span class="cp-label" title="Oscilloscope line thickness (tube radius)">Thick</span>
+        <input type="range" id="cpOscThickness" min="1" max="20" step="1" value="6">
+        <span class="cp-value" id="cpOscThicknessVal">0.30</span>
+      </div>
+      <div class="cp-slider-row">
+        <span class="cp-label" title="Oscilloscope vertical position">Y Pos</span>
+        <input type="range" id="cpOscYPos" min="-50" max="50" step="5" value="0">
+        <span class="cp-value" id="cpOscYPosVal">0.0</span>
+      </div>
+      <div class="cp-slider-row">
+        <span class="cp-label" title="Oscilloscope spark/flame intensity">Spark</span>
+        <input type="range" id="cpOscSpark" min="0" max="10" step="1" value="5">
+        <span class="cp-value" id="cpOscSparkVal">0.5</span>
+      </div>
     </div>
 
     <div class="cp-audio-source" id="cpAudioSource" style="display:flex;align-items:center;gap:4px;padding:4px 8px;border-top:1px solid #444;margin-top:4px;">
@@ -1170,41 +1185,75 @@
     }
 
     // === Oscilloscope 3D Waveform (Three.js) ===
-    let _oscLine = null;         // THREE.Line object
-    let _oscGeometry = null;     // BufferGeometry
-    let _oscMaterial = null;     // LineBasicMaterial
-    let _oscHistory = [];        // Ring buffer of past waveform lines
-    let _oscHistoryLines = [];   // THREE.Line objects for history
-    const OSC_SEGMENTS = 256;    // Points per waveform line
+    let _oscTubeMesh = null;     // THREE.Mesh with TubeGeometry (current waveform)
+    let _oscTubeMaterial = null; // ShaderMaterial for spark effect
+    let _oscHistory = [];        // Ring buffer of past waveform position arrays
+    let _oscHistoryLines = [];   // THREE.Line objects for history (thin fading trails)
+    const OSC_CURVE_POINTS = 64; // Control points for TubeGeometry curve (performance balance)
+    const OSC_SEGMENTS = 256;    // Points per history waveform line
     const OSC_HISTORY_MAX = 48;  // Number of trailing waveform lines
     const OSC_RIBBON_WIDTH = 20; // Width of ribbon in world units
     const OSC_RIBBON_HEIGHT = 3; // Max amplitude in world units
-    const OSC_Z_BASE = 8;       // Z position (in front of everything)
-    const OSC_Y_BASE = -2;      // Y position
-    let _oscScrollOffset = 0;
+    const OSC_Z_BASE = 3;        // Z position: camera@z=5 looking at z=0, so z=3 is visible in front
+    const OSC_Y_BASE = 0;        // Y position (center)
+
+    // Vertex shader: sine-based noise displacement for spark/flame effect
+    const OSC_VERT_SHADER = `
+      uniform float time;
+      uniform float sparkIntensity;
+      void main() {
+        float noise = sin(position.x * 8.0 + time * 4.0) * 0.04 * sparkIntensity
+                    + sin(position.x * 3.0 - time * 2.5) * 0.06 * sparkIntensity;
+        vec3 displaced = position + normal * noise;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(displaced, 1.0);
+      }
+    `;
+
+    // Fragment shader: hot color mix based on spark intensity
+    const OSC_FRAG_SHADER = `
+      uniform float sparkIntensity;
+      uniform vec3 sparkColor;
+      uniform vec3 baseColor;
+      void main() {
+        vec3 col = mix(baseColor, sparkColor, sparkIntensity * 0.8);
+        float alpha = 0.5 + 0.5 * sparkIntensity;
+        gl_FragColor = vec4(col, alpha);
+      }
+    `;
 
     function initOscilloscope() {
       if (!scene) return;
 
-      // Current waveform line (bright)
-      _oscGeometry = new THREE.BufferGeometry();
-      const positions = new Float32Array(OSC_SEGMENTS * 3);
-      _oscGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-
-      _oscMaterial = new THREE.LineBasicMaterial({
-        color: 0x00ff66,
+      // ShaderMaterial for current waveform tube (spark/flame effect)
+      _oscTubeMaterial = new THREE.ShaderMaterial({
+        vertexShader: OSC_VERT_SHADER,
+        fragmentShader: OSC_FRAG_SHADER,
+        uniforms: {
+          time: { value: 0.0 },
+          sparkIntensity: { value: 0.5 },
+          sparkColor: { value: new THREE.Vector3(1.0, 0.5, 0.0) },
+          baseColor: { value: new THREE.Vector3(0.0, 1.0, 0.4) }
+        },
         transparent: true,
-        opacity: 1.0,
         blending: THREE.AdditiveBlending,
-        linewidth: 2
+        side: THREE.DoubleSide
       });
 
-      _oscLine = new THREE.Line(_oscGeometry, _oscMaterial);
-      _oscLine.frustumCulled = false;
-      _oscLine.renderOrder = 999; // Render last (in front)
-      scene.add(_oscLine);
+      // Initial flat tube (will be recreated each frame with real waveform data)
+      const initPoints = [];
+      for (let i = 0; i < OSC_CURVE_POINTS; i++) {
+        const x = -OSC_RIBBON_WIDTH / 2 + (i / (OSC_CURVE_POINTS - 1)) * OSC_RIBBON_WIDTH;
+        initPoints.push(new THREE.Vector3(x, OSC_Y_BASE, OSC_Z_BASE));
+      }
+      const initCurve = new THREE.CatmullRomCurve3(initPoints);
+      const initGeo = new THREE.TubeGeometry(initCurve, OSC_CURVE_POINTS, 0.3, 6, false);
+      _oscTubeMesh = new THREE.Mesh(initGeo, _oscTubeMaterial);
+      _oscTubeMesh.frustumCulled = false;
+      _oscTubeMesh.renderOrder = 999;
+      _oscTubeMesh.visible = false;
+      scene.add(_oscTubeMesh);
 
-      // Initialize history lines pool
+      // Initialize history lines pool (thin LineBasicMaterial for trailing effect)
       for (let i = 0; i < OSC_HISTORY_MAX; i++) {
         const histGeo = new THREE.BufferGeometry();
         const histPos = new Float32Array(OSC_SEGMENTS * 3);
@@ -1225,37 +1274,62 @@
     }
 
     // Called from Ruby JSBridge.update_oscilloscope
-    window.updateOscilloscope = function(waveform, scrollOffset, intensity, color, zPos, yPos) {
-      if (!_oscLine || !scene) return;
+    window.updateOscilloscope = function(waveform, scrollOffset, intensity, color, zPos, yPos, tubeRadius, sparkIntensity, sparkColor) {
+      if (!_oscTubeMesh || !scene) return;
 
       // Get actual time-domain data from synth analyser
       const synthWave = getSynthWaveform();
       const wave = synthWave || new Float32Array(OSC_SEGMENTS);
 
-      // Update current waveform line positions
-      const positions = _oscGeometry.attributes.position.array;
       const halfWidth = OSC_RIBBON_WIDTH / 2;
       const halfHeight = OSC_RIBBON_HEIGHT / 2;
-      const step = wave.length / OSC_SEGMENTS;
+      const actualYPos = (yPos !== undefined && yPos !== null) ? yPos : OSC_Y_BASE;
+      const actualZPos = (zPos !== undefined && zPos !== null) ? zPos : OSC_Z_BASE;
+      const actualRadius = (tubeRadius !== undefined && tubeRadius !== null && tubeRadius > 0) ? tubeRadius : 0.3;
+      const actualSpark = (sparkIntensity !== undefined && sparkIntensity !== null) ? sparkIntensity : 0.5;
+      const r = color && color[0] !== undefined ? color[0] : 0;
+      const g = color && color[1] !== undefined ? color[1] : 1;
+      const b = color && color[2] !== undefined ? color[2] : 0.4;
+      const sr = sparkColor && sparkColor[0] !== undefined ? sparkColor[0] : 1.0;
+      const sg = sparkColor && sparkColor[1] !== undefined ? sparkColor[1] : 0.5;
+      const sb = sparkColor && sparkColor[2] !== undefined ? sparkColor[2] : 0.0;
 
+      // Build CatmullRomCurve3 from waveform samples (reduced points for perf)
+      const step = wave.length / OSC_CURVE_POINTS;
+      const curvePoints = [];
+      for (let i = 0; i < OSC_CURVE_POINTS; i++) {
+        const x = -halfWidth + (i / (OSC_CURVE_POINTS - 1)) * OSC_RIBBON_WIDTH;
+        const sampleIdx = Math.min(Math.floor(i * step), wave.length - 1);
+        const y = actualYPos + wave[sampleIdx] * halfHeight * intensity;
+        curvePoints.push(new THREE.Vector3(x, y, actualZPos));
+      }
+      const curve = new THREE.CatmullRomCurve3(curvePoints);
+
+      // Recreate TubeGeometry each frame (dispose old to free GPU memory)
+      const oldGeo = _oscTubeMesh.geometry;
+      _oscTubeMesh.geometry = new THREE.TubeGeometry(curve, OSC_CURVE_POINTS, actualRadius, 6, false);
+      oldGeo.dispose();
+
+      // Update shader uniforms
+      _oscTubeMaterial.uniforms.time.value = performance.now() / 1000.0;
+      _oscTubeMaterial.uniforms.sparkIntensity.value = actualSpark;
+      _oscTubeMaterial.uniforms.baseColor.value.set(r, g, b);
+      _oscTubeMaterial.uniforms.sparkColor.value.set(sr, sg, sb);
+      _oscTubeMesh.visible = intensity > 0.01;
+
+      // Also build flat position array for history lines (full resolution)
+      const histStep = wave.length / OSC_SEGMENTS;
+      const positions = new Float32Array(OSC_SEGMENTS * 3);
       for (let i = 0; i < OSC_SEGMENTS; i++) {
         const x = -halfWidth + (i / (OSC_SEGMENTS - 1)) * OSC_RIBBON_WIDTH;
-        const sampleIdx = Math.min(Math.floor(i * step), wave.length - 1);
-        const y = (yPos || OSC_Y_BASE) + wave[sampleIdx] * halfHeight * intensity;
-        const z = zPos || OSC_Z_BASE;
+        const sampleIdx = Math.min(Math.floor(i * histStep), wave.length - 1);
+        const y = actualYPos + wave[sampleIdx] * halfHeight * intensity;
         positions[i * 3] = x;
         positions[i * 3 + 1] = y;
-        positions[i * 3 + 2] = z;
+        positions[i * 3 + 2] = actualZPos;
       }
-      _oscGeometry.attributes.position.needsUpdate = true;
 
-      // Update current line color and opacity
-      const r = color[0] || 0, g = color[1] || 1, b = color[2] || 0.4;
-      _oscMaterial.color.setRGB(r, g, b);
-      _oscMaterial.opacity = Math.max(0.3, intensity);
-      _oscLine.visible = intensity > 0.01;
-
-      // Push to history ring buffer (shift existing lines back in Z)
+      // Push to history ring buffer
       _oscHistory.unshift(Array.from(positions));
       if (_oscHistory.length > OSC_HISTORY_MAX) _oscHistory.pop();
 
@@ -1268,7 +1342,7 @@
         }
         const histPositions = entry.geometry.attributes.position.array;
         const srcPositions = _oscHistory[h];
-        const zOffset = -(h + 1) * 0.3; // Each history line is 0.3 units behind
+        const zOffset = -(h + 1) * 0.3;
         for (let i = 0; i < OSC_SEGMENTS; i++) {
           histPositions[i * 3] = srcPositions[i * 3];
           histPositions[i * 3 + 1] = srcPositions[i * 3 + 1];
@@ -2708,6 +2782,39 @@
           const speed = (parseFloat(oscSpeed.value) / 10).toFixed(1);
           if (oscSpeedVal) oscSpeedVal.textContent = speed;
           if (window.rubyExecPrompt) window.rubyExecPrompt('osc_sp ' + speed);
+        });
+      }
+
+      // Oscilloscope thickness (tube radius) slider
+      const oscThickness = document.getElementById('cpOscThickness');
+      const oscThicknessVal = document.getElementById('cpOscThicknessVal');
+      if (oscThickness) {
+        oscThickness.addEventListener('input', () => {
+          const radius = (parseFloat(oscThickness.value) / 20).toFixed(2);
+          if (oscThicknessVal) oscThicknessVal.textContent = radius;
+          if (window.rubyExecPrompt) window.rubyExecPrompt('osc_r ' + radius);
+        });
+      }
+
+      // Oscilloscope Y position slider
+      const oscYPos = document.getElementById('cpOscYPos');
+      const oscYPosVal = document.getElementById('cpOscYPosVal');
+      if (oscYPos) {
+        oscYPos.addEventListener('input', () => {
+          const ypos = (parseFloat(oscYPos.value) / 10).toFixed(1);
+          if (oscYPosVal) oscYPosVal.textContent = ypos;
+          if (window.rubyExecPrompt) window.rubyExecPrompt('osc_y ' + ypos);
+        });
+      }
+
+      // Oscilloscope spark intensity slider
+      const oscSpark = document.getElementById('cpOscSpark');
+      const oscSparkVal = document.getElementById('cpOscSparkVal');
+      if (oscSpark) {
+        oscSpark.addEventListener('input', () => {
+          const spark = (parseFloat(oscSpark.value) / 10).toFixed(1);
+          if (oscSparkVal) oscSparkVal.textContent = spark;
+          if (window.rubyExecPrompt) window.rubyExecPrompt('osc_spark ' + spark);
         });
       }
 
