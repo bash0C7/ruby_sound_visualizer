@@ -205,4 +205,67 @@ class TestVJSynthCommands < Test::Unit::TestCase
     assert_equal "osc speed: 5.0", result[:msg]
     assert_in_delta 5.0, @oscilloscope_renderer.scroll_speed, 0.01
   end
+
+  # --- Oscilloscope tube radius ---
+
+  def test_osc_r_get
+    result = @pad.exec("osc_r")
+    assert_equal "osc radius: 0.3", result[:msg]
+  end
+
+  def test_osc_r_set
+    result = @pad.exec("osc_r 0.7")
+    assert_equal "osc radius: 0.7", result[:msg]
+    assert_in_delta 0.7, @oscilloscope_renderer.tube_radius, 0.01
+  end
+
+  def test_osc_r_not_available
+    pad = VJPad.new
+    result = pad.exec("osc_r")
+    assert_equal "oscilloscope: not available", result[:msg]
+  end
+
+  # --- Oscilloscope Y position ---
+
+  def test_osc_y_get
+    result = @pad.exec("osc_y")
+    assert_equal "osc y: 0.0", result[:msg]
+  end
+
+  def test_osc_y_set
+    result = @pad.exec("osc_y 2.5")
+    assert_equal "osc y: 2.5", result[:msg]
+    assert_in_delta 2.5, @oscilloscope_renderer.y_position, 0.01
+  end
+
+  def test_osc_y_set_negative
+    result = @pad.exec("osc_y -3.0")
+    assert_equal "osc y: -3.0", result[:msg]
+    assert_in_delta(-3.0, @oscilloscope_renderer.y_position, 0.01)
+  end
+
+  def test_osc_y_not_available
+    pad = VJPad.new
+    result = pad.exec("osc_y")
+    assert_equal "oscilloscope: not available", result[:msg]
+  end
+
+  # --- Oscilloscope spark intensity ---
+
+  def test_osc_spark_get
+    result = @pad.exec("osc_spark")
+    assert_equal "osc spark: 0.5", result[:msg]
+  end
+
+  def test_osc_spark_set
+    result = @pad.exec("osc_spark 0.8")
+    assert_equal "osc spark: 0.8", result[:msg]
+    assert_in_delta 0.8, @oscilloscope_renderer.spark_intensity, 0.01
+  end
+
+  def test_osc_spark_not_available
+    pad = VJPad.new
+    result = pad.exec("osc_spark")
+    assert_equal "oscilloscope: not available", result[:msg]
+  end
 end
