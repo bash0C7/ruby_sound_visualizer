@@ -37,7 +37,7 @@ Project task list for tracking progress.
 NOTE: ~/src/Arduino/picoruby-ot は Claude Code on the Web からアクセス不可。
       ローカル Claude Code セッションでのみ実施すること。
 
-- [OT-1] PENDING [LOCAL]: Create otv.rb in picoruby-ot project
+- [OT-1] DONE [LOCAL]: Create otv.rb in picoruby-ot project
   - New file: /Users/bash/src/Arduino/picoruby-ot/src_components/R2P2-ESP32/storage/home/otv.rb
   - Base: otpwm.rb をコピーして以下を変更
   - REMOVE from otpwm.rb:
@@ -90,7 +90,7 @@ NOTE: ~/src/Arduino/picoruby-ot は Claude Code on the Web からアクセス不
   - PicoRuby compat: no inline rescue, no defined?, no lambda/proc
   - Build verify: cd ~/src/Arduino/picoruby-ot && APP=otv rake build
 
-- [OT-2] PENDING [LOCAL]: Update picoruby-ot README.md
+- [OT-2] DONE [LOCAL]: Update picoruby-ot README.md
   - File: /Users/bash/src/Arduino/picoruby-ot/README.md
   - Add to Overview section (after otpwm.rb description):
       ### otv.rb - Distance Sensor UART Visualizer
