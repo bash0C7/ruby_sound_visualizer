@@ -16,11 +16,15 @@ class VisualizerApp
     @frame_counter = FrameCounter.new
     @serial_manager = SerialManager.new
     @serial_audio_source = SerialAudioSource.new
+    @synth_engine = SynthEngine.new
+    @oscilloscope_renderer = OscilloscopeRenderer.new
     @pen_input = PenInput.new
     @wordart_renderer = WordartRenderer.new
     @vj_pad = VJPad.new(@audio_input_manager,
                         serial_manager: @serial_manager,
                         serial_audio_source: @serial_audio_source,
+                        synth_engine: @synth_engine,
+                        oscilloscope_renderer: @oscilloscope_renderer,
                         wordart_renderer: @wordart_renderer,
                         pen_input: @pen_input)
   end
@@ -73,11 +77,11 @@ class VisualizerApp
 
   def on_serial_receive(data)
     frames = @serial_manager.receive_data(data.to_s)
-    if frames && @serial_audio_source
+    if frames
       frames.each do |frame|
-        if frame[:type] == :frequency
-          @serial_audio_source.update(frame[:frequency], frame[:duty])
-        end
+        next unless frame[:type] == :frequency
+        @serial_audio_source.update(frame[:frequency], frame[:duty]) if @serial_audio_source
+        @synth_engine.note_on(frame[:frequency], frame[:duty]) if @synth_engine
       end
     end
     last_line = @serial_manager.rx_log.last
@@ -196,6 +200,33 @@ class VisualizerApp
         sa_data[:volume]
       )
     end
+
+    update_synth
+    update_oscilloscope
+  end
+
+  def update_synth
+    return unless @synth_engine
+
+    if @synth_engine.pending_update?
+      synth_data = @synth_engine.consume_update
+      JSBridge.update_synth(synth_data)
+    end
+  end
+
+  def update_oscilloscope
+    return unless @oscilloscope_renderer&.enabled?
+
+    # Set intensity from synth duty (0-100 → 0-1)
+    if @synth_engine&.active?
+      @oscilloscope_renderer.set_intensity(@synth_engine.duty / 100.0)
+    else
+      @oscilloscope_renderer.set_intensity(0.0)
+    end
+
+    @oscilloscope_renderer.advance_scroll(16.67)
+    @oscilloscope_renderer.push_to_history
+    JSBridge.update_oscilloscope(@oscilloscope_renderer.render_data)
   end
 
   def update_pen_input

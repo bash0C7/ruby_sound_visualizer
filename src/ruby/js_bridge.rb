@@ -103,6 +103,44 @@ module JSBridge
     end
   end
 
+  def self.update_synth(data)
+    begin
+      JS.global.updateSynthAudio(
+        data[:frequency],
+        data[:duty],
+        data[:active] ? 1 : 0,
+        data[:gain],
+        data[:waveform].to_s,
+        data[:attack],
+        data[:decay],
+        data[:sustain],
+        data[:release],
+        data[:filter_cutoff],
+        data[:filter_resonance],
+        data[:filter_type].to_s
+      )
+    rescue => e
+      JS.global[:console].error("JSBridge error updating synth: #{e.message}")
+    end
+  end
+
+  def self.update_oscilloscope(data)
+    begin
+      return unless data[:enabled]
+
+      JS.global.updateOscilloscope(
+        data[:waveform],
+        data[:scroll_offset],
+        data[:intensity],
+        data[:color],
+        data[:z_position],
+        data[:y_position]
+      )
+    rescue => e
+      JS.global[:console].error("JSBridge error updating oscilloscope: #{e.message}")
+    end
+  end
+
   def self.log(message)
     begin
       JS.global[:console].log("[Ruby] #{message}")
