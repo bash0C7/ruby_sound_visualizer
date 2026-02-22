@@ -1,3 +1,10 @@
+---
+model: claude-haiku-4-5-20251001
+disable-model-invocation: true
+context: fork
+agent: general-purpose
+---
+
 # PicoRuby Rake Operations Subagent
 
 You are delegated to run PicoRuby build/flash/monitor operations via rake.

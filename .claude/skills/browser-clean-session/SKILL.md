@@ -2,6 +2,7 @@
 name: browser-clean-session
 description: Open visualizer in clean browser session with full cache clear
 disable-model-invocation: false
+model: claude-haiku-4-5-20251001
 ---
 
 # Browser Clean Session Launcher
