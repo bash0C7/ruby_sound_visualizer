@@ -17,6 +17,7 @@ class VisualizerApp
     @serial_manager = SerialManager.new
     @serial_audio_source = SerialAudioSource.new
     @synth_engine = SynthEngine.new
+    @synth_effects = SynthEffects.new
     @oscilloscope_renderer = OscilloscopeRenderer.new
     @pen_input = PenInput.new
     @wordart_renderer = WordartRenderer.new
@@ -24,6 +25,7 @@ class VisualizerApp
                         serial_manager: @serial_manager,
                         serial_audio_source: @serial_audio_source,
                         synth_engine: @synth_engine,
+                        synth_effects: @synth_effects,
                         oscilloscope_renderer: @oscilloscope_renderer,
                         wordart_renderer: @wordart_renderer,
                         pen_input: @pen_input)
@@ -206,11 +208,12 @@ class VisualizerApp
   end
 
   def update_synth
-    return unless @synth_engine
+    if @synth_engine&.pending_update?
+      JSBridge.update_synth(@synth_engine.consume_update)
+    end
 
-    if @synth_engine.pending_update?
-      synth_data = @synth_engine.consume_update
-      JSBridge.update_synth(synth_data)
+    if @synth_effects&.pending_update?
+      JSBridge.update_synth_effects(@synth_effects.consume_update)
     end
   end
 

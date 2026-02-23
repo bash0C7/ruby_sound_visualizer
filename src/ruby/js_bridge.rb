@@ -105,22 +105,53 @@ module JSBridge
 
   def self.update_synth(data)
     begin
-      JS.global.updateSynthAudio(
-        data[:frequency],
-        data[:duty],
-        data[:active] ? 1 : 0,
-        data[:gain],
-        data[:waveform].to_s,
-        data[:attack],
-        data[:decay],
-        data[:sustain],
-        data[:release],
-        data[:filter_cutoff],
-        data[:filter_resonance],
-        data[:filter_type].to_s
-      )
+      if data[:params]
+        p = data[:params]
+        JS.global.updateSynthParams(
+          p[:waveform].to_s,
+          p[:attack],
+          p[:decay],
+          p[:sustain],
+          p[:release],
+          p[:gain],
+          p[:max_sustain_ms]
+        )
+      end
+      if data[:voice_events]
+        data[:voice_events].each do |evt|
+          case evt[:type]
+          when :note_on
+            JS.global.startPolyVoice(evt[:voice_id], evt[:freq], evt[:duty])
+          when :note_off
+            JS.global.releasePolyVoice(evt[:voice_id])
+          end
+        end
+      end
     rescue => e
       JS.global[:console].error("JSBridge error updating synth: #{e.message}")
+    end
+  end
+
+  def self.update_synth_effects(data)
+    begin
+      JS.global.updateSynthEffects(
+        data[:distortion],
+        data[:filter_type].to_s,
+        data[:filter_cutoff],
+        data[:filter_q],
+        data[:delay_time],
+        data[:delay_feedback],
+        data[:delay_wet],
+        data[:reverb_size],
+        data[:reverb_decay],
+        data[:reverb_wet],
+        data[:comp_threshold],
+        data[:comp_ratio],
+        data[:comp_attack],
+        data[:comp_release]
+      )
+    rescue => e
+      JS.global[:console].error("JSBridge error updating synth effects: #{e.message}")
     end
   end
 

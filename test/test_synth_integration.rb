@@ -20,20 +20,18 @@ class TestSynthIntegration < Test::Unit::TestCase
     synth = SynthEngine.new
     source = SerialAudioSource.new
 
-    # Simulate receiving serial frequency frame
     source.update(440, 50)
     synth.note_on(source.frequency, source.duty)
 
     assert_equal true, synth.active?
-    assert_equal 440, synth.frequency
     assert_equal 50, synth.duty
+    assert_equal 1, synth.voice_count
   end
 
   def test_serial_zero_frequency_triggers_synth_note_off
     synth = SynthEngine.new
     synth.note_on(440, 50)
 
-    # Simulate zero frequency (hand removed from sensor)
     synth.note_on(0, 0)
     assert_equal false, synth.active?
   end
@@ -43,7 +41,6 @@ class TestSynthIntegration < Test::Unit::TestCase
     manager = SerialManager.new
     manager.on_connect(115200)
 
-    # Start: normal frequency frame
     frames = manager.receive_data("<F:440,D:50>\n")
     synth.note_on(frames[0][:frequency], frames[0][:duty])
     assert_equal true, synth.active?
@@ -63,16 +60,45 @@ class TestSynthIntegration < Test::Unit::TestCase
     manager = SerialManager.new
     manager.on_connect(115200)
 
-    # Simulate receiving raw serial data
     frames = manager.receive_data("<F:880,D:60>\n")
     assert_equal 1, frames.length
     assert_equal :frequency, frames[0][:type]
 
-    # Feed to synth
     synth.note_on(frames[0][:frequency], frames[0][:duty])
-    assert_equal 880, synth.frequency
     assert_equal 60, synth.duty
     assert_equal true, synth.active?
+    assert_equal 1, synth.voice_count
+  end
+
+  # --- SynthEngine polyphonic voice events ---
+
+  def test_consume_update_contains_voice_events_on_note_on
+    synth = SynthEngine.new
+    synth.consume_update if synth.pending_update?
+    synth.note_on(440, 50)
+
+    data = synth.consume_update
+    assert_not_nil data
+    assert_not_nil data[:voice_events]
+    assert_equal 1, data[:voice_events].length
+    assert_equal :note_on, data[:voice_events][0][:type]
+    assert_equal 440, data[:voice_events][0][:freq]
+  end
+
+  def test_consume_update_contains_params_on_waveform_change
+    synth = SynthEngine.new
+    synth.consume_update if synth.pending_update?
+    synth.set_waveform(:square)
+
+    data = synth.consume_update
+    assert_not_nil data[:params]
+    assert_equal :square, data[:params][:waveform]
+  end
+
+  def test_synth_no_update_when_not_pending
+    synth = SynthEngine.new
+    synth.consume_update if synth.pending_update?
+    assert_nil synth.consume_update
   end
 
   # --- SynthEngine + OscilloscopeRenderer integration ---
@@ -82,7 +108,6 @@ class TestSynthIntegration < Test::Unit::TestCase
     osc = OscilloscopeRenderer.new
 
     synth.note_on(440, 50)
-    # When synth is active, intensity should follow duty
     intensity = synth.duty / 100.0
     osc.set_intensity(intensity)
 
@@ -92,7 +117,6 @@ class TestSynthIntegration < Test::Unit::TestCase
   def test_oscilloscope_waveform_update_from_samples
     osc = OscilloscopeRenderer.new
 
-    # Simulate waveform samples (sine wave)
     samples = Array.new(256) { |i| Math.sin(i * 2 * Math::PI / 256) }
     osc.update_waveform(samples)
     osc.push_to_history
@@ -107,26 +131,53 @@ class TestSynthIntegration < Test::Unit::TestCase
 
   def test_vj_pad_synth_waveform_changes_engine
     synth = SynthEngine.new
+    fx = SynthEffects.new
     osc = OscilloscopeRenderer.new
-    pad = VJPad.new(nil, synth_engine: synth, oscilloscope_renderer: osc)
+    pad = VJPad.new(nil, synth_engine: synth, synth_effects: fx, oscilloscope_renderer: osc)
 
     pad.exec("syn_w square")
     assert_equal :square, synth.waveform
 
     pad.exec("syn_a 0.2")
     assert_in_delta 0.2, synth.attack, 0.001
+  end
 
-    pad.exec("syn_fc 3000")
-    assert_in_delta 3000.0, synth.filter_cutoff, 0.1
+  def test_vj_pad_sfx_commands_change_effects
+    synth = SynthEngine.new
+    fx = SynthEffects.new
+    osc = OscilloscopeRenderer.new
+    pad = VJPad.new(nil, synth_engine: synth, synth_effects: fx, oscilloscope_renderer: osc)
 
-    pad.exec("syn_fq 12")
-    assert_in_delta 12.0, synth.filter_resonance, 0.1
+    pad.exec("sfx_hardcore")
+    assert_equal SynthEffects::HARDCORE_PRESET[:distortion], fx.distortion
+
+    pad.exec("sfx_thru")
+    assert_equal 0, fx.distortion
+
+    pad.exec("sfx_dist 100")
+    assert_equal 100, fx.distortion
+
+    pad.exec("sfx_filt 3000")
+    assert_in_delta 3000.0, fx.filter_cutoff, 0.1
+
+    pad.exec("sfx_q 8")
+    assert_in_delta 8.0, fx.filter_q, 0.01
+  end
+
+  def test_vj_pad_sfx_ft_bare_string
+    synth = SynthEngine.new
+    fx = SynthEffects.new
+    pad = VJPad.new(nil, synth_engine: synth, synth_effects: fx)
+
+    pad.exec("sfx_ft lowpass")
+    assert_equal 'lowpass', fx.filter_type
   end
 
   def test_vj_pad_oscilloscope_toggle
     synth = SynthEngine.new
+    fx = SynthEffects.new
     osc = OscilloscopeRenderer.new
-    pad = VJPad.new(nil, synth_engine: synth, oscilloscope_renderer: osc)
+    pad = VJPad.new(nil, synth_engine: synth, synth_effects: fx, oscilloscope_renderer: osc)
 
     pad.exec("osc 0")
     assert_equal false, osc.enabled?
@@ -135,30 +186,14 @@ class TestSynthIntegration < Test::Unit::TestCase
     assert_equal true, osc.enabled?
   end
 
-  # --- SynthEngine consume_update for JSBridge ---
-
-  def test_synth_consume_update_returns_all_params
+  def test_vj_pad_syn_fc_command_removed
     synth = SynthEngine.new
-    synth.set_waveform(:square)
-    synth.set_attack(0.1)
-    synth.set_filter_cutoff(5000)
-    synth.set_filter_resonance(8)
-    synth.note_on(440, 50)
+    fx = SynthEffects.new
+    pad = VJPad.new(nil, synth_engine: synth, synth_effects: fx)
 
-    data = synth.consume_update
-    assert_not_nil data
-    assert_equal :square, data[:waveform]
-    assert_in_delta 0.1, data[:attack], 0.001
-    assert_in_delta 5000.0, data[:filter_cutoff], 0.1
-    assert_in_delta 8.0, data[:filter_resonance], 0.1
-    assert_equal 440, data[:frequency]
-    assert_equal 50, data[:duty]
-    assert_equal true, data[:active]
-  end
-
-  def test_synth_no_update_when_not_pending
-    synth = SynthEngine.new
-    assert_nil synth.consume_update
+    # syn_fc is removed - should fail
+    result = pad.exec("syn_fc 3000")
+    assert_equal false, result[:ok]
   end
 
   # --- OscilloscopeRenderer render_data for JSBridge ---
@@ -187,22 +222,19 @@ class TestSynthIntegration < Test::Unit::TestCase
     synth = SynthEngine.new
     osc = OscilloscopeRenderer.new
 
-    # Step 1: Receive serial data
     frames = manager.receive_data("<F:660,D:45>\n")
     assert_equal 1, frames.length
 
-    # Step 2: Feed to synth
     frame = frames[0]
     synth.note_on(frame[:frequency], frame[:duty])
     assert_equal true, synth.active?
-    assert_equal 660, synth.frequency
+    assert_equal 45, synth.duty
 
-    # Step 3: Synth produces update for JS
     synth_data = synth.consume_update
     assert_not_nil synth_data
-    assert_equal 660, synth_data[:frequency]
+    assert_not_nil synth_data[:voice_events]
+    assert_equal 660, synth_data[:voice_events][0][:freq]
 
-    # Step 4: Oscilloscope gets waveform and renders
     samples = Array.new(256) { |i| Math.sin(i * 2 * Math::PI * 660 / 44100) }
     osc.update_waveform(samples)
     osc.set_intensity(frame[:duty] / 100.0)
@@ -214,5 +246,16 @@ class TestSynthIntegration < Test::Unit::TestCase
     assert_equal 1, render[:history].length
     assert render[:scroll_offset] > 0
     assert_in_delta 0.45, render[:intensity], 0.01
+  end
+
+  # --- SynthEffects + VJPad voice pool commands ---
+
+  def test_sfx_voices_changes_max_voices
+    synth = SynthEngine.new
+    fx = SynthEffects.new
+    pad = VJPad.new(nil, synth_engine: synth, synth_effects: fx)
+
+    pad.exec("sfx_voices 4")
+    assert_equal 4, synth.max_voices
   end
 end

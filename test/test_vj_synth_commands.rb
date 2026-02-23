@@ -102,50 +102,6 @@ class TestVJSynthCommands < Test::Unit::TestCase
     assert_in_delta 1.5, @synth_engine.release, 0.001
   end
 
-  # --- Filter cutoff ---
-
-  def test_syn_fc_get
-    result = @pad.exec("syn_fc")
-    assert_equal "synth cutoff: 2000Hz", result[:msg]
-  end
-
-  def test_syn_fc_set
-    result = @pad.exec("syn_fc 5000")
-    assert_equal "synth cutoff: 5000Hz", result[:msg]
-    assert_in_delta 5000.0, @synth_engine.filter_cutoff, 0.1
-  end
-
-  # --- Filter resonance ---
-
-  def test_syn_fq_get
-    result = @pad.exec("syn_fq")
-    assert_equal "synth Q: 1.0", result[:msg]
-  end
-
-  def test_syn_fq_set
-    result = @pad.exec("syn_fq 10")
-    assert_equal "synth Q: 10.0", result[:msg]
-    assert_in_delta 10.0, @synth_engine.filter_resonance, 0.1
-  end
-
-  # --- Filter type ---
-
-  def test_syn_ft_get
-    result = @pad.exec("syn_ft")
-    assert_equal "synth filter: lowpass", result[:msg]
-  end
-
-  def test_syn_ft_set_highpass
-    result = @pad.exec("syn_ft highpass")
-    assert_equal "synth filter: highpass", result[:msg]
-    assert_equal :highpass, @synth_engine.filter_type
-  end
-
-  def test_syn_ft_set_bandpass
-    result = @pad.exec("syn_ft bandpass")
-    assert_equal "synth filter: bandpass", result[:msg]
-  end
-
   # --- Gain ---
 
   def test_syn_g_get
