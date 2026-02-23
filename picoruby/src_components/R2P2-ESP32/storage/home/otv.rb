@@ -105,33 +105,32 @@ class NoiseInstrument
     # 距離計測とフィルタリング
     raw_distance = @tof_sensor.read_distance
 
-    # ノイズ判定：-1、DIST_VALID_MIN未満、DIST_VALID_MAX超
     if raw_distance < 0 || raw_distance < DIST_VALID_MIN || raw_distance > DIST_VALID_MAX
+      # Out of range: target duty → 0 to send D:0 and stop sound
       @unstable_frames += 1
-      # フェードアウト処理（段階的に音を消す）
-      @target_duty = (@target_duty * (1.0 - FADE_RATE)).to_i.clamp(1, BASE_DUTY)
-      return
+      @target_duty = 0
+    else
+      # EMAで距離を平滑化（整数演算）
+      delta = raw_distance - @prev_distance
+      @distance = @prev_distance + (delta * DISTANCE_SMOOTH_ALPHA / 100)
+      @prev_distance = @distance
+      @unstable_frames = 0
+
+      # 周波数計算：対数スケール（オクターブ感覚）
+      # freq = FREQ_MIN * (FREQ_MAX / FREQ_MIN) ^ (distance_ratio)
+      distance_ratio = (@distance - DIST_VALID_MIN).to_f / @dist_range
+      @current_freq = (FREQ_MIN * (@freq_ratio ** distance_ratio)).to_i
+      @target_duty = BASE_DUTY
+
+      if @prev_set_freq != @current_freq
+        @speaker.frequency(@current_freq)
+        @prev_set_freq = @current_freq
+      end
     end
 
-    # EMAで距離を平滑化（整数演算）
-    delta = raw_distance - @prev_distance
-    @distance = @prev_distance + (delta * DISTANCE_SMOOTH_ALPHA / 100)
-    @prev_distance = @distance
-    @unstable_frames = 0
-
-    # 周波数計算：対数スケール（オクターブ感覚）
-    # freq = FREQ_MIN * (FREQ_MAX / FREQ_MIN) ^ (distance_ratio)
-    distance_ratio = (@distance - DIST_VALID_MIN).to_f / @dist_range
-    @current_freq = (FREQ_MIN * (@freq_ratio ** distance_ratio)).to_i
-    @target_duty = BASE_DUTY
-
-    if @prev_set_freq != @current_freq
-      @speaker.frequency(@current_freq)
-      @prev_set_freq = @current_freq
-    end
-
+    # Duty update: always executed so D:0 reaches ruby.wasm when out of range
     @current_duty += (@target_duty - @current_duty) / DUTY_SMOOTH_FACTOR
-    @current_duty = @current_duty.clamp(1, DUTY_MAX)
+    @current_duty = @current_duty.clamp(0, DUTY_MAX)
 
     if @prev_set_duty != @current_duty
       @speaker.duty(@current_duty)
