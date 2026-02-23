@@ -129,6 +129,47 @@ class TestJSBridge < Test::Unit::TestCase
     assert_nothing_raised { JSBridge.update_vrm_material(config) }
   end
 
+  # -- update_synth --
+
+  def test_update_synth_with_valid_data
+    data = {
+      frequency: 440, duty: 50, active: true, gain: 0.3,
+      waveform: :sawtooth, attack: 0.01, decay: 0.3, sustain: 0.6, release: 0.3,
+      filter_cutoff: 2000.0, filter_resonance: 1.0, filter_type: :lowpass
+    }
+    assert_nothing_raised { JSBridge.update_synth(data) }
+  end
+
+  def test_update_synth_inactive
+    data = {
+      frequency: 0, duty: 0, active: false, gain: 0.3,
+      waveform: :sawtooth, attack: 0.01, decay: 0.3, sustain: 0.6, release: 0.3,
+      filter_cutoff: 2000.0, filter_resonance: 1.0, filter_type: :lowpass
+    }
+    assert_nothing_raised { JSBridge.update_synth(data) }
+  end
+
+  # -- update_oscilloscope --
+
+  def test_update_oscilloscope_with_valid_data
+    data = {
+      waveform: Array.new(256, 0.0), scroll_offset: 0.5,
+      intensity: 0.8, color: [0.0, 1.0, 0.4],
+      z_position: 8.0, y_position: -2.0, enabled: true
+    }
+    assert_nothing_raised { JSBridge.update_oscilloscope(data) }
+  end
+
+  def test_update_oscilloscope_skips_when_disabled
+    data = {
+      waveform: Array.new(256, 0.0), scroll_offset: 0.5,
+      intensity: 0.8, color: [0.0, 1.0, 0.4],
+      z_position: 8.0, y_position: -2.0, enabled: false
+    }
+    # Should not call JS when disabled
+    assert_nothing_raised { JSBridge.update_oscilloscope(data) }
+  end
+
   # -- log / error --
 
   def test_log_does_not_raise

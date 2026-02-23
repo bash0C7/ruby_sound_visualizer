@@ -75,6 +75,13 @@ class TestBloomController < Test::Unit::TestCase
     assert_operator boosted, :>, base
   end
 
+  def test_strength_never_negative
+    VisualizerPolicy.bloom_base_strength = -1.0
+    @controller.update(make_analysis(energy: 0.0))
+    data = @controller.get_data
+    assert_operator data[:strength], :>=, 0.0
+  end
+
   def test_no_nan_values
     10.times do
       @controller.update(make_analysis(energy: rand, impulse_overall: rand))

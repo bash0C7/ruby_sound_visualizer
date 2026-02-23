@@ -1,13 +1,38 @@
-# PicoRuby - ATOM Matrix Audio LED Visualizer
+# PicoRuby Firmware
 
-PicoRuby firmware for M5Stack ATOM Matrix that receives audio analysis data via USB Serial and renders frequency band visualization on the 5x5 LED matrix using WS2812.
+PicoRuby firmware for ESP32-based hardware. Two applications are available:
+
+## Applications
+
+### led_visualizer — ATOM Matrix LED VU Meter
+
+Receives audio analysis data from Chrome visualizer via USB Serial and renders
+frequency band visualization on the 5x5 WS2812 LED matrix.
+
+### otv — Theremin Instrument
+
+Reads VL53L0X ToF distance sensor and maps hand position to frequency.
+Sends `<F:NNNNN,D:NNN>` frames via UART to Chrome ruby.wasm synthesizer.
+Drives 29-LED WS2812 strip with distance-mapped ambient colors.
+
+See `.claude/guides/picoruby-instrument.md` for full documentation.
 
 ## Hardware
+
+### ATOM Matrix (led_visualizer)
 
 - **MCU**: ESP32-PICO-D4 (M5Stack ATOM Matrix)
 - **LED**: 5x5 WS2812 matrix (GPIO 27, 25 LEDs)
 - **USB Serial**: ESP32_UART0 (115200 baud default)
 - **Button**: GPIO 39
+
+### R2P2-ESP32 (otv)
+
+- **MCU**: ESP32 (R2P2-ESP32 board)
+- **Distance sensor**: VL53L0X (I2C, SDA=GPIO25, SCL=GPIO21)
+- **LED strip**: 29x WS2812 (GPIO 26)
+- **Button**: GPIO 39 (mute toggle)
+- **USB Serial**: ESP32_UART0 (115200 baud)
 
 ## Serial Protocol
 
@@ -162,11 +187,14 @@ APP=led_visualizer rake monitor
 ### Usage Examples
 
 ```bash
-# Initial setup (setup_esp32 + build)
+# led_visualizer: Initial setup (setup_esp32 + build)
 cd picoruby && APP=led_visualizer rake buildall
 
-# Normal build workflow (chained tasks)
+# led_visualizer: Normal build workflow (chained tasks)
 cd picoruby && APP=led_visualizer rake build flash monitor
+
+# otv: Build and flash theremin instrument
+cd picoruby && APP=otv rake build flash monitor
 
 # Check environment
 cd picoruby && rake check_env
@@ -191,7 +219,8 @@ picoruby/
     R2P2-ESP32/
       sdkconfig.defaults
       storage/home/
-        led_visualizer.rb    # Main firmware source (edit here)
+        led_visualizer.rb    # LED VU meter firmware (ATOM Matrix, edit here)
+        otv.rb               # Theremin instrument firmware (R2P2-ESP32, edit here)
       components/picoruby-esp32/
         CMakeLists.txt
         picoruby/

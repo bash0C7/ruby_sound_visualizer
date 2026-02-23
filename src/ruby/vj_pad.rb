@@ -1,5 +1,6 @@
 class VJPad
   include VJSerialCommands
+  include VJSynthCommands
 
   attr_reader :history, :last_result, :pending_actions
 
@@ -41,12 +42,15 @@ class VJPad
   end
 
   def initialize(audio_input_manager = nil, serial_manager: nil, serial_audio_source: nil,
-                 wordart_renderer: nil, pen_input: nil)
+                 wordart_renderer: nil, pen_input: nil,
+                 synth_engine: nil, oscilloscope_renderer: nil)
     @audio_input_manager = audio_input_manager
     @serial_manager = serial_manager
     @serial_audio_source = serial_audio_source
     @wordart_renderer = wordart_renderer
     @pen_input = pen_input
+    @synth_engine = synth_engine
+    @oscilloscope_renderer = oscilloscope_renderer
     @history = []
     @last_result = nil
     @pending_actions = []
@@ -193,7 +197,10 @@ class VJPad
   private
 
   def preprocess_text_command(input)
-    input.sub(/\A(wa)\s+(?!["'])(.+)/) { "#{$1} \"#{$2.gsub('\\', '\\\\\\\\').gsub('"', '\\"')}\"" }
+    # Quote bare string arguments for wordart and synth commands
+    input = input.sub(/\A(wa)\s+(?!["'])(.+)/) { "#{$1} \"#{$2.gsub('\\', '\\\\\\\\').gsub('"', '\\"')}\"" }
+    input = input.sub(/\A(syn_w|syn_ft)\s+(?!["'])([a-z]+)\s*\z/) { "#{$1} \"#{$2}\"" }
+    input
   end
 
   def execute_plugin(plugin, args)

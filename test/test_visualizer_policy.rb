@@ -50,9 +50,11 @@ class TestVisualizerPolicy < Test::Unit::TestCase
   end
 
   def test_bloom_constants
-    assert_equal 1.5, VisualizerPolicy::BLOOM_BASE_STRENGTH
+    assert_equal 0.5, VisualizerPolicy::BLOOM_BASE_STRENGTH
     assert_equal 0.0, VisualizerPolicy::BLOOM_BASE_THRESHOLD
     assert_equal 1.5, VisualizerPolicy::BLOOM_MAX_STRENGTH
+    assert_equal 0.15, VisualizerPolicy::BLOOM_THRESHOLD_BASE
+    assert_equal 0.04, VisualizerPolicy::BLOOM_THRESHOLD_IMPULSE_SCALE
   end
 
   # Test runtime config accessors
@@ -84,8 +86,8 @@ class TestVisualizerPolicy < Test::Unit::TestCase
     VisualizerPolicy.input_gain = 25.0
     assert_equal 20.0, VisualizerPolicy.input_gain
 
-    VisualizerPolicy.input_gain = -25.0
-    assert_equal(-20.0, VisualizerPolicy.input_gain)
+    VisualizerPolicy.input_gain = -45.0
+    assert_equal(-40.0, VisualizerPolicy.input_gain)
   end
 
   def test_input_gain_linear
@@ -267,16 +269,19 @@ class TestVisualizerPolicy < Test::Unit::TestCase
   # === New mutable audio-reactive parameters ===
 
   def test_bloom_base_strength_accessor
-    assert_equal 1.5, VisualizerPolicy.bloom_base_strength
+    assert_equal 0.5, VisualizerPolicy.bloom_base_strength
     VisualizerPolicy.bloom_base_strength = 3.0
     assert_equal 3.0, VisualizerPolicy.bloom_base_strength
-    # Clamp to min 0.0
-    VisualizerPolicy.bloom_base_strength = -1.0
-    assert_equal 0.0, VisualizerPolicy.bloom_base_strength
+    # Clamp to min -1.0 (allows negative base to suppress bloom at low energy)
+    VisualizerPolicy.bloom_base_strength = -0.5
+    assert_equal(-0.5, VisualizerPolicy.bloom_base_strength)
+    # Below -1.0 is clamped
+    VisualizerPolicy.bloom_base_strength = -2.0
+    assert_equal(-1.0, VisualizerPolicy.bloom_base_strength)
   end
 
   def test_bloom_energy_scale_accessor
-    assert_equal 2.5, VisualizerPolicy.bloom_energy_scale
+    assert_equal 1.0, VisualizerPolicy.bloom_energy_scale
     VisualizerPolicy.bloom_energy_scale = 4.0
     assert_equal 4.0, VisualizerPolicy.bloom_energy_scale
   end
@@ -285,6 +290,30 @@ class TestVisualizerPolicy < Test::Unit::TestCase
     assert_equal 1.5, VisualizerPolicy.bloom_impulse_scale
     VisualizerPolicy.bloom_impulse_scale = 2.0
     assert_equal 2.0, VisualizerPolicy.bloom_impulse_scale
+  end
+
+  def test_bloom_strength_scale_accessor
+    assert_equal 2.5, VisualizerPolicy.bloom_strength_scale
+    VisualizerPolicy.bloom_strength_scale = 3.0
+    assert_equal 3.0, VisualizerPolicy.bloom_strength_scale
+    # Clamp to min 0.0
+    VisualizerPolicy.bloom_strength_scale = -1.0
+    assert_equal 0.0, VisualizerPolicy.bloom_strength_scale
+    # Reset
+    VisualizerPolicy.reset_runtime
+    assert_equal 2.5, VisualizerPolicy.bloom_strength_scale
+  end
+
+  def test_bloom_flash_multiplier_accessor
+    assert_equal 2.0, VisualizerPolicy.bloom_flash_multiplier
+    VisualizerPolicy.bloom_flash_multiplier = 3.0
+    assert_equal 3.0, VisualizerPolicy.bloom_flash_multiplier
+    # Clamp to min 0.0
+    VisualizerPolicy.bloom_flash_multiplier = -1.0
+    assert_equal 0.0, VisualizerPolicy.bloom_flash_multiplier
+    # Reset
+    VisualizerPolicy.reset_runtime
+    assert_equal 2.0, VisualizerPolicy.bloom_flash_multiplier
   end
 
   def test_particle_explosion_base_prob_accessor
@@ -362,6 +391,7 @@ class TestVisualizerPolicy < Test::Unit::TestCase
     sensitivity: 1.5, input_gain: 5.0, max_brightness: 200, max_lightness: 200,
     max_emissive: 1.5, max_bloom: 3.0, max_saturation: 70, exclude_max: true,
     bloom_base_strength: 2.0, bloom_energy_scale: 3.0, bloom_impulse_scale: 2.0,
+    bloom_strength_scale: 3.0, bloom_flash_multiplier: 3.0,
     particle_explosion_base_prob: 0.3, particle_explosion_energy_scale: 0.8,
     particle_explosion_force_scale: 0.8, particle_friction: 0.85,
     visual_smoothing: 0.85, impulse_decay: 0.90

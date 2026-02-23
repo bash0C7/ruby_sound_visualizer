@@ -73,6 +73,7 @@ See [.claude/INVESTIGATION-PROTOCOL.md](.claude/INVESTIGATION-PROTOCOL.md) for d
 **CRITICAL: Never claim something works without actual Chrome MCP verification. Do not report completion until screenshot and console check confirm it.**
 
 - **Cache busting**: ruby.wasm aggressively caches. Always use `?nocache=<random>` in URL when testing. If changes seem invisible, suspect caching first.
+- **Console multi-tab pollution**: Chrome console shows messages from ALL open tabs in the same window. When checking for errors, confirm the URL in the message source (e.g., `nocache=XXXXX`) matches your current session. Errors from stale cached tabs appear alongside current session logs and cause false positives.
 - **JS::Object nil? prohibition**: Never use `.nil?` on `JS::Object` instances — it always returns `false` (BasicObject). Use `.typeof == "undefined"` instead.
 
 Use `/debug-browser` skill for detailed procedures. Use `/verify` skill for the full TDD + browser confirmation loop.
@@ -108,6 +109,7 @@ src/ruby/               # Ruby source files
 ├── vj_plugin.rb              # Plugin system core (VJPlugin + PluginDefinition)
 ├── vj_pad.rb                 # VJ Pad DSL (delegates to plugins)
 ├── vj_serial_commands.rb     # VJ Pad serial command handler
+├── vj_synth_commands.rb      # VJ Pad synth/oscilloscope command handler
 ├── effect_dispatcher.rb      # Plugin effects → EffectManager translator
 ├── effect_manager.rb         # Coordinates all visual effects
 ├── audio_input_manager.rb    # Microphone input management
@@ -125,6 +127,8 @@ src/ruby/               # Ruby source files
 ├── serial_protocol.rb        # ASCII serial frame format (encode/decode)
 ├── serial_manager.rb         # Serial connection state machine
 ├── serial_audio_source.rb    # Serial PWM audio output state management
+├── synth_engine.rb           # Analog monophonic synthesizer state management
+├── oscilloscope_renderer.rb  # 3D oscilloscope waveform visualization state
 ├── wordart_renderer.rb       # 90s WordArt text animation engine
 ├── pen_input.rb              # Mouse pen drawing with fade-out
 ├── keyboard_handler.rb       # Keyboard input event handling
@@ -133,7 +137,7 @@ src/ruby/               # Ruby source files
 ├── debug_formatter.rb        # Debug output formatting utilities
 ├── frame_counter.rb          # Frame counting and timing
 └── math_helper.rb            # Mathematical utility functions
-picoruby/               # PicoRuby firmware for ATOM Matrix
+picoruby/               # PicoRuby firmware (two apps)
 ├── CLAUDE.md                 # PicoRuby project instructions
 ├── AGENTS.md                 # Symlink to CLAUDE.md
 ├── SERIAL_AUDIO_PROTOCOL.md  # Serial audio protocol spec (PicoRuby → Chrome)
@@ -144,7 +148,8 @@ picoruby/               # PicoRuby firmware for ATOM Matrix
     └── R2P2-ESP32/
         ├── sdkconfig.defaults
         ├── storage/home/
-        │   └── led_visualizer.rb   # LED VU meter firmware (5x5 WS2812, edit here)
+        │   ├── led_visualizer.rb   # LED VU meter firmware (ATOM Matrix 5x5 WS2812, APP=led_visualizer)
+        │   └── otv.rb              # Theremin instrument firmware (R2P2-ESP32, APP=otv)
         └── components/picoruby-esp32/
             ├── CMakeLists.txt
             └── picoruby/
@@ -231,6 +236,7 @@ Reference guides for technologies used in this project (located in `.claude/guid
 - [VRM Guide](.claude/guides/vrm.md) - VRM model loading, bones, expressions
 - [JS-Ruby Interop](.claude/guides/js-ruby-wasm-interop.md) - JavaScript & ruby.wasm integration
 - [ruby.wasm Technical](.claude/guides/ruby-wasm-technical.md) - ruby.wasm platform specifics
+- [PicoRuby Theremin Instrument](.claude/guides/picoruby-instrument.md) - otv.rb signal flow, hardware, and key classes
 
 ## References
 

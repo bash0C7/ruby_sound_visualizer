@@ -63,7 +63,7 @@
       position: fixed;
       top: 0;
       right: 0;
-      width: 300px;
+      width: 390px;
       height: 100vh;
       background: rgba(0, 0, 0, 0.85);
       color: #ccc;
@@ -295,6 +295,79 @@
       <span id="serialRxLed" title="RX" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#333;margin-left:4px;vertical-align:middle;"></span><span style="color:#555;font-size:9px;margin-left:1px;vertical-align:middle;">RX</span>
       <span id="serialRxDisplay" style="color:#0ff;font-size:10px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-left:4px;display:block;"></span>
     </div>
+    <div class="cp-group" id="cpSynthGroup" style="border-top:1px solid #444;padding-top:6px;">
+      <div class="cp-group-title" style="color:#f0c;">Synth</div>
+      <div style="display:flex;gap:3px;margin-bottom:4px;">
+        <span style="color:#888;font-size:9px;flex-shrink:0;">Wave:</span>
+        <button class="cp-btn cp-synth-wave" data-wave="sawtooth" style="flex:1;padding:2px 0;font-size:9px;">saw</button>
+        <button class="cp-btn cp-synth-wave" data-wave="square" style="flex:1;padding:2px 0;font-size:9px;">sq</button>
+        <button class="cp-btn cp-synth-wave" data-wave="sine" style="flex:1;padding:2px 0;font-size:9px;">sin</button>
+        <button class="cp-btn cp-synth-wave" data-wave="triangle" style="flex:1;padding:2px 0;font-size:9px;">tri</button>
+      </div>
+      <div class="cp-slider-row">
+        <span class="cp-label" title="Attack time (s)">Attack</span>
+        <input type="range" id="cpSynthAttack" min="1" max="5000" step="1" value="10">
+        <span class="cp-value" id="cpSynthAttackVal">0.01s</span>
+      </div>
+      <div class="cp-slider-row">
+        <span class="cp-label" title="Decay time (s)">Decay</span>
+        <input type="range" id="cpSynthDecay" min="1" max="5000" step="1" value="300">
+        <span class="cp-value" id="cpSynthDecayVal">0.30s</span>
+      </div>
+      <div class="cp-slider-row">
+        <span class="cp-label" title="Sustain level">Sustain</span>
+        <input type="range" id="cpSynthSustain" min="0" max="100" step="1" value="60">
+        <span class="cp-value" id="cpSynthSustainVal">0.60</span>
+      </div>
+      <div class="cp-slider-row">
+        <span class="cp-label" title="Release time (s)">Release</span>
+        <input type="range" id="cpSynthRelease" min="1" max="5000" step="1" value="300">
+        <span class="cp-value" id="cpSynthReleaseVal">0.30s</span>
+      </div>
+      <div class="cp-slider-row">
+        <span class="cp-label" title="Filter cutoff (Hz)">Cutoff</span>
+        <input type="range" id="cpSynthCutoff" min="20" max="20000" step="1" value="2000">
+        <span class="cp-value" id="cpSynthCutoffVal">2000</span>
+      </div>
+      <div class="cp-slider-row">
+        <span class="cp-label" title="Filter resonance (Q)">Reso</span>
+        <input type="range" id="cpSynthReso" min="0" max="300" step="1" value="10">
+        <span class="cp-value" id="cpSynthResoVal">1.0</span>
+      </div>
+      <div style="display:flex;gap:3px;margin-top:3px;">
+        <span style="color:#888;font-size:9px;flex-shrink:0;">Filter:</span>
+        <button class="cp-btn cp-synth-filter" data-filter="lowpass" style="flex:1;padding:2px 0;font-size:9px;">LP</button>
+        <button class="cp-btn cp-synth-filter" data-filter="highpass" style="flex:1;padding:2px 0;font-size:9px;">HP</button>
+        <button class="cp-btn cp-synth-filter" data-filter="bandpass" style="flex:1;padding:2px 0;font-size:9px;">BP</button>
+      </div>
+      <div class="cp-slider-row" style="margin-top:4px;">
+        <span class="cp-label" title="Synth gain (%)">Gain</span>
+        <input type="range" id="cpSynthGain" min="0" max="100" step="1" value="30">
+        <span class="cp-value" id="cpSynthGainVal">30%</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:4px;margin-top:3px;">
+        <label style="color:#888;font-size:9px;"><input type="checkbox" id="cpOscToggle" checked style="margin-right:2px;">Oscilloscope</label>
+        <span style="color:#888;font-size:9px;flex-shrink:0;">Speed:</span>
+        <input type="range" id="cpOscSpeed" min="1" max="100" step="1" value="10" style="flex:1;">
+        <span class="cp-value" id="cpOscSpeedVal">1.0</span>
+      </div>
+      <div class="cp-slider-row">
+        <span class="cp-label" title="Oscilloscope line thickness (tube radius)">Thick</span>
+        <input type="range" id="cpOscThickness" min="1" max="20" step="1" value="2">
+        <span class="cp-value" id="cpOscThicknessVal">0.10</span>
+      </div>
+      <div class="cp-slider-row">
+        <span class="cp-label" title="Oscilloscope vertical position">Y Pos</span>
+        <input type="range" id="cpOscYPos" min="-50" max="50" step="5" value="0">
+        <span class="cp-value" id="cpOscYPosVal">0.0</span>
+      </div>
+      <div class="cp-slider-row">
+        <span class="cp-label" title="Oscilloscope spark/flame intensity">Spark</span>
+        <input type="range" id="cpOscSpark" min="0" max="10" step="1" value="1">
+        <span class="cp-value" id="cpOscSparkVal">0.1</span>
+      </div>
+    </div>
+
     <div class="cp-audio-source" id="cpAudioSource" style="display:flex;align-items:center;gap:4px;padding:4px 8px;border-top:1px solid #444;margin-top:4px;">
       <span style="color:#888;font-size:10px;">Audio:</span>
       <button class="cp-btn cp-src-btn" id="cpSrcMic" style="padding:2px 6px;font-size:10px;">Mic</button><button class="cp-btn" id="cpMicDeviceBtn" style="padding:2px 4px;font-size:10px;flex:0 0 auto;" title="Select mic device">⚙</button>
@@ -367,6 +440,9 @@
   <script type="text/ruby" src="src/ruby/keyboard_handler.rb"></script>
   <script type="text/ruby" src="src/ruby/vj_plugin.rb"></script>
   <script type="text/ruby" src="src/ruby/vj_serial_commands.rb"></script>
+  <script type="text/ruby" src="src/ruby/synth_engine.rb"></script>
+  <script type="text/ruby" src="src/ruby/oscilloscope_renderer.rb"></script>
+  <script type="text/ruby" src="src/ruby/vj_synth_commands.rb"></script>
   <script type="text/ruby" src="src/ruby/vj_pad.rb"></script>
 
   <!-- VJ Pad Plugins (src/ruby/plugins/vj_*.rb) -->
@@ -993,6 +1069,292 @@
       }, 0);
     };
 
+    // === Synth Audio Engine (analog monophonic synthesizer) ===
+    let _synthOscillator = null;
+    let _synthGain = null;       // envelope gain
+    let _synthOutputGain = null; // master output gain
+    let _synthFilter = null;     // BiquadFilter
+    let _synthAnalyser = null;   // AnalyserNode for oscilloscope
+    let _synthActive = false;
+    let _synthWaveform = 'sawtooth';
+    let _synthTimeDomain = null; // Float32Array for time-domain data
+    let _synthEnvelopeTimeout = null;
+
+    function startSynth(freq, gain, waveform, attack, decay, sustain, release, cutoff, resonance, filterType) {
+      if (!audioContext) return;
+      stopSynth();
+
+      _synthOscillator = audioContext.createOscillator();
+      _synthOscillator.type = waveform;
+      _synthOscillator.frequency.setValueAtTime(freq, audioContext.currentTime);
+
+      _synthFilter = audioContext.createBiquadFilter();
+      _synthFilter.type = filterType;
+      _synthFilter.frequency.setValueAtTime(cutoff, audioContext.currentTime);
+      _synthFilter.Q.setValueAtTime(resonance, audioContext.currentTime);
+
+      _synthGain = audioContext.createGain();
+      _synthOutputGain = audioContext.createGain();
+      _synthOutputGain.gain.setValueAtTime(gain, audioContext.currentTime);
+
+      // ADSR envelope: start at 0, ramp to 1 over attack, decay to sustain
+      const now = audioContext.currentTime;
+      _synthGain.gain.setValueAtTime(0.001, now);
+      _synthGain.gain.linearRampToValueAtTime(1.0, now + attack);
+      _synthGain.gain.linearRampToValueAtTime(sustain, now + attack + decay);
+
+      // Analyser for oscilloscope waveform capture
+      _synthAnalyser = audioContext.createAnalyser();
+      _synthAnalyser.fftSize = 512;
+      _synthTimeDomain = new Float32Array(_synthAnalyser.fftSize);
+
+      // Signal chain: oscillator → filter → envelope gain → analyser → output gain → destination
+      _synthOscillator.connect(_synthFilter);
+      _synthFilter.connect(_synthGain);
+      _synthGain.connect(_synthAnalyser);
+      _synthAnalyser.connect(_synthOutputGain);
+      _synthOutputGain.connect(analyser);  // feed into main visualizer analyser
+      _synthOutputGain.connect(audioContext.destination);
+
+      _synthOscillator.start();
+      _synthActive = true;
+      console.log('[Synth] Started: ' + freq + 'Hz ' + waveform + ' cutoff=' + cutoff + 'Hz Q=' + resonance);
+    }
+
+    function stopSynth(release) {
+      release = release || 0.01;
+      if (_synthGain && _synthActive) {
+        const now = audioContext.currentTime;
+        _synthGain.gain.cancelScheduledValues(now);
+        _synthGain.gain.setValueAtTime(_synthGain.gain.value, now);
+        _synthGain.gain.linearRampToValueAtTime(0.001, now + release);
+        // Schedule actual disconnect after release completes
+        if (_synthEnvelopeTimeout) clearTimeout(_synthEnvelopeTimeout);
+        _synthEnvelopeTimeout = setTimeout(() => {
+          cleanupSynth();
+        }, (release + 0.05) * 1000);
+        _synthActive = false;
+        return;
+      }
+      cleanupSynth();
+    }
+
+    function cleanupSynth() {
+      if (_synthOscillator) {
+        try { _synthOscillator.stop(); } catch (_e) {}
+        _synthOscillator.disconnect();
+        _synthOscillator = null;
+      }
+      if (_synthFilter) { _synthFilter.disconnect(); _synthFilter = null; }
+      if (_synthGain) { _synthGain.disconnect(); _synthGain = null; }
+      if (_synthAnalyser) { _synthAnalyser.disconnect(); _synthAnalyser = null; }
+      if (_synthOutputGain) { _synthOutputGain.disconnect(); _synthOutputGain = null; }
+      _synthActive = false;
+    }
+
+    // Called from Ruby JSBridge.update_synth each frame when synth params change
+    window.updateSynthAudio = function(freq, duty, active, gain, waveform, attack, decay, sustain, release, cutoff, resonance, filterType) {
+      if (active && freq > 0) {
+        if (!_synthActive) {
+          startSynth(freq, gain, waveform, attack, decay, sustain, release, cutoff, resonance, filterType);
+        } else {
+          // Update running oscillator parameters
+          if (_synthOscillator) {
+            _synthOscillator.frequency.setValueAtTime(freq, audioContext.currentTime);
+            if (_synthOscillator.type !== waveform) _synthOscillator.type = waveform;
+          }
+          if (_synthFilter) {
+            _synthFilter.frequency.setValueAtTime(cutoff, audioContext.currentTime);
+            _synthFilter.Q.setValueAtTime(resonance, audioContext.currentTime);
+            if (_synthFilter.type !== filterType) _synthFilter.type = filterType;
+          }
+          if (_synthOutputGain) {
+            _synthOutputGain.gain.setValueAtTime(gain, audioContext.currentTime);
+          }
+        }
+      } else {
+        if (_synthActive) stopSynth(release);
+      }
+    };
+
+    // Get synth time-domain waveform for oscilloscope (called from animation loop)
+    function getSynthWaveform() {
+      if (!_synthAnalyser || !_synthTimeDomain) return null;
+      _synthAnalyser.getFloatTimeDomainData(_synthTimeDomain);
+      return _synthTimeDomain;
+    }
+
+    // === Oscilloscope 3D Waveform (Three.js) ===
+    let _oscTubeMesh = null;     // THREE.Mesh with TubeGeometry (current waveform)
+    let _oscTubeMaterial = null; // ShaderMaterial for spark effect
+    let _oscHistory = [];        // Ring buffer of past waveform position arrays
+    let _oscHistoryLines = [];   // THREE.Line objects for history (thin fading trails)
+    const OSC_CURVE_POINTS = 64; // Control points for TubeGeometry curve (performance balance)
+    const OSC_SEGMENTS = 256;    // Points per history waveform line
+    const OSC_HISTORY_MAX = 48;  // Number of trailing waveform lines
+    const OSC_RIBBON_WIDTH = 20; // Width of ribbon in world units
+    const OSC_RIBBON_HEIGHT = 3; // Max amplitude in world units
+    const OSC_Z_BASE = 3;        // Z position: camera@z=5 looking at z=0, so z=3 is visible in front
+    const OSC_Y_BASE = 0;        // Y position (center)
+
+    // Vertex shader: sine-based noise displacement for spark/flame effect
+    const OSC_VERT_SHADER = `
+      uniform float time;
+      uniform float sparkIntensity;
+      void main() {
+        float noise = sin(position.x * 8.0 + time * 4.0) * 0.04 * sparkIntensity
+                    + sin(position.x * 3.0 - time * 2.5) * 0.06 * sparkIntensity;
+        vec3 displaced = position + normal * noise;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(displaced, 1.0);
+      }
+    `;
+
+    // Fragment shader: hot color mix based on spark intensity
+    const OSC_FRAG_SHADER = `
+      uniform float sparkIntensity;
+      uniform vec3 sparkColor;
+      uniform vec3 baseColor;
+      void main() {
+        vec3 col = mix(baseColor, sparkColor, sparkIntensity * 0.8);
+        float alpha = 0.5 + 0.5 * sparkIntensity;
+        gl_FragColor = vec4(col, alpha);
+      }
+    `;
+
+    function initOscilloscope() {
+      if (!scene) return;
+
+      // ShaderMaterial for current waveform tube (spark/flame effect)
+      _oscTubeMaterial = new THREE.ShaderMaterial({
+        vertexShader: OSC_VERT_SHADER,
+        fragmentShader: OSC_FRAG_SHADER,
+        uniforms: {
+          time: { value: 0.0 },
+          sparkIntensity: { value: 0.5 },
+          sparkColor: { value: new THREE.Vector3(1.0, 0.5, 0.0) },
+          baseColor: { value: new THREE.Vector3(0.0, 1.0, 0.4) }
+        },
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide
+      });
+
+      // Initial flat tube (will be recreated each frame with real waveform data)
+      const initPoints = [];
+      for (let i = 0; i < OSC_CURVE_POINTS; i++) {
+        const x = -OSC_RIBBON_WIDTH / 2 + (i / (OSC_CURVE_POINTS - 1)) * OSC_RIBBON_WIDTH;
+        initPoints.push(new THREE.Vector3(x, OSC_Y_BASE, OSC_Z_BASE));
+      }
+      const initCurve = new THREE.CatmullRomCurve3(initPoints);
+      const initGeo = new THREE.TubeGeometry(initCurve, OSC_CURVE_POINTS, 0.3, 6, false);
+      _oscTubeMesh = new THREE.Mesh(initGeo, _oscTubeMaterial);
+      _oscTubeMesh.frustumCulled = false;
+      _oscTubeMesh.renderOrder = 999;
+      _oscTubeMesh.visible = false;
+      scene.add(_oscTubeMesh);
+
+      // Initialize history lines pool (thin LineBasicMaterial for trailing effect)
+      for (let i = 0; i < OSC_HISTORY_MAX; i++) {
+        const histGeo = new THREE.BufferGeometry();
+        const histPos = new Float32Array(OSC_SEGMENTS * 3);
+        histGeo.setAttribute('position', new THREE.BufferAttribute(histPos, 3));
+        const histMat = new THREE.LineBasicMaterial({
+          color: 0x00ff66,
+          transparent: true,
+          opacity: 0.0,
+          blending: THREE.AdditiveBlending
+        });
+        const histLine = new THREE.Line(histGeo, histMat);
+        histLine.frustumCulled = false;
+        histLine.renderOrder = 998;
+        histLine.visible = false;
+        scene.add(histLine);
+        _oscHistoryLines.push({ line: histLine, geometry: histGeo, material: histMat });
+      }
+    }
+
+    // Called from Ruby JSBridge.update_oscilloscope
+    window.updateOscilloscope = function(waveform, scrollOffset, intensity, color, zPos, yPos, tubeRadius, sparkIntensity, sparkColor) {
+      if (!_oscTubeMesh || !scene) return;
+
+      // Get actual time-domain data from synth analyser
+      const synthWave = getSynthWaveform();
+      const wave = synthWave || new Float32Array(OSC_SEGMENTS);
+
+      const halfWidth = OSC_RIBBON_WIDTH / 2;
+      const halfHeight = OSC_RIBBON_HEIGHT / 2;
+      const actualYPos = (yPos !== undefined && yPos !== null) ? yPos : OSC_Y_BASE;
+      const actualZPos = (zPos !== undefined && zPos !== null) ? zPos : OSC_Z_BASE;
+      const actualRadius = (tubeRadius !== undefined && tubeRadius !== null && tubeRadius > 0) ? tubeRadius : 0.3;
+      const actualSpark = (sparkIntensity !== undefined && sparkIntensity !== null) ? sparkIntensity : 0.5;
+      const r = color && color[0] !== undefined ? color[0] : 0;
+      const g = color && color[1] !== undefined ? color[1] : 1;
+      const b = color && color[2] !== undefined ? color[2] : 0.4;
+      const sr = sparkColor && sparkColor[0] !== undefined ? sparkColor[0] : 1.0;
+      const sg = sparkColor && sparkColor[1] !== undefined ? sparkColor[1] : 0.5;
+      const sb = sparkColor && sparkColor[2] !== undefined ? sparkColor[2] : 0.0;
+
+      // Build CatmullRomCurve3 from waveform samples (reduced points for perf)
+      const step = wave.length / OSC_CURVE_POINTS;
+      const curvePoints = [];
+      for (let i = 0; i < OSC_CURVE_POINTS; i++) {
+        const x = -halfWidth + (i / (OSC_CURVE_POINTS - 1)) * OSC_RIBBON_WIDTH;
+        const sampleIdx = Math.min(Math.floor(i * step), wave.length - 1);
+        const y = actualYPos + wave[sampleIdx] * halfHeight * intensity;
+        curvePoints.push(new THREE.Vector3(x, y, actualZPos));
+      }
+      const curve = new THREE.CatmullRomCurve3(curvePoints);
+
+      // Recreate TubeGeometry each frame (dispose old to free GPU memory)
+      const oldGeo = _oscTubeMesh.geometry;
+      _oscTubeMesh.geometry = new THREE.TubeGeometry(curve, OSC_CURVE_POINTS, actualRadius, 6, false);
+      oldGeo.dispose();
+
+      // Update shader uniforms
+      _oscTubeMaterial.uniforms.time.value = performance.now() / 1000.0;
+      _oscTubeMaterial.uniforms.sparkIntensity.value = actualSpark;
+      _oscTubeMaterial.uniforms.baseColor.value.set(r, g, b);
+      _oscTubeMaterial.uniforms.sparkColor.value.set(sr, sg, sb);
+      _oscTubeMesh.visible = intensity > 0.01;
+
+      // Also build flat position array for history lines (full resolution)
+      const histStep = wave.length / OSC_SEGMENTS;
+      const positions = new Float32Array(OSC_SEGMENTS * 3);
+      for (let i = 0; i < OSC_SEGMENTS; i++) {
+        const x = -halfWidth + (i / (OSC_SEGMENTS - 1)) * OSC_RIBBON_WIDTH;
+        const sampleIdx = Math.min(Math.floor(i * histStep), wave.length - 1);
+        const y = actualYPos + wave[sampleIdx] * halfHeight * intensity;
+        positions[i * 3] = x;
+        positions[i * 3 + 1] = y;
+        positions[i * 3 + 2] = actualZPos;
+      }
+
+      // Push to history ring buffer
+      _oscHistory.unshift(Array.from(positions));
+      if (_oscHistory.length > OSC_HISTORY_MAX) _oscHistory.pop();
+
+      // Update history line positions with Z offset and fading opacity
+      for (let h = 0; h < OSC_HISTORY_MAX; h++) {
+        const entry = _oscHistoryLines[h];
+        if (h >= _oscHistory.length) {
+          entry.line.visible = false;
+          continue;
+        }
+        const histPositions = entry.geometry.attributes.position.array;
+        const srcPositions = _oscHistory[h];
+        const zOffset = -(h + 1) * 0.3;
+        for (let i = 0; i < OSC_SEGMENTS; i++) {
+          histPositions[i * 3] = srcPositions[i * 3];
+          histPositions[i * 3 + 1] = srcPositions[i * 3 + 1];
+          histPositions[i * 3 + 2] = srcPositions[i * 3 + 2] + zOffset;
+        }
+        entry.geometry.attributes.position.needsUpdate = true;
+        entry.material.color.setRGB(r, g, b);
+        entry.material.opacity = Math.max(0, (1.0 - h / OSC_HISTORY_MAX) * intensity * 0.5);
+        entry.line.visible = entry.material.opacity > 0.01;
+      }
+    };
+
     // === Pen Input Overlay Canvas (minimal JS, logic in Ruby PenInput) ===
     let _penCanvas = null;
     let _penCtx = null;
@@ -1303,6 +1665,9 @@
       bloomLayer = new THREE.Layers();
       bloomLayer.set(BLOOM_LAYER);
       darkMaterial = new THREE.MeshBasicMaterial({ color: 'black' });
+
+      // Initialize oscilloscope 3D waveform
+      initOscilloscope();
 
       console.log('[JS] Three.js initialized successfully');
 
@@ -1683,9 +2048,6 @@
         }
 
         let paramText = window.paramInfoText || '';
-        if (camera) {
-          paramText += `  |  Cam: (${camera.position.x.toFixed(1)}, ${camera.position.y.toFixed(1)}, ${camera.position.z.toFixed(1)})`;
-        }
         if (window.vrmDebugText) {
           paramText += `  |  ${window.vrmDebugText}`;
         }
@@ -1998,15 +2360,20 @@
 
     // Slider definitions (mirrors VisualizerPolicy::MUTABLE_KEYS)
     const SLIDER_GROUPS = {
-      'Master': [
+      'Input': [
         { key: 'sensitivity', label: 'Sensitivity', min: 0.1, max: 1.9, step: 0.05, default: 1.0 },
-        { key: 'input_gain', label: 'Input Gain (dB)', min: -20.0, max: 20.0, step: 0.5, default: 0.0 },
+        { key: 'input_gain', label: 'Input Gain (dB)', min: -40.0, max: 20.0, step: 0.5, default: 0.0 },
+        { key: 'mic_gain', label: 'Mic Volume', min: 0.0, max: 2.0, step: 0.1, default: 1.0,
+          setter: v => { if (micGain) micGain.gain.value = v; },
+          getter: () => micGain ? micGain.gain.value : 1.0 },
       ],
       'Bloom': [
-        { key: 'bloom_base_strength', label: 'Base Strength', min: 0.0, max: 3.0, step: 0.1, default: 1.5 },
+        { key: 'bloom_base_strength', label: 'Base Strength', min: -1.0, max: 3.0, step: 0.1, default: 0.5 },
         { key: 'max_bloom', label: 'Max (Cap)', min: 0.0, max: 9.0, step: 0.1, default: 4.5 },
-        { key: 'bloom_energy_scale', label: 'Energy Scale', min: 0.0, max: 5.0, step: 0.1, default: 2.5 },
+        { key: 'bloom_energy_scale', label: 'Energy Scale', min: 0.0, max: 5.0, step: 0.1, default: 1.0 },
         { key: 'bloom_impulse_scale', label: 'Impulse Scale', min: 0.0, max: 3.0, step: 0.1, default: 1.5 },
+        { key: 'bloom_strength_scale', label: 'Strength Scale', min: 0.0, max: 5.0, step: 0.1, default: 2.5 },
+        { key: 'bloom_flash_multiplier', label: 'Flash Multiplier', min: 0.0, max: 5.0, step: 0.1, default: 2.0 },
       ],
       'Particles': [
         { key: 'particle_explosion_base_prob', label: 'Explosion Prob.', min: 0.0, max: 0.40, step: 0.01, default: 0.20 },
@@ -2017,8 +2384,6 @@
       'Rendering': [
         { key: 'max_lightness', label: 'Max Lightness', min: 0, max: 255, step: 1, default: 255 },
         { key: 'max_emissive', label: 'Max Emissive', min: 0.0, max: 4.0, step: 0.1, default: 2.0 },
-      ],
-      'Audio': [
         { key: 'visual_smoothing', label: 'Visual Smoothing', min: 0.41, max: 0.99, step: 0.01, default: 0.70 },
         { key: 'impulse_decay', label: 'Impulse Decay', min: 0.65, max: 0.99, step: 0.01, default: 0.82 },
       ],
@@ -2040,9 +2405,13 @@
         { key: 'cap_video_opacity', label: 'Video Opacity', min: 0, max: 1, step: 0.01, default: 1.0,
           setter: v => { capVideoOpacity = v; document.getElementById('tabVideo').style.opacity = v; },
           getter: () => capVideoOpacity },
-      ],
-      'Serial Audio': [
-        { key: 'serial_audio_volume', label: 'PWM Volume', min: 0, max: 100, step: 1, default: 30,
+        { key: 'tab_audio_gain', label: 'Tab Audio Vol', min: 0.0, max: 2.0, step: 0.1, default: 1.0,
+          setter: v => { if (tabAudioGain) tabAudioGain.gain.value = v; },
+          getter: () => tabAudioGain ? tabAudioGain.gain.value : 1.0 },
+        { key: 'cam_mic_gain', label: 'Cam Mic Vol', min: 0.0, max: 2.0, step: 0.1, default: 1.0,
+          setter: v => { if (camMicGain) camMicGain.gain.value = v; },
+          getter: () => camMicGain ? camMicGain.gain.value : 1.0 },
+        { key: 'serial_audio_volume', label: 'PWM Volume', min: 0, max: 100, step: 1, default: 10,
           setter: v => { _serialAudioVolume = v; if (window.rubyExecPrompt) window.rubyExecPrompt('sav ' + Math.round(v)); },
           getter: () => _serialAudioVolume },
       ],
@@ -2351,8 +2720,111 @@
           }
         }
         syncControlPanelValues();
+        // Reset oscilloscope sliders to defaults
+        if (oscSpeed) { oscSpeed.value = 10; if (oscSpeedVal) oscSpeedVal.textContent = '1.0'; if (window.rubyExecPrompt) window.rubyExecPrompt('osc_sp 1.0'); }
+        if (oscThickness) { oscThickness.value = 2; if (oscThicknessVal) oscThicknessVal.textContent = '0.10'; if (window.rubyExecPrompt) window.rubyExecPrompt('osc_r 0.10'); }
+        if (oscSpark) { oscSpark.value = 1; if (oscSparkVal) oscSparkVal.textContent = '0.1'; if (window.rubyExecPrompt) window.rubyExecPrompt('osc_spark 0.1'); }
         scheduleURLUpdate();
       });
+
+      // --- Synth Panel Event Handlers ---
+      // Waveform buttons
+      document.querySelectorAll('.cp-synth-wave').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const wave = btn.dataset.wave;
+          document.querySelectorAll('.cp-synth-wave').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          if (window.rubyExecPrompt) window.rubyExecPrompt('syn_w ' + wave);
+        });
+      });
+      // Set initial active waveform button
+      document.querySelector('.cp-synth-wave[data-wave="sawtooth"]')?.classList.add('active');
+
+      // Filter type buttons
+      document.querySelectorAll('.cp-synth-filter').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const ft = btn.dataset.filter;
+          document.querySelectorAll('.cp-synth-filter').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          if (window.rubyExecPrompt) window.rubyExecPrompt('syn_ft ' + ft);
+        });
+      });
+      document.querySelector('.cp-synth-filter[data-filter="lowpass"]')?.classList.add('active');
+
+      // ADSR + Filter sliders
+      const synthSliders = [
+        { id: 'cpSynthAttack',  valId: 'cpSynthAttackVal',  cmd: 'syn_a',  fmt: v => (v/1000).toFixed(2) + 's', scale: v => v/1000 },
+        { id: 'cpSynthDecay',   valId: 'cpSynthDecayVal',   cmd: 'syn_d',  fmt: v => (v/1000).toFixed(2) + 's', scale: v => v/1000 },
+        { id: 'cpSynthSustain', valId: 'cpSynthSustainVal', cmd: 'syn_s',  fmt: v => (v/100).toFixed(2),         scale: v => v/100 },
+        { id: 'cpSynthRelease', valId: 'cpSynthReleaseVal', cmd: 'syn_r',  fmt: v => (v/1000).toFixed(2) + 's', scale: v => v/1000 },
+        { id: 'cpSynthCutoff',  valId: 'cpSynthCutoffVal',  cmd: 'syn_fc', fmt: v => v + '',                    scale: v => v },
+        { id: 'cpSynthReso',    valId: 'cpSynthResoVal',    cmd: 'syn_fq', fmt: v => (v/10).toFixed(1),          scale: v => v/10 },
+        { id: 'cpSynthGain',    valId: 'cpSynthGainVal',    cmd: 'syn_g',  fmt: v => v + '%',                   scale: v => v },
+      ];
+      synthSliders.forEach(s => {
+        const slider = document.getElementById(s.id);
+        const valEl = document.getElementById(s.valId);
+        if (slider) {
+          slider.addEventListener('input', () => {
+            const raw = parseFloat(slider.value);
+            if (valEl) valEl.textContent = s.fmt(raw);
+            const scaled = s.scale(raw);
+            if (window.rubyExecPrompt) window.rubyExecPrompt(s.cmd + ' ' + scaled);
+          });
+        }
+      });
+
+      // Oscilloscope toggle
+      const oscToggle = document.getElementById('cpOscToggle');
+      if (oscToggle) {
+        oscToggle.addEventListener('change', () => {
+          if (window.rubyExecPrompt) window.rubyExecPrompt('osc ' + (oscToggle.checked ? '1' : '0'));
+        });
+      }
+
+      // Oscilloscope speed slider
+      const oscSpeed = document.getElementById('cpOscSpeed');
+      const oscSpeedVal = document.getElementById('cpOscSpeedVal');
+      if (oscSpeed) {
+        oscSpeed.addEventListener('input', () => {
+          const speed = (parseFloat(oscSpeed.value) / 10).toFixed(1);
+          if (oscSpeedVal) oscSpeedVal.textContent = speed;
+          if (window.rubyExecPrompt) window.rubyExecPrompt('osc_sp ' + speed);
+        });
+      }
+
+      // Oscilloscope thickness (tube radius) slider
+      const oscThickness = document.getElementById('cpOscThickness');
+      const oscThicknessVal = document.getElementById('cpOscThicknessVal');
+      if (oscThickness) {
+        oscThickness.addEventListener('input', () => {
+          const radius = (parseFloat(oscThickness.value) / 20).toFixed(2);
+          if (oscThicknessVal) oscThicknessVal.textContent = radius;
+          if (window.rubyExecPrompt) window.rubyExecPrompt('osc_r ' + radius);
+        });
+      }
+
+      // Oscilloscope Y position slider
+      const oscYPos = document.getElementById('cpOscYPos');
+      const oscYPosVal = document.getElementById('cpOscYPosVal');
+      if (oscYPos) {
+        oscYPos.addEventListener('input', () => {
+          const ypos = (parseFloat(oscYPos.value) / 10).toFixed(1);
+          if (oscYPosVal) oscYPosVal.textContent = ypos;
+          if (window.rubyExecPrompt) window.rubyExecPrompt('osc_y ' + ypos);
+        });
+      }
+
+      // Oscilloscope spark intensity slider
+      const oscSpark = document.getElementById('cpOscSpark');
+      const oscSparkVal = document.getElementById('cpOscSparkVal');
+      if (oscSpark) {
+        oscSpark.addEventListener('input', () => {
+          const spark = (parseFloat(oscSpark.value) / 10).toFixed(1);
+          if (oscSparkVal) oscSparkVal.textContent = spark;
+          if (window.rubyExecPrompt) window.rubyExecPrompt('osc_spark ' + spark);
+        });
+      }
 
       // Initialize hue wheel
       initHueWheel();

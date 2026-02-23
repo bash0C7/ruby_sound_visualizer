@@ -29,10 +29,7 @@ class DebugFormatter
   end
 
   def format_param_text
-    mic_status = @audio_input_manager&.mic_muted? ? "MIC:OFF" : "MIC:ON"
-    tab_status = @audio_input_manager&.tab_capture? ? "TAB:ON" : "TAB:OFF"
-    gain_str = VisualizerPolicy.input_gain == 0.0 ? "0dB" : "#{VisualizerPolicy.input_gain > 0 ? '+' : ''}#{VisualizerPolicy.input_gain.round(1)}dB"
-    "#{mic_status}  #{tab_status}  |  Sensitivity: #{VisualizerPolicy.sensitivity.round(2)}x  Gain: #{gain_str}  |  MaxBrightness: #{VisualizerPolicy.max_brightness}  |  MaxLightness: #{VisualizerPolicy.max_lightness}"
+    ""
   end
 
   def format_key_guide

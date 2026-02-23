@@ -36,17 +36,18 @@ mcp__claude-in-chrome__navigate(
 
 **CRITICAL**: Always use `?nocache=<random>`. ruby.wasm caches aggressively — without this, you may be testing stale code.
 
-## Step 3: Wait for User Action
+## Step 3: Start Mic (autonomous)
 
-Display this message and PAUSE:
+Wait 3 seconds for the app to initialize, then click the Mic button to start audio input:
 
 ```
-Browser loaded. Please:
-- Upload VRM file if needed, OR click "Skip"
-- Let me know when the visualizer is running
+mcp__claude-in-chrome__computer(action: "wait", duration: 3, tabId: XXX)
+mcp__claude-in-chrome__find(query: "Mic button", tabId: XXX)
+mcp__claude-in-chrome__computer(action: "left_click", ref: "ref_XXX", tabId: XXX)
+mcp__claude-in-chrome__computer(action: "wait", duration: 2, tabId: XXX)
 ```
 
-Do NOT proceed until user confirms ready.
+Note: VRM loading requires a file picker (user action). Ask the user only when the test specifically involves VRM features.
 
 ## Step 4: Screenshot
 

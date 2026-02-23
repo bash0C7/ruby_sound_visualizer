@@ -2,16 +2,13 @@
 # Receives frequency/duty data from PicoRuby via serial and tracks state
 # for Web Audio API oscillator updates. Pure Ruby state - no JavaScript calls.
 class SerialAudioSource
-  FREQ_MIN = 0
-  FREQ_MAX = 20000
-  DUTY_MIN = 0
-  DUTY_MAX = 100
-  DEFAULT_VOLUME = 0.3
+  DEFAULT_VOLUME = 0.1
 
   attr_reader :frequency, :duty, :volume
 
   def initialize
     @active = false
+    @user_stopped = false
     @frequency = 440
     @duty = 50
     @volume = DEFAULT_VOLUME
@@ -23,21 +20,24 @@ class SerialAudioSource
   end
 
   def start
+    @user_stopped = false
     @active = true
     @pending_update = true
   end
 
   def stop
+    @user_stopped = true
     @active = false
     @pending_update = true
   end
 
   # Update frequency and duty from received serial data.
   # Auto-starts on first call so PicoRuby button press triggers audio immediately.
+  # Does NOT restart if user explicitly stopped via stop().
   def update(freq, duty)
-    start unless @active
-    @frequency = [[freq.to_i, FREQ_MIN].max, FREQ_MAX].min
-    @duty = [[duty.to_i, DUTY_MIN].max, DUTY_MAX].min
+    start unless @active || @user_stopped
+    @frequency = [[freq.to_i, SerialProtocol::FREQ_MIN].max, SerialProtocol::FREQ_MAX].min
+    @duty = [[duty.to_i, SerialProtocol::DUTY_MIN].max, SerialProtocol::DUTY_MAX].min
     @pending_update = true
   end
 

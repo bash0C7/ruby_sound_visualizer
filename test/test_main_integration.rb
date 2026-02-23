@@ -72,18 +72,9 @@ class TestMainIntegration < Test::Unit::TestCase
     manager = AudioInputManager.new
     formatter = DebugFormatter.new(manager)
 
-    # Verify debug formatter reads from audio input manager
+    # format_param_text is simplified to empty string (info shown in Controls panel)
     result = formatter.format_param_text
-    assert_match(/MIC:ON/, result)
-    assert_match(/TAB:OFF/, result)
-
-    manager.mute_mic
-    result = formatter.format_param_text
-    assert_match(/MIC:OFF/, result)
-
-    manager.switch_to_tab
-    result = formatter.format_param_text
-    assert_match(/TAB:ON/, result)
+    assert_equal "", result
   end
 
   def test_audio_analyzer_to_effect_manager_flow
