@@ -1,0 +1,50 @@
+inherit_from: .rubocop_todo.yml
+
+inherit_mode:
+  merge:
+    - Exclude
+
+AllCops:
+  TargetRubyVersion: 3.4
+  NewCops: enable
+  Exclude:
+    - "picoruby/**/*"
+    - "vendor/**/*"
+    - "node_modules/**/*"
+    - "Gemfile"
+
+# ruby.wasm code often has long JS interop lines
+Layout/LineLength:
+  Max: 120
+
+# Test files naturally have long method bodies
+Metrics/MethodLength:
+  Exclude:
+    - "test/**/*"
+
+# Test files naturally have long classes
+Metrics/ClassLength:
+  Exclude:
+    - "test/**/*"
+
+# Test files have large blocks (test methods, setup)
+Metrics/BlockLength:
+  Exclude:
+    - "test/**/*"
+    - "Rakefile"
+
+# ruby.wasm interop uses class variables intentionally
+Style/ClassVars:
+  Enabled: false
+
+# Not requiring top-level class/module documentation
+Style/Documentation:
+  Enabled: false
+
+# JS interop methods sometimes use camelCase naming
+Naming/MethodName:
+  Enabled: false
+
+# JS interop accessor patterns
+Naming/AccessorMethodName:
+  Enabled: false
