@@ -6,11 +6,6 @@ class SynthEngine
   WAVEFORMS = %i[sine square sawtooth triangle].freeze
   FILTER_TYPES = %i[lowpass highpass bandpass].freeze
 
-  FREQ_MIN = 0
-  FREQ_MAX = 20000
-  DUTY_MIN = 0
-  DUTY_MAX = 100
-
   ATTACK_MIN = 0.001
   ATTACK_MAX = 5.0
   DECAY_MIN = 0.001
@@ -109,8 +104,8 @@ class SynthEngine
   # --- Note on/off (from serial frequency data) ---
 
   def note_on(freq, duty)
-    f = clamp(freq.to_i, FREQ_MIN, FREQ_MAX)
-    d = clamp(duty.to_i, DUTY_MIN, DUTY_MAX)
+    f = clamp(freq.to_i, SerialProtocol::FREQ_MIN, SerialProtocol::FREQ_MAX)
+    d = clamp(duty.to_i, SerialProtocol::DUTY_MIN, SerialProtocol::DUTY_MAX)
 
     if f == 0 || d == 0
       note_off

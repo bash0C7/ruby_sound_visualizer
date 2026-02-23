@@ -100,7 +100,7 @@ class TestOscilloscopeRenderer < Test::Unit::TestCase
   end
 
   def test_scroll_speed_default
-    assert_in_delta 2.0, @renderer.scroll_speed, 0.01
+    assert_in_delta 1.0, @renderer.scroll_speed, 0.01
   end
 
   def test_set_scroll_speed
@@ -201,7 +201,7 @@ class TestOscilloscopeRenderer < Test::Unit::TestCase
   # --- Tube radius ---
 
   def test_initial_tube_radius
-    assert_in_delta 0.3, @renderer.tube_radius, 0.01
+    assert_in_delta 0.1, @renderer.tube_radius, 0.01
   end
 
   def test_set_tube_radius
@@ -222,7 +222,7 @@ class TestOscilloscopeRenderer < Test::Unit::TestCase
   # --- Spark intensity ---
 
   def test_initial_spark_intensity
-    assert_in_delta 0.5, @renderer.spark_intensity, 0.01
+    assert_in_delta 0.1, @renderer.spark_intensity, 0.01
   end
 
   def test_set_spark_intensity

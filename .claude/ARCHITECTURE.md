@@ -146,6 +146,25 @@ These parameters can be adjusted via:
 
 All parameters have min/max bounds and can be reset to defaults with `r` (VJ Pad) or `rubyConfigReset()` (DevTools).
 
+## Parameter Naming Across Three Independent Systems
+
+**CRITICAL**: The same parameter uses DIFFERENT key names in each system. These three paths are completely independent — mixing them up causes `undefined method` errors.
+
+| VisualizerPolicy accessor | VJPad command | SnapshotManager URL key | rubyConfigSet key |
+|---|---|---|---|
+| `sensitivity` | `s` | `sens` | `sensitivity` |
+| `input_gain` | `ig` | `ig` | `input_gain` |
+| `max_brightness` | `br` | `brt` | `max_brightness` |
+| `bloom_base_strength` | `bbs` | `bbs` | `bloom_base_strength` |
+| `max_bloom` | `bm` | `bmax` | `max_bloom` |
+
+Rules:
+- **VJPad** (`rubyExecPrompt`): short abbreviations (`s`, `ig`, `bbs`) — these are Ruby method names on the VJPad instance
+- **SnapshotManager** (`rubySnapshotApply`): URL-safe compact keys (`sens`, `brt`, `bmax`) — stored in query string, call VisualizerPolicy directly
+- **rubyConfigSet/Get**: same as VisualizerPolicy accessor names (`sensitivity`, `max_brightness`)
+
+**Example of the mistake**: `rubyExecPrompt('sens 1.2')` → `undefined method 'sens'`. Correct: `rubyExecPrompt('s 1.2')`. The URL `?sens=1.2` is processed by `SnapshotManager`, NOT by VJPad.
+
 ## Control Panel UI
 
 HTML/CSS control panel overlaying the visualizer canvas:

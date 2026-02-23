@@ -75,22 +75,10 @@ class TestDebugFormatter < Test::Unit::TestCase
     assert_instance_of String, result
   end
 
-  def test_format_param_text_contains_sensitivity
+  def test_format_param_text_returns_empty_string
     formatter = DebugFormatter.new
     result = formatter.format_param_text
-    assert_match(/Sensitivity:/, result)
-  end
-
-  def test_format_param_text_contains_brightness
-    formatter = DebugFormatter.new
-    result = formatter.format_param_text
-    assert_match(/MaxBrightness:/, result)
-  end
-
-  def test_format_param_text_contains_lightness
-    formatter = DebugFormatter.new
-    result = formatter.format_param_text
-    assert_match(/MaxLightness:/, result)
+    assert_equal "", result
   end
 
   def test_format_key_guide_returns_string
@@ -129,27 +117,11 @@ class TestDebugFormatter < Test::Unit::TestCase
     assert_match(/-60\.0dB/, result)
   end
 
-  def test_format_param_text_without_manager_shows_on
-    formatter = DebugFormatter.new
-    result = formatter.format_param_text
-    assert_match(/MIC:ON/, result)
-    assert_match(/TAB:OFF/, result)
-  end
-
-  def test_format_param_text_with_manager_mic_muted
+  def test_format_param_text_with_manager_returns_empty
     manager = AudioInputManager.new
-    manager.mute_mic
     formatter = DebugFormatter.new(manager)
     result = formatter.format_param_text
-    assert_match(/MIC:OFF/, result)
-  end
-
-  def test_format_param_text_with_manager_tab_active
-    manager = AudioInputManager.new
-    manager.switch_to_tab
-    formatter = DebugFormatter.new(manager)
-    result = formatter.format_param_text
-    assert_match(/TAB:ON/, result)
+    assert_equal "", result
   end
 
   def test_format_key_guide_contains_mic_key
@@ -172,32 +144,13 @@ class TestDebugFormatter < Test::Unit::TestCase
     # Should not raise
   end
 
-  def test_format_param_text_reads_mic_state_from_audio_input_manager
+  def test_format_param_text_ignores_manager_state
     manager = AudioInputManager.new
     formatter = DebugFormatter.new(manager)
-
-    # Default: unmuted
-    result = formatter.format_param_text
-    assert_match(/MIC:ON/, result)
-
-    # After muting
     manager.mute_mic
-    result = formatter.format_param_text
-    assert_match(/MIC:OFF/, result)
-  end
-
-  def test_format_param_text_reads_tab_state_from_audio_input_manager
-    manager = AudioInputManager.new
-    formatter = DebugFormatter.new(manager)
-
-    # Default: microphone (tab off)
-    result = formatter.format_param_text
-    assert_match(/TAB:OFF/, result)
-
-    # After switching to tab
     manager.switch_to_tab
     result = formatter.format_param_text
-    assert_match(/TAB:ON/, result)
+    assert_equal "", result
   end
 
   def test_debug_formatter_backward_compatibility_without_audio_input_manager

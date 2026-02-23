@@ -197,7 +197,7 @@ class TestVJSynthCommands < Test::Unit::TestCase
 
   def test_osc_sp_get
     result = @pad.exec("osc_sp")
-    assert_equal "osc speed: 2.0", result[:msg]
+    assert_equal "osc speed: 1.0", result[:msg]
   end
 
   def test_osc_sp_set
@@ -210,7 +210,7 @@ class TestVJSynthCommands < Test::Unit::TestCase
 
   def test_osc_r_get
     result = @pad.exec("osc_r")
-    assert_equal "osc radius: 0.3", result[:msg]
+    assert_equal "osc radius: 0.1", result[:msg]
   end
 
   def test_osc_r_set
@@ -254,7 +254,7 @@ class TestVJSynthCommands < Test::Unit::TestCase
 
   def test_osc_spark_get
     result = @pad.exec("osc_spark")
-    assert_equal "osc spark: 0.5", result[:msg]
+    assert_equal "osc spark: 0.1", result[:msg]
   end
 
   def test_osc_spark_set

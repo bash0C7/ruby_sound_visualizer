@@ -20,7 +20,7 @@ class TestSerialAudioSource < Test::Unit::TestCase
   end
 
   def test_initial_volume
-    assert_in_delta 0.3, @source.volume, 0.01
+    assert_in_delta 0.1, @source.volume, 0.01
   end
 
   # --- Start/Stop ---
@@ -111,7 +111,7 @@ class TestSerialAudioSource < Test::Unit::TestCase
     assert_equal 880, data[:frequency]
     assert_equal 75, data[:duty]
     assert_equal true, data[:active]
-    assert_in_delta 0.3, data[:volume], 0.01
+    assert_in_delta 0.1, data[:volume], 0.01
   end
 
   def test_consume_update_after_stop_returns_inactive
@@ -144,6 +144,41 @@ class TestSerialAudioSource < Test::Unit::TestCase
     assert_equal true, @source.pending_update?
   end
 
+  # --- Stop prevents auto-restart ---
+
+  def test_stop_prevents_update_from_restarting
+    @source.start
+    @source.stop
+    @source.update(880, 75)
+    assert_equal false, @source.active?,
+      "update() after stop() should NOT restart audio (user stopped it)"
+  end
+
+  def test_stop_prevents_auto_start_on_update
+    # Initial state: never started, user explicitly stopped
+    @source.stop
+    @source.update(880, 75)
+    assert_equal false, @source.active?,
+      "update() after explicit stop() should NOT auto-start"
+  end
+
+  def test_start_after_stop_allows_auto_start_again
+    @source.start
+    @source.stop
+    @source.start  # user re-enables
+    @source.stop
+    @source.update(880, 75)
+    assert_equal false, @source.active?
+  end
+
+  def test_update_auto_starts_without_prior_stop
+    # Normal first-time serial data: should auto-start
+    assert_equal false, @source.active?
+    @source.update(880, 75)
+    assert_equal true, @source.active?,
+      "First update() without prior stop() should auto-start"
+  end
+
   # --- Status ---
 
   def test_status_when_inactive
@@ -161,4 +196,5 @@ class TestSerialAudioSource < Test::Unit::TestCase
     assert_match(/880/, result)
     assert_match(/75/, result)
   end
+
 end

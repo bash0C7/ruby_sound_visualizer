@@ -73,6 +73,7 @@ See [.claude/INVESTIGATION-PROTOCOL.md](.claude/INVESTIGATION-PROTOCOL.md) for d
 **CRITICAL: Never claim something works without actual Chrome MCP verification. Do not report completion until screenshot and console check confirm it.**
 
 - **Cache busting**: ruby.wasm aggressively caches. Always use `?nocache=<random>` in URL when testing. If changes seem invisible, suspect caching first.
+- **Console multi-tab pollution**: Chrome console shows messages from ALL open tabs in the same window. When checking for errors, confirm the URL in the message source (e.g., `nocache=XXXXX`) matches your current session. Errors from stale cached tabs appear alongside current session logs and cause false positives.
 - **JS::Object nil? prohibition**: Never use `.nil?` on `JS::Object` instances — it always returns `false` (BasicObject). Use `.typeof == "undefined"` instead.
 
 Use `/debug-browser` skill for detailed procedures. Use `/verify` skill for the full TDD + browser confirmation loop.

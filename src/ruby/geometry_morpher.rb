@@ -1,9 +1,20 @@
 class GeometryMorpher
+  DEFAULT_COLOR = [0.3, 0.3, 0.3].freeze
+  IMPULSE_SCALE = 0.8
+  ROTATION_BASS = 0.15
+  ROTATION_MID = 0.1
+  ROTATION_HIGH = 0.08
+  IMPULSE_ROTATION_BASS = 0.5
+  IMPULSE_ROTATION_MID = 0.4
+  IMPULSE_ROTATION_HIGH = 0.3
+  EMISSIVE_SCALE = 1.5
+  EMISSIVE_IMPULSE = 0.8
+
   def initialize
     @rotation = [0, 0, 0]
     @scale = VisualizerPolicy::GEOMETRY_BASE_SCALE
     @emissive_intensity = 0.0
-    @color = [0.3, 0.3, 0.3]
+    @color = DEFAULT_COLOR.dup
   end
 
   def update(analysis)
@@ -20,18 +31,18 @@ class GeometryMorpher
     @color = ColorPalette.frequency_to_color(analysis)
 
     @scale = VisualizerPolicy::GEOMETRY_BASE_SCALE + energy * VisualizerPolicy::GEOMETRY_SCALE_MULTIPLIER
-    @scale += 0.8 * imp_overall
+    @scale += IMPULSE_SCALE * imp_overall
 
-    @rotation[0] += bass * 0.15
-    @rotation[1] += mid * 0.1
-    @rotation[2] += high * 0.08
+    @rotation[0] += bass * ROTATION_BASS
+    @rotation[1] += mid * ROTATION_MID
+    @rotation[2] += high * ROTATION_HIGH
 
-    @rotation[0] += 0.5 * imp_bass
-    @rotation[1] += 0.4 * imp_mid
-    @rotation[2] += 0.3 * imp_high
+    @rotation[0] += IMPULSE_ROTATION_BASS * imp_bass
+    @rotation[1] += IMPULSE_ROTATION_MID * imp_mid
+    @rotation[2] += IMPULSE_ROTATION_HIGH * imp_high
 
-    @emissive_intensity = Math.tanh(energy * 1.5) * 1.5
-    @emissive_intensity += Math.tanh(imp_overall) * 0.8
+    @emissive_intensity = Math.tanh(energy * EMISSIVE_SCALE) * EMISSIVE_SCALE
+    @emissive_intensity += Math.tanh(imp_overall) * EMISSIVE_IMPULSE
     @emissive_intensity = VisualizerPolicy.cap_emissive(@emissive_intensity)
   end
 

@@ -3,11 +3,8 @@ class FrequencyMapper
   MID_RANGE = (250..2000)
   HIGH_RANGE = (2000..20000)
 
-  SAMPLE_RATE = 48000
-  FFT_SIZE = 2048
-
   def initialize
-    @bin_size = (SAMPLE_RATE / 2.0) / (FFT_SIZE / 2.0)
+    @bin_size = (VisualizerPolicy::SAMPLE_RATE / 2.0) / (VisualizerPolicy::FFT_SIZE / 2.0)
   end
 
   def split_bands(frequency_data)

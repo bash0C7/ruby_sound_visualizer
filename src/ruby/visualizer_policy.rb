@@ -38,25 +38,29 @@ module VisualizerPolicy
   GEOMETRY_MAX_EMISSIVE = 2.0
 
   # Bloom
-  BLOOM_BASE_STRENGTH = 1.5
+  BLOOM_BASE_STRENGTH = 0.5
   BLOOM_BASE_THRESHOLD = 0.0
   BLOOM_MAX_STRENGTH = 1.5
   BLOOM_MIN_THRESHOLD = 0.1
+  BLOOM_THRESHOLD_BASE = 0.15
+  BLOOM_THRESHOLD_IMPULSE_SCALE = 0.04
 
   # Runtime-mutable parameter definitions: drives accessor generation,
   # reset_runtime, set_by_key, and get_by_key via metaprogramming.
   RUNTIME_PARAMS = {
     sensitivity:                     { default: 1.0,                          type: :float, min: 0.1,   max: 1.9  },
-    input_gain:                      { default: 0.0,                          type: :float, min: -20.0, max: 20.0 },
+    input_gain:                      { default: 0.0,                          type: :float, min: -40.0, max: 20.0 },
     max_brightness:                  { default: 255,                          type: :int,   min: 0,     max: 255  },
     max_lightness:                   { default: 255,                          type: :int,   min: 0,     max: 255  },
     max_saturation:                  { default: 100,                          type: :int,   min: 0,     max: 100  },
     max_emissive:                    { default: 2.0,                          type: :float, min: 0.0              },
     max_bloom:                       { default: 4.5,                          type: :float, min: 0.0              },
     exclude_max:                     { default: false,                        type: :bool                         },
-    bloom_base_strength:             { default: BLOOM_BASE_STRENGTH,          type: :float, min: 0.0              },
-    bloom_energy_scale:              { default: 2.5,                          type: :float, min: 0.0              },
+    bloom_base_strength:             { default: BLOOM_BASE_STRENGTH,          type: :float, min: -1.0             },
+    bloom_energy_scale:              { default: 1.0,                          type: :float, min: 0.0              },
     bloom_impulse_scale:             { default: 1.5,                          type: :float, min: 0.0              },
+    bloom_strength_scale:            { default: 2.5,                          type: :float, min: 0.0              },
+    bloom_flash_multiplier:          { default: 2.0,                          type: :float, min: 0.0              },
     particle_explosion_base_prob:    { default: PARTICLE_EXPLOSION_BASE_PROB, type: :float, min: 0.0,  max: 1.0  },
     particle_explosion_energy_scale: { default: PARTICLE_EXPLOSION_ENERGY_SCALE, type: :float, min: 0.0           },
     particle_explosion_force_scale:  { default: PARTICLE_EXPLOSION_FORCE_SCALE,  type: :float, min: 0.0           },
@@ -123,11 +127,13 @@ module VisualizerPolicy
 
   MUTABLE_KEYS = {
     'sensitivity' => { min: 0.1, max: 1.9, type: :float, default: 1.0, group: 'Master', step: 0.05 },
-    'input_gain' => { min: -20.0, max: 20.0, type: :float, default: 0.0, group: 'Master', step: 0.5 },
-    'bloom_base_strength' => { min: 0.0, max: 3.0, type: :float, default: 1.5, group: 'Bloom', step: 0.1 },
+    'input_gain' => { min: -40.0, max: 20.0, type: :float, default: 0.0, group: 'Master', step: 0.5 },
+    'bloom_base_strength' => { min: -1.0, max: 3.0, type: :float, default: 0.5, group: 'Bloom', step: 0.1 },
     'max_bloom' => { min: 0.0, max: 9.0, type: :float, default: 4.5, group: 'Bloom', step: 0.1 },
-    'bloom_energy_scale' => { min: 0.0, max: 5.0, type: :float, default: 2.5, group: 'Bloom', step: 0.1 },
+    'bloom_energy_scale' => { min: 0.0, max: 5.0, type: :float, default: 1.0, group: 'Bloom', step: 0.1 },
     'bloom_impulse_scale' => { min: 0.0, max: 3.0, type: :float, default: 1.5, group: 'Bloom', step: 0.1 },
+    'bloom_strength_scale' => { min: 0.0, max: 5.0, type: :float, default: 2.5, group: 'Bloom', step: 0.1 },
+    'bloom_flash_multiplier' => { min: 0.0, max: 5.0, type: :float, default: 2.0, group: 'Bloom', step: 0.1 },
     'particle_explosion_base_prob' => { min: 0.0, max: 0.40, type: :float, default: 0.20, group: 'Particles', step: 0.01 },
     'particle_explosion_energy_scale' => { min: 0.0, max: 1.0, type: :float, default: 0.50, group: 'Particles', step: 0.01 },
     'particle_explosion_force_scale' => { min: 0.0, max: 1.10, type: :float, default: 0.55, group: 'Particles', step: 0.01 },
