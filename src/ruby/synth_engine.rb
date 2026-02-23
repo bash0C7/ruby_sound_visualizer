@@ -34,8 +34,9 @@ class SynthEngine
     @voices          = {}
     @next_voice_id   = 0
     @pending_voice_events   = []
-    @pending_params_update  = false
+    @pending_params_update  = true  # send initial params to JS on first frame
     @pending_voices_update  = false
+    @last_note_on_ms = nil
   end
 
   def active?
@@ -48,7 +49,7 @@ class SynthEngine
 
   # --- UART RX compatible interface (note_on/note_off) ---
 
-  def note_on(freq, duty)
+  def note_on(freq, duty, now_ms: nil)
     f = clamp(freq.to_i, SerialProtocol::FREQ_MIN, SerialProtocol::FREQ_MAX)
     d = clamp(duty.to_i, SerialProtocol::DUTY_MIN, SerialProtocol::DUTY_MAX)
 
@@ -57,17 +58,15 @@ class SynthEngine
       return
     end
 
+    @last_note_on_ms = now_ms || (Time.now.to_f * 1000)
     @duty = d
 
     # Same frequency already active: no new voice needed
     return if @voices.any? { |_id, v| v[:freq] == f && v[:state] == :active }
 
-    # Steal oldest voice when at max capacity
-    if voice_count >= @max_voices
-      oldest_id = @voices.select { |_id, v| v[:state] == :active }
-                         .min_by { |id, _v| id }&.first
-      release_voice(oldest_id) if oldest_id
-    end
+    # Different frequency: release all active voices so previous pitch fades out via ADSR
+    # (sensor sends continuous pitch data — one pitch at a time, not chords)
+    @voices.select { |_id, v| v[:state] == :active }.each { |id, _v| release_voice(id) }
 
     voice_id = alloc_voice_id
     @voices[voice_id] = { freq: f, duty: d, state: :active }
@@ -129,6 +128,15 @@ class SynthEngine
   def set_max_sustain_ms(val)
     @max_sustain_ms = clamp(val.to_i, MAX_SUSTAIN_MS_MIN, MAX_SUSTAIN_MS_MAX)
     @pending_params_update = true
+  end
+
+  # --- Serial receive timeout (auto note_off) ---
+
+  def check_timeout(current_ms: nil, threshold_ms: SerialProtocol::RECEIVE_TIMEOUT_MS)
+    return unless active?
+    return unless @last_note_on_ms
+    current_ms ||= (Time.now.to_f * 1000)
+    note_off if (current_ms - @last_note_on_ms) > threshold_ms
   end
 
   # --- Pending update ---

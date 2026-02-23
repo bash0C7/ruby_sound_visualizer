@@ -208,6 +208,8 @@ class VisualizerApp
   end
 
   def update_synth
+    @synth_engine&.check_timeout
+
     if @synth_engine&.pending_update?
       JSBridge.update_synth(@synth_engine.consume_update)
     end

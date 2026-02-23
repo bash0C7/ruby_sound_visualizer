@@ -201,10 +201,11 @@ class TestSynthEngine < Test::Unit::TestCase
     assert_equal 1, @engine.voice_count
   end
 
-  def test_note_on_different_freqs_allocate_multiple_voices
+  def test_note_on_different_freq_releases_previous_voice
     @engine.note_on(440, 50)
     @engine.note_on(880, 50)
-    assert_equal 2, @engine.voice_count
+    # Previous voice is released (ADSR fade-out); only the new pitch is active
+    assert_equal 1, @engine.voice_count
   end
 
   def test_note_on_marks_pending
@@ -249,17 +250,17 @@ class TestSynthEngine < Test::Unit::TestCase
     assert events.any? { |e| e[:type] == :note_off }
   end
 
-  # --- Polyphony: voice stealing ---
+  # --- Pitch change releases previous voice ---
 
-  def test_voice_stealing_when_at_max_capacity
+  def test_pitch_change_releases_previous_voice
     engine = SynthEngine.new
-    engine.set_max_voices(2)
     engine.consume_update
     engine.note_on(100, 50)
-    engine.note_on(200, 50)
-    engine.consume_update
-    engine.note_on(300, 50)  # should steal oldest
-    assert_equal 2, engine.voice_count
+    assert_equal 1, engine.voice_count
+    engine.note_on(200, 50)  # new pitch: previous voice released
+    assert_equal 1, engine.voice_count
+    engine.note_on(300, 50)  # new pitch: previous voice released
+    assert_equal 1, engine.voice_count
   end
 
   # --- Gain ---
@@ -393,5 +394,61 @@ class TestSynthEngine < Test::Unit::TestCase
 
   def test_no_filter_types_constant
     refute defined?(SynthEngine::FILTER_TYPES)
+  end
+
+  # --- Serial receive timeout (auto note_off) ---
+
+  def test_check_timeout_triggers_note_off_after_threshold
+    @engine.note_on(440, 50, now_ms: 0.0)
+    @engine.check_timeout(current_ms: 201.0, threshold_ms: 200)
+    assert_equal false, @engine.active?
+  end
+
+  def test_check_timeout_no_effect_before_threshold
+    @engine.note_on(440, 50, now_ms: 0.0)
+    @engine.check_timeout(current_ms: 199.0, threshold_ms: 200)
+    assert_equal true, @engine.active?
+  end
+
+  def test_check_timeout_at_exact_threshold_no_effect
+    @engine.note_on(440, 50, now_ms: 0.0)
+    @engine.check_timeout(current_ms: 200.0, threshold_ms: 200)
+    assert_equal true, @engine.active?
+  end
+
+  def test_check_timeout_inactive_synth_does_nothing
+    assert_equal false, @engine.active?
+    @engine.check_timeout(current_ms: 9999.0, threshold_ms: 200)
+    assert_equal false, @engine.active?
+  end
+
+  def test_check_timeout_without_note_on_does_nothing
+    @engine.check_timeout(current_ms: 9999.0, threshold_ms: 200)
+    assert_equal false, @engine.active?
+  end
+
+  def test_check_timeout_marks_pending_on_note_off
+    @engine.note_on(440, 50, now_ms: 0.0)
+    @engine.consume_update
+    @engine.check_timeout(current_ms: 201.0, threshold_ms: 200)
+    assert_equal true, @engine.pending_update?
+  end
+
+  def test_check_timeout_default_threshold
+    assert_equal SerialProtocol::RECEIVE_TIMEOUT_MS, 200
+  end
+
+  def test_note_on_refreshes_timeout
+    @engine.note_on(440, 50, now_ms: 0.0)
+    @engine.note_on(440, 50, now_ms: 150.0)
+    @engine.check_timeout(current_ms: 250.0, threshold_ms: 200)
+    assert_equal true, @engine.active?
+  end
+
+  def test_note_on_different_freq_refreshes_timeout
+    @engine.note_on(440, 50, now_ms: 0.0)
+    @engine.note_on(880, 50, now_ms: 150.0)
+    @engine.check_timeout(current_ms: 250.0, threshold_ms: 200)
+    assert_equal true, @engine.active?
   end
 end
