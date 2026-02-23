@@ -1,5 +1,6 @@
-# VJ Pad commands for controlling the analog monophonic synthesizer.
-# Mixed into VJPad to provide synth parameter control via command line.
+# VJ Pad commands for controlling the polyphonic synthesizer oscillator parameters.
+# Filter, distortion, delay, reverb, and compressor are in VJSynthEffectsCommands.
+# Mixed into VJPad to provide syn_* parameter control via command line.
 module VJSynthCommands
   # Synth waveform: syn_w [sine|square|sawtooth|triangle]
   def syn_w(type = :_get)
@@ -49,36 +50,6 @@ module VJSynthCommands
     end
     @synth_engine.set_release(val.to_f)
     "synth release: #{@synth_engine.release}s"
-  end
-
-  # Synth filter cutoff: syn_fc [Hz]
-  def syn_fc(val = :_get)
-    return "synth: not available" unless @synth_engine
-    if val == :_get
-      return "synth cutoff: #{@synth_engine.filter_cutoff.round}Hz"
-    end
-    @synth_engine.set_filter_cutoff(val.to_f)
-    "synth cutoff: #{@synth_engine.filter_cutoff.round}Hz"
-  end
-
-  # Synth filter resonance: syn_fq [Q value]
-  def syn_fq(val = :_get)
-    return "synth: not available" unless @synth_engine
-    if val == :_get
-      return "synth Q: #{@synth_engine.filter_resonance}"
-    end
-    @synth_engine.set_filter_resonance(val.to_f)
-    "synth Q: #{@synth_engine.filter_resonance}"
-  end
-
-  # Synth filter type: syn_ft [lowpass|highpass|bandpass]
-  def syn_ft(type = :_get)
-    return "synth: not available" unless @synth_engine
-    if type == :_get
-      return "synth filter: #{@synth_engine.filter_type}"
-    end
-    @synth_engine.set_filter_type(type.to_s)
-    "synth filter: #{@synth_engine.filter_type}"
   end
 
   # Synth gain: syn_g [0-100 percent]

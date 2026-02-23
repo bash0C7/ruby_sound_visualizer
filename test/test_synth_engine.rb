@@ -27,32 +27,28 @@ class TestSynthEngine < Test::Unit::TestCase
     assert_in_delta 0.3, @engine.release, 0.001
   end
 
-  def test_initial_filter_cutoff
-    assert_in_delta 2000.0, @engine.filter_cutoff, 0.1
-  end
-
-  def test_initial_filter_resonance
-    assert_in_delta 1.0, @engine.filter_resonance, 0.1
-  end
-
-  def test_initial_filter_type
-    assert_equal :lowpass, @engine.filter_type
-  end
-
-  def test_initial_frequency_zero
-    assert_equal 0, @engine.frequency
-  end
-
-  def test_initial_duty_zero
-    assert_equal 0, @engine.duty
-  end
-
   def test_initial_gain
     assert_in_delta 0.3, @engine.gain, 0.01
   end
 
   def test_initial_active_false
     assert_equal false, @engine.active?
+  end
+
+  def test_initial_duty_zero
+    assert_equal 0, @engine.duty
+  end
+
+  def test_initial_voice_count_zero
+    assert_equal 0, @engine.voice_count
+  end
+
+  def test_initial_max_voices
+    assert_equal SynthEngine::DEFAULT_MAX_VOICES, @engine.max_voices
+  end
+
+  def test_initial_max_sustain_ms
+    assert_equal SynthEngine::DEFAULT_MAX_SUSTAIN_MS, @engine.max_sustain_ms
   end
 
   # --- Waveform ---
@@ -130,12 +126,6 @@ class TestSynthEngine < Test::Unit::TestCase
     assert_in_delta 5.0, @engine.decay, 0.001
   end
 
-  def test_set_decay_marks_pending
-    @engine.consume_update if @engine.pending_update?
-    @engine.set_decay(1.0)
-    assert_equal true, @engine.pending_update?
-  end
-
   def test_set_sustain
     @engine.set_sustain(0.8)
     assert_in_delta 0.8, @engine.sustain, 0.001
@@ -149,12 +139,6 @@ class TestSynthEngine < Test::Unit::TestCase
   def test_set_sustain_clamps_max
     @engine.set_sustain(1.5)
     assert_in_delta 1.0, @engine.sustain, 0.001
-  end
-
-  def test_set_sustain_marks_pending
-    @engine.consume_update if @engine.pending_update?
-    @engine.set_sustain(0.8)
-    assert_equal true, @engine.pending_update?
   end
 
   def test_set_release
@@ -172,107 +156,16 @@ class TestSynthEngine < Test::Unit::TestCase
     assert_in_delta 5.0, @engine.release, 0.001
   end
 
-  def test_set_release_marks_pending
-    @engine.consume_update if @engine.pending_update?
-    @engine.set_release(1.5)
-    assert_equal true, @engine.pending_update?
-  end
-
-  # --- Filter ---
-
-  def test_set_filter_cutoff
-    @engine.set_filter_cutoff(5000.0)
-    assert_in_delta 5000.0, @engine.filter_cutoff, 0.1
-  end
-
-  def test_set_filter_cutoff_clamps_min
-    @engine.set_filter_cutoff(5.0)
-    assert_in_delta 20.0, @engine.filter_cutoff, 0.1
-  end
-
-  def test_set_filter_cutoff_clamps_max
-    @engine.set_filter_cutoff(25000.0)
-    assert_in_delta 20000.0, @engine.filter_cutoff, 0.1
-  end
-
-  def test_set_filter_cutoff_marks_pending
-    @engine.consume_update if @engine.pending_update?
-    @engine.set_filter_cutoff(5000.0)
-    assert_equal true, @engine.pending_update?
-  end
-
-  def test_set_filter_resonance
-    @engine.set_filter_resonance(10.0)
-    assert_in_delta 10.0, @engine.filter_resonance, 0.1
-  end
-
-  def test_set_filter_resonance_clamps_min
-    @engine.set_filter_resonance(-1.0)
-    assert_in_delta 0.0, @engine.filter_resonance, 0.1
-  end
-
-  def test_set_filter_resonance_clamps_max
-    @engine.set_filter_resonance(35.0)
-    assert_in_delta 30.0, @engine.filter_resonance, 0.1
-  end
-
-  def test_set_filter_resonance_marks_pending
-    @engine.consume_update if @engine.pending_update?
-    @engine.set_filter_resonance(10.0)
-    assert_equal true, @engine.pending_update?
-  end
-
-  def test_set_filter_type_lowpass
-    @engine.set_filter_type(:lowpass)
-    assert_equal :lowpass, @engine.filter_type
-  end
-
-  def test_set_filter_type_highpass
-    @engine.set_filter_type(:highpass)
-    assert_equal :highpass, @engine.filter_type
-  end
-
-  def test_set_filter_type_bandpass
-    @engine.set_filter_type(:bandpass)
-    assert_equal :bandpass, @engine.filter_type
-  end
-
-  def test_set_filter_type_invalid_raises
-    assert_raise(ArgumentError) { @engine.set_filter_type(:notch) }
-  end
-
-  def test_set_filter_type_by_string
-    @engine.set_filter_type("highpass")
-    assert_equal :highpass, @engine.filter_type
-  end
-
-  def test_set_filter_type_marks_pending
-    @engine.consume_update if @engine.pending_update?
-    @engine.set_filter_type(:highpass)
-    assert_equal true, @engine.pending_update?
-  end
-
-  # --- Frequency/Duty from serial ---
-
-  def test_note_on_sets_frequency_and_duty
-    @engine.note_on(440, 50)
-    assert_equal 440, @engine.frequency
-    assert_equal 50, @engine.duty
-  end
+  # --- note_on / note_off (UART RX compatible interface) ---
 
   def test_note_on_activates
     @engine.note_on(440, 50)
     assert_equal true, @engine.active?
   end
 
-  def test_note_on_clamps_frequency_max
-    @engine.note_on(25000, 50)
-    assert_equal 20000, @engine.frequency
-  end
-
-  def test_note_on_clamps_frequency_min
-    @engine.note_on(-100, 50)
-    assert_equal 0, @engine.frequency
+  def test_note_on_sets_duty
+    @engine.note_on(440, 50)
+    assert_equal 50, @engine.duty
   end
 
   def test_note_on_clamps_duty_max
@@ -283,6 +176,36 @@ class TestSynthEngine < Test::Unit::TestCase
   def test_note_on_clamps_duty_min
     @engine.note_on(440, -10)
     assert_equal 0, @engine.duty
+  end
+
+  def test_note_on_with_zero_duty_triggers_note_off
+    @engine.note_on(440, 50)
+    @engine.note_on(0, 0)
+    assert_equal false, @engine.active?
+  end
+
+  def test_note_on_nonzero_freq_zero_duty_triggers_note_off
+    @engine.note_on(440, 50)
+    @engine.note_on(440, 0)
+    assert_equal false, @engine.active?
+  end
+
+  def test_note_on_allocates_voice
+    @engine.note_on(440, 50)
+    assert_equal 1, @engine.voice_count
+  end
+
+  def test_note_on_same_freq_does_not_duplicate_voice
+    @engine.note_on(440, 50)
+    @engine.note_on(440, 50)
+    assert_equal 1, @engine.voice_count
+  end
+
+  def test_note_on_different_freq_releases_previous_voice
+    @engine.note_on(440, 50)
+    @engine.note_on(880, 50)
+    # Previous voice is released (ADSR fade-out); only the new pitch is active
+    assert_equal 1, @engine.voice_count
   end
 
   def test_note_on_marks_pending
@@ -304,17 +227,40 @@ class TestSynthEngine < Test::Unit::TestCase
     assert_equal true, @engine.pending_update?
   end
 
-  def test_note_on_with_zero_duty_triggers_note_off
+  def test_note_on_produces_note_on_voice_event
+    @engine.consume_update if @engine.pending_update?
     @engine.note_on(440, 50)
-    @engine.note_on(0, 0)
-    assert_equal false, @engine.active?
+    data = @engine.consume_update
+    events = data[:voice_events]
+    assert_not_nil events
+    assert_equal 1, events.length
+    assert_equal :note_on, events[0][:type]
+    assert_equal 440, events[0][:freq]
+    assert_equal 50, events[0][:duty]
+    assert events[0].key?(:voice_id)
   end
 
-  def test_note_on_nonzero_freq_zero_duty_triggers_note_off
-    # otv.rb mute case: <F:440,D:0> - duty=0 means muted/off
+  def test_note_off_produces_note_off_voice_event
     @engine.note_on(440, 50)
-    @engine.note_on(440, 0)
-    assert_equal false, @engine.active?
+    @engine.consume_update
+    @engine.note_off
+    data = @engine.consume_update
+    events = data[:voice_events]
+    assert_not_nil events
+    assert events.any? { |e| e[:type] == :note_off }
+  end
+
+  # --- Pitch change releases previous voice ---
+
+  def test_pitch_change_releases_previous_voice
+    engine = SynthEngine.new
+    engine.consume_update
+    engine.note_on(100, 50)
+    assert_equal 1, engine.voice_count
+    engine.note_on(200, 50)  # new pitch: previous voice released
+    assert_equal 1, engine.voice_count
+    engine.note_on(300, 50)  # new pitch: previous voice released
+    assert_equal 1, engine.voice_count
   end
 
   # --- Gain ---
@@ -340,7 +286,29 @@ class TestSynthEngine < Test::Unit::TestCase
     assert_equal true, @engine.pending_update?
   end
 
-  # --- Pending update / consume ---
+  # --- Voice config ---
+
+  def test_set_max_voices
+    @engine.set_max_voices(4)
+    assert_equal 4, @engine.max_voices
+  end
+
+  def test_set_max_voices_clamps_min
+    @engine.set_max_voices(0)
+    assert_equal SynthEngine::MAX_VOICES_MIN, @engine.max_voices
+  end
+
+  def test_set_max_voices_clamps_max
+    @engine.set_max_voices(999)
+    assert_equal SynthEngine::MAX_VOICES_MAX, @engine.max_voices
+  end
+
+  def test_set_max_sustain_ms
+    @engine.set_max_sustain_ms(300)
+    assert_equal 300, @engine.max_sustain_ms
+  end
+
+  # --- consume_update structure ---
 
   def test_consume_update_clears_pending
     @engine.note_on(440, 50)
@@ -348,36 +316,42 @@ class TestSynthEngine < Test::Unit::TestCase
     assert_equal false, @engine.pending_update?
   end
 
-  def test_consume_update_returns_full_state
-    @engine.set_waveform(:square)
-    @engine.set_attack(0.1)
-    @engine.set_decay(0.5)
-    @engine.set_sustain(0.7)
-    @engine.set_release(0.4)
-    @engine.set_filter_cutoff(3000.0)
-    @engine.set_filter_resonance(8.0)
-    @engine.set_filter_type(:highpass)
-    @engine.note_on(880, 60)
-    @engine.set_gain(0.5)
-
-    data = @engine.consume_update
-    assert_equal :square, data[:waveform]
-    assert_in_delta 0.1, data[:attack], 0.001
-    assert_in_delta 0.5, data[:decay], 0.001
-    assert_in_delta 0.7, data[:sustain], 0.001
-    assert_in_delta 0.4, data[:release], 0.001
-    assert_in_delta 3000.0, data[:filter_cutoff], 0.1
-    assert_in_delta 8.0, data[:filter_resonance], 0.1
-    assert_equal :highpass, data[:filter_type]
-    assert_equal 880, data[:frequency]
-    assert_equal 60, data[:duty]
-    assert_equal true, data[:active]
-    assert_in_delta 0.5, data[:gain], 0.01
-  end
-
   def test_consume_update_nil_when_not_pending
     @engine.consume_update if @engine.pending_update?
     assert_nil @engine.consume_update
+  end
+
+  def test_consume_update_params_on_waveform_change
+    @engine.consume_update if @engine.pending_update?
+    @engine.set_waveform(:square)
+    data = @engine.consume_update
+    assert_not_nil data[:params]
+    assert_equal :square, data[:params][:waveform]
+    assert data[:params].key?(:attack)
+    assert data[:params].key?(:decay)
+    assert data[:params].key?(:sustain)
+    assert data[:params].key?(:release)
+    assert data[:params].key?(:gain)
+    assert data[:params].key?(:max_sustain_ms)
+  end
+
+  def test_consume_update_voice_events_on_note_on
+    @engine.consume_update if @engine.pending_update?
+    @engine.note_on(440, 50)
+    data = @engine.consume_update
+    assert_not_nil data[:voice_events]
+    assert_equal 1, data[:voice_events].length
+  end
+
+  def test_consume_update_no_filter_keys
+    @engine.note_on(440, 50)
+    data = @engine.consume_update
+    # Filter moved to SynthEffects - must NOT be in SynthEngine output
+    refute data.key?(:filter_cutoff)
+    refute data.key?(:filter_resonance)
+    refute data.key?(:filter_type)
+    refute data.key?(:frequency)
+    refute data.key?(:active)
   end
 
   # --- Status ---
@@ -392,7 +366,6 @@ class TestSynthEngine < Test::Unit::TestCase
     @engine.note_on(440, 50)
     result = @engine.status
     assert_match(/on/, result)
-    assert_match(/440/, result)
     assert_match(/sawtooth/, result)
   end
 
@@ -404,10 +377,10 @@ class TestSynthEngine < Test::Unit::TestCase
     assert_match(/R:/, result)
   end
 
-  def test_status_includes_filter
+  def test_status_shows_voice_count
+    @engine.note_on(440, 50)
     result = @engine.status
-    assert_match(/cutoff/, result)
-    assert_match(/Q/, result)
+    assert_match(/voice/, result)
   end
 
   # --- Constants ---
@@ -419,9 +392,63 @@ class TestSynthEngine < Test::Unit::TestCase
     assert_includes SynthEngine::WAVEFORMS, :triangle
   end
 
-  def test_valid_filter_types_constant
-    assert_includes SynthEngine::FILTER_TYPES, :lowpass
-    assert_includes SynthEngine::FILTER_TYPES, :highpass
-    assert_includes SynthEngine::FILTER_TYPES, :bandpass
+  def test_no_filter_types_constant
+    refute defined?(SynthEngine::FILTER_TYPES)
+  end
+
+  # --- Serial receive timeout (auto note_off) ---
+
+  def test_check_timeout_triggers_note_off_after_threshold
+    @engine.note_on(440, 50, now_ms: 0.0)
+    @engine.check_timeout(current_ms: 201.0, threshold_ms: 200)
+    assert_equal false, @engine.active?
+  end
+
+  def test_check_timeout_no_effect_before_threshold
+    @engine.note_on(440, 50, now_ms: 0.0)
+    @engine.check_timeout(current_ms: 199.0, threshold_ms: 200)
+    assert_equal true, @engine.active?
+  end
+
+  def test_check_timeout_at_exact_threshold_no_effect
+    @engine.note_on(440, 50, now_ms: 0.0)
+    @engine.check_timeout(current_ms: 200.0, threshold_ms: 200)
+    assert_equal true, @engine.active?
+  end
+
+  def test_check_timeout_inactive_synth_does_nothing
+    assert_equal false, @engine.active?
+    @engine.check_timeout(current_ms: 9999.0, threshold_ms: 200)
+    assert_equal false, @engine.active?
+  end
+
+  def test_check_timeout_without_note_on_does_nothing
+    @engine.check_timeout(current_ms: 9999.0, threshold_ms: 200)
+    assert_equal false, @engine.active?
+  end
+
+  def test_check_timeout_marks_pending_on_note_off
+    @engine.note_on(440, 50, now_ms: 0.0)
+    @engine.consume_update
+    @engine.check_timeout(current_ms: 201.0, threshold_ms: 200)
+    assert_equal true, @engine.pending_update?
+  end
+
+  def test_check_timeout_default_threshold
+    assert_equal SerialProtocol::RECEIVE_TIMEOUT_MS, 200
+  end
+
+  def test_note_on_refreshes_timeout
+    @engine.note_on(440, 50, now_ms: 0.0)
+    @engine.note_on(440, 50, now_ms: 150.0)
+    @engine.check_timeout(current_ms: 250.0, threshold_ms: 200)
+    assert_equal true, @engine.active?
+  end
+
+  def test_note_on_different_freq_refreshes_timeout
+    @engine.note_on(440, 50, now_ms: 0.0)
+    @engine.note_on(880, 50, now_ms: 150.0)
+    @engine.check_timeout(current_ms: 250.0, threshold_ms: 200)
+    assert_equal true, @engine.active?
   end
 end

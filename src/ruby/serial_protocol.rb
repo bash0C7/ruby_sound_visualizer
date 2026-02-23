@@ -9,6 +9,7 @@ module SerialProtocol
   DUTY_MAX = 100
   DUTY_MIN = 0
   MAX_BUFFER_SIZE = 4096
+  RECEIVE_TIMEOUT_MS = 200
 
   FRAME_SPECS = {
     audio_level: {
