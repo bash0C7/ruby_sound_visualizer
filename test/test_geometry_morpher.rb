@@ -100,6 +100,27 @@ class TestGeometryMorpher < Test::Unit::TestCase
     data[:rotation].each { |r| assert(!r.nan?, "rotation contains NaN") }
   end
 
+  def test_constants_defined_in_visualizer_policy
+    assert_in_delta 0.8,  VisualizerPolicy::GEOMETRY_IMPULSE_SCALE, 0.001
+    assert_in_delta 0.15, VisualizerPolicy::GEOMETRY_ROTATION_BASS, 0.001
+    assert_in_delta 0.10, VisualizerPolicy::GEOMETRY_ROTATION_MID, 0.001
+    assert_in_delta 0.08, VisualizerPolicy::GEOMETRY_ROTATION_HIGH, 0.001
+    assert_in_delta 0.5,  VisualizerPolicy::GEOMETRY_IMPULSE_ROTATION_BASS, 0.001
+    assert_in_delta 0.4,  VisualizerPolicy::GEOMETRY_IMPULSE_ROTATION_MID, 0.001
+    assert_in_delta 0.3,  VisualizerPolicy::GEOMETRY_IMPULSE_ROTATION_HIGH, 0.001
+    assert_in_delta 1.5,  VisualizerPolicy::GEOMETRY_EMISSIVE_SCALE, 0.001
+    assert_in_delta 0.8,  VisualizerPolicy::GEOMETRY_EMISSIVE_IMPULSE, 0.001
+  end
+
+  def test_geometry_morpher_uses_policy_constants
+    assert !defined?(GeometryMorpher::IMPULSE_SCALE),
+           'GeometryMorpher::IMPULSE_SCALE should be removed (use VisualizerPolicy)'
+    assert !defined?(GeometryMorpher::ROTATION_BASS),
+           'GeometryMorpher::ROTATION_BASS should be removed (use VisualizerPolicy)'
+    assert !defined?(GeometryMorpher::EMISSIVE_SCALE),
+           'GeometryMorpher::EMISSIVE_SCALE should be removed (use VisualizerPolicy)'
+  end
+
   private
 
   def make_analysis(energy: 0.0, bass: 0.0, mid: 0.0, high: 0.0, impulse_overall: 0.0, impulse_bass: 0.0, impulse_mid: 0.0, impulse_high: 0.0)
