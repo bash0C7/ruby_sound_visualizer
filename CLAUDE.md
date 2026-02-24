@@ -184,7 +184,8 @@ picoruby/               # PicoRuby firmware (two apps)
 │   ├── shader-operations.md  # Post-processing & shader guide
 │   ├── vrm.md                # VRM model integration guide
 │   ├── js-ruby-wasm-interop.md  # JS-Ruby interop patterns
-│   └── ruby-wasm-technical.md   # ruby.wasm platform guide
+│   ├── ruby-wasm-technical.md   # ruby.wasm platform guide
+│   └── picoruby-instrument.md   # PicoRuby theremin instrument guide
 └── skills/             # Project-local skills
     ├── create-plugin/  # Scaffold new VJ Pad plugin
     ├── debug-browser/  # Browser debugging procedures
