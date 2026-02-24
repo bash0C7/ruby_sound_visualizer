@@ -106,6 +106,72 @@ These can be fixed with `bundle exec rubocop --autocorrect` per cop. Verify test
   - Fix or configure thresholds per cop, remove from `.rubocop_todo.yml` after each
 
 
+## SynthPatch Integration Tasks (syn_fm_and_module branch)
+
+### 調査結果サマリー（2025-02-24時点）
+
+#### 確認済み実装（index.html 変更済み）
+
+- **Fix 2** ✅: `_pendingSynthPatchSpec` pending rebuild
+  `SynthPatch.build()` → `synthPatchBuild(json)` が audioContext なしで呼ばれた場合にキュー、
+  `initAudio()` 後に自動リビルド。ログで動作確認済み。
+
+- **Fix 3** ✅: `_synthPatchMasterGainTarget` で Gain スライダーを ADSR peak に反映
+  `synthPatchBuild` で初期値読み取り、`synthPatchUpdateParam` で更新、
+  `synthPatchNoteOn` の ADSR peak を `_synthPatchMasterGainTarget` で制御。
+
+- **可観測性ログ** ✅: `synthPatchNoteOn`, `synthPatchNoteOff`, `synthPatchUpdateParam` にログ追加済み
+
+- **一時デバッグログ** ⚠️ CLEANUP NEEDED: `init()` に `_initCallCount` カウンタとスタックトレース追加（削除必要）
+
+#### ページリロード問題（未解決・調査中）
+
+**現象**:
+- 起動後 9〜90秒の不規則間隔でページが**完全リロード**される
+- 毎回 `[JS] init() called, count=1` + `[Ruby] Ruby VM started` が同時に出現
+- `_initCallCount = 0` にリセット → スクリプトブロックが再評価されている証拠
+
+**調査済みの否定事項**:
+- `browser.script.iife.js` v2.8.1 にリスタート機構なし（one-shot loader）
+- `location.reload()` / `location.href=` のコード内呼び出しなし
+- WEBrick サーバーに live reload なし
+- `history.replaceState` 単独では page reload にならない
+
+**残り仮説（優先度順）**:
+1. **Claude in Chrome MCP 拡張機能がリロードを引き起こしている可能性**
+   → 拡張機能なしで(`--disable-extensions` など)ページを開いてリロードが起きるか確認
+2. **no-cache ヘッダー + Chrome の何らかの動作**
+   → 通常の ruby -ehttpd サーバーで試してみる
+3. **`history.replaceState` が `?nocache=...` → `?v=1&...` に変わることで何か引き起こす**
+   → `scheduleURLUpdate` を一時的に無効化してリロードが止まるか確認
+
+**今のところリロードが起きても Fix 2 でグラフ自動リビルドされるため致命的ではないが、
+スライダー値がリセットされる問題はある。**
+
+### 次のアクション
+
+- [S-1] PENDING: 一時デバッグログのクリーンアップ
+  `init()` から `_initCallCount` と stack trace を削除
+  (`index.html` 2199-2202行付近)
+
+- [S-2] PENDING: ページリロード原因の特定
+  上記仮説1から順に検証（拡張機能なし、別サーバー、URL更新無効化）
+
+- [S-3] PENDING: `bundle exec rake test` でテスト全確認
+  Fix 2, Fix 3 を含む状態で 949 テスト全通過確認
+
+- [S-4] PENDING: ブラウザ verify（`/verify` スキル）
+  S-1, S-3 完了後に実施
+
+- [S-5] PENDING: Controls パネル各スライダー・ボタンの音への反映確認
+  sp_co, sp_gain, sp_osc_w, sp_a/d/s/r, sp_ft 全確認
+  （serial PicoRuby 入力なしで note_on を手動 VJPad コマンドでテスト）
+
+- [S-6] PENDING: Fix 2 で `synthPatchBuild` 内の `_pendingSynthPatchSpec = null` タイミング
+  `initAudio()` が `synthPatchBuild` を呼ぶ前に null クリアしてしまう問題がないか確認
+
+---
+
 ## PicoRuby LED Visualizer Tasks (ATOM Matrix)
 
 - [P-8] PENDING: Visual parameter tuning based on hardware feedback

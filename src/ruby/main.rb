@@ -16,19 +16,25 @@ class VisualizerApp
     @frame_counter = FrameCounter.new
     @serial_manager = SerialManager.new
     @serial_audio_source = SerialAudioSource.new
-    @synth_engine = SynthEngine.new
-    @synth_effects = SynthEffects.new
     @oscilloscope_renderer = OscilloscopeRenderer.new
     @pen_input = PenInput.new
     @wordart_renderer = WordartRenderer.new
+    @synth_patch = SynthPatch.build(adapter: SynthPatch::WebAdapter.new) do |syn|
+      mod     = syn.fm_op(:sine, freq: 220, amp: 80, name: :mod)
+      carrier = syn.fm_op(:sine, freq: 440, name: :carrier).fm(mod)
+      sub     = syn.osc(:sawtooth, freq: 220, name: :sub)
+      syn.mix(carrier, sub, name: :mixer)
+         .filter(:lowpass, cutoff: 1200, q: 0.9, name: :main_filter)
+         .gain(0.35, name: :master_gain)
+         .out
+    end
     @vj_pad = VJPad.new(@audio_input_manager,
                         serial_manager: @serial_manager,
                         serial_audio_source: @serial_audio_source,
-                        synth_engine: @synth_engine,
-                        synth_effects: @synth_effects,
                         oscilloscope_renderer: @oscilloscope_renderer,
                         wordart_renderer: @wordart_renderer,
-                        pen_input: @pen_input)
+                        pen_input: @pen_input,
+                        synth_patch: @synth_patch)
   end
 
   def register_callbacks
@@ -83,7 +89,7 @@ class VisualizerApp
       frames.each do |frame|
         next unless frame[:type] == :frequency
         @serial_audio_source.update(frame[:frequency], frame[:duty]) if @serial_audio_source
-        @synth_engine.note_on(frame[:frequency], frame[:duty]) if @synth_engine
+        @synth_patch.note_on(frame[:frequency], frame[:duty]) if @synth_patch
       end
     end
     last_line = @serial_manager.rx_log.last
@@ -208,23 +214,14 @@ class VisualizerApp
   end
 
   def update_synth
-    @synth_engine&.check_timeout
-
-    if @synth_engine&.pending_update?
-      JSBridge.update_synth(@synth_engine.consume_update)
-    end
-
-    if @synth_effects&.pending_update?
-      JSBridge.update_synth_effects(@synth_effects.consume_update)
-    end
+    @synth_patch&.check_timeout(current_ms: (Time.now.to_f * 1000))
   end
 
   def update_oscilloscope
     return unless @oscilloscope_renderer&.enabled?
 
-    # Set intensity from synth duty (0-100 → 0-1)
-    if @synth_engine&.active?
-      @oscilloscope_renderer.set_intensity(@synth_engine.duty / 100.0)
+    if @synth_patch&.active?
+      @oscilloscope_renderer.set_intensity(1.0)
     else
       @oscilloscope_renderer.set_intensity(0.0)
     end

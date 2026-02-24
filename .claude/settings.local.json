@@ -48,5 +48,7 @@
         ]
       }
     ]
-  }
+  },
+  "spinnerTipsEnabled": false,
+  "prefersReducedMotion": true
 }
