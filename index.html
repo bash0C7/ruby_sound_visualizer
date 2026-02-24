@@ -2196,10 +2196,7 @@
     }
 
     // Initialize everything (auto-start flow)
-    let _initCallCount = 0;
     async function init() {
-      _initCallCount++;
-      console.log('[JS] init() called, count=' + _initCallCount + ' stack=' + new Error().stack.split('\n').slice(1,4).join('|'));
       try {
         // Phase 1: Wait for Ruby WASM to finish loading
         updateLoadingStatus('Loading Ruby WASM...');
