@@ -33,7 +33,8 @@
       "Read(//private/tmp/**)",
       "WebFetch(domain:support.claude.com)",
       "Read(//Users/bash/.claude/skills/commit/**)",
-      "Bash(bundle exec rubocop:*)"
+      "Bash(bundle exec rubocop:*)",
+      "WebFetch(domain:docs.anthropic.com)"
     ]
   },
   "spinnerTipsEnabled": false,
