@@ -2,7 +2,6 @@ class ColorPalette
   attr_reader :hue_offset, :last_hsv
   attr_reader :hue_mode
 
-
   def initialize
     @hue_mode = nil
     @hue_offset = 0.0

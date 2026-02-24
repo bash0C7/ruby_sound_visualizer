@@ -152,14 +152,14 @@ class TestParticleSystemLogging < Test::Unit::TestCase
     5.times { @system.update(make_analysis) }
     ruby_logs = @log_messages.select { |m| m.include?('[Ruby]') }
     assert ruby_logs.any? { |m| m.include?('particle.explosion.bass=') },
-      "Expected log with particle.explosion.bass, got: #{ruby_logs.inspect}"
+           "Expected log with particle.explosion.bass, got: #{ruby_logs.inspect}"
   end
 
   def test_log_includes_all_bands
     5.times { @system.update(make_analysis) }
     ruby_logs = @log_messages.select { |m| m.include?('[Ruby]') && m.include?('particle.explosion.bass=') }
     assert ruby_logs.any? { |m| m.include?('particle.explosion.mid=') && m.include?('particle.explosion.high=') },
-      "Expected log with all band explosion counts, got: #{ruby_logs.inspect}"
+           "Expected log with all band explosion counts, got: #{ruby_logs.inspect}"
   end
 
   def test_no_log_when_no_explosion

@@ -5,7 +5,6 @@ class WordartRenderer
   PHASE_SUSTAIN = :sustain
   PHASE_EXIT = :exit
 
-
   # WordArt style presets (rotated through)
   STYLES = [
     {

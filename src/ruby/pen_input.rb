@@ -4,7 +4,6 @@
 # Color matches current visualizer particle color palette for
 # a "Gakuen Idolmaster" girly handwritten font aesthetic.
 class PenInput
-
   Stroke = Struct.new(:points, :color, :width, :opacity, :created_frame, keyword_init: true)
 
   attr_reader :strokes

@@ -151,7 +151,7 @@ class TestSerialAudioSource < Test::Unit::TestCase
     @source.stop
     @source.update(880, 75)
     assert_equal false, @source.active?,
-      "update() after stop() should NOT restart audio (user stopped it)"
+                 'update() after stop() should NOT restart audio (user stopped it)'
   end
 
   def test_stop_prevents_auto_start_on_update
@@ -159,13 +159,13 @@ class TestSerialAudioSource < Test::Unit::TestCase
     @source.stop
     @source.update(880, 75)
     assert_equal false, @source.active?,
-      "update() after explicit stop() should NOT auto-start"
+                 'update() after explicit stop() should NOT auto-start'
   end
 
   def test_start_after_stop_allows_auto_start_again
     @source.start
     @source.stop
-    @source.start  # user re-enables
+    @source.start # user re-enables
     @source.stop
     @source.update(880, 75)
     assert_equal false, @source.active?
@@ -176,7 +176,7 @@ class TestSerialAudioSource < Test::Unit::TestCase
     assert_equal false, @source.active?
     @source.update(880, 75)
     assert_equal true, @source.active?,
-      "First update() without prior stop() should auto-start"
+                 'First update() without prior stop() should auto-start'
   end
 
   # --- Status ---
@@ -196,5 +196,4 @@ class TestSerialAudioSource < Test::Unit::TestCase
     assert_match(/880/, result)
     assert_match(/75/, result)
   end
-
 end

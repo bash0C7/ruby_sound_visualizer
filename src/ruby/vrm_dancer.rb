@@ -7,7 +7,6 @@ class VRMDancer
     rightUpperLeg rightLowerLeg
   ]
 
-
   def initialize
     @time = 0.0
     @beat_phase = 0.0

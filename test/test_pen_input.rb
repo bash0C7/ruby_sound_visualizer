@@ -172,7 +172,7 @@ class TestPenInput < Test::Unit::TestCase
   def test_constants_defined_in_visualizer_policy
     assert_equal 180, VisualizerPolicy::PEN_FADE_DURATION_FRAMES
     assert_in_delta 3.0, VisualizerPolicy::PEN_STROKE_WIDTH, 0.001
-    assert_equal 50,  VisualizerPolicy::PEN_MAX_STROKES
+    assert_equal 50, VisualizerPolicy::PEN_MAX_STROKES
   end
 
   def test_pen_input_uses_policy_constants

@@ -162,21 +162,21 @@ class TestEffectDispatcherLogging < Test::Unit::TestCase
     @dispatcher.dispatch({ impulse: { bass: 0.8, mid: 0.3, high: 0.1, overall: 0.6 } })
     ruby_logs = @log_messages.select { |m| m.include?('[Ruby]') }
     assert ruby_logs.any? { |m| m.include?('effect.type=impulse') },
-      "Expected log with effect.type=impulse, got: #{ruby_logs.inspect}"
+           "Expected log with effect.type=impulse, got: #{ruby_logs.inspect}"
   end
 
   def test_impulse_log_includes_band_magnitudes
     @dispatcher.dispatch({ impulse: { bass: 0.8, mid: 0.3, high: 0.1, overall: 0.6 } })
     ruby_logs = @log_messages.select { |m| m.include?('[Ruby]') }
     assert ruby_logs.any? { |m| m.include?('effect.bass=') && m.include?('effect.overall=') },
-      "Expected log with band magnitudes, got: #{ruby_logs.inspect}"
+           "Expected log with band magnitudes, got: #{ruby_logs.inspect}"
   end
 
   def test_logs_bloom_flash_dispatch
     @dispatcher.dispatch({ bloom_flash: 0.9 })
     ruby_logs = @log_messages.select { |m| m.include?('[Ruby]') }
     assert ruby_logs.any? { |m| m.include?('effect.type=bloom_flash') },
-      "Expected log with effect.type=bloom_flash, got: #{ruby_logs.inspect}"
+           "Expected log with effect.type=bloom_flash, got: #{ruby_logs.inspect}"
   end
 
   def test_no_log_for_empty_effects

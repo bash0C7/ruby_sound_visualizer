@@ -202,8 +202,7 @@ class VJPad
   def preprocess_text_command(input)
     # Quote bare string arguments for wordart and synth commands
     input = input.sub(/\A(wa)\s+(?!["'])(.+)/) { "#{$1} \"#{$2.gsub('\\', '\\\\\\\\').gsub('"', '\\"')}\"" }
-    input = input.sub(/\A(sp_osc_w|sp_ft)\s+(?!["'])([a-z]+)\s*\z/) { "#{$1} \"#{$2}\"" }
-    input
+    input.sub(/\A(sp_osc_w|sp_ft)\s+(?!["'])([a-z]+)\s*\z/) { "#{$1} \"#{$2}\"" }
   end
 
   def execute_plugin(plugin, args)

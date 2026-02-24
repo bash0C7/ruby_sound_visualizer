@@ -33,7 +33,11 @@
       "Bash(tee:*)",
       "Read(//private/tmp/**)",
       "WebFetch(domain:support.claude.com)",
-      "Read(//Users/bash/.claude/skills/commit/**)"
+      "Read(//Users/bash/.claude/skills/commit/**)",
+      "Bash(bundle exec rubocop --format offenses 2>&1 | head -30)",
+      "Bash(bundle exec rubocop -a --only Style/StringLiterals src/ruby/ test/ 2>&1 | tail -6)",
+      "Bash(bundle exec rubocop -a --only Layout/EmptyLineAfterGuardClause src/ruby/ test/ 2>&1 | tail -4)",
+      "Bash(bundle exec rubocop -a --only Layout/ArgumentAlignment src/ruby/ test/ 2>&1 | tail -4 && bundle exec rake test 2>&1 | tail -4)"
     ]
   },
   "hooks": {

@@ -17,7 +17,7 @@ class TestOscilloscopeRenderer < Test::Unit::TestCase
 
   def test_initial_waveform_buffer_is_zeros
     assert_equal 256, @renderer.waveform_buffer.length
-    assert @renderer.waveform_buffer.all? { |v| v == 0.0 }
+    assert(@renderer.waveform_buffer.all? { |v| v == 0.0 })
   end
 
   def test_initial_scroll_offset_zero
@@ -70,7 +70,7 @@ class TestOscilloscopeRenderer < Test::Unit::TestCase
     @renderer.update_waveform(samples)
     assert_equal 256, @renderer.waveform_buffer.length
     assert_in_delta 0.5, @renderer.waveform_buffer[0], 0.001
-    assert_in_delta -0.5, @renderer.waveform_buffer[1], 0.001
+    assert_in_delta(-0.5, @renderer.waveform_buffer[1], 0.001)
     assert_in_delta 0.3, @renderer.waveform_buffer[2], 0.001
     assert_in_delta 0.0, @renderer.waveform_buffer[3], 0.001
   end
@@ -302,7 +302,7 @@ class TestOscilloscopeRenderer < Test::Unit::TestCase
 
   def test_history_caps_at_depth
     70.times do |i|
-      samples = Array.new(256) { |j| Math.sin(j * 0.1 + i) }
+      samples = Array.new(256) { |j| Math.sin((j * 0.1) + i) }
       @renderer.update_waveform(samples)
       @renderer.push_to_history
     end

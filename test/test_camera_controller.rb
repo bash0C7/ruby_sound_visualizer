@@ -83,7 +83,7 @@ class TestCameraControllerLogging < Test::Unit::TestCase
     @controller.update(analysis)
     ruby_logs = @log_messages.select { |m| m.include?('[Ruby]') }
     assert ruby_logs.any? { |m| m.include?('camera.shake.trigger=') },
-      "Expected log with camera.shake.trigger, got: #{ruby_logs.inspect}"
+           "Expected log with camera.shake.trigger, got: #{ruby_logs.inspect}"
   end
 
   def test_logs_on_impulse_shake_trigger
@@ -91,7 +91,7 @@ class TestCameraControllerLogging < Test::Unit::TestCase
     @controller.update(analysis)
     ruby_logs = @log_messages.select { |m| m.include?('[Ruby]') }
     assert ruby_logs.any? { |m| m.include?('camera.shake.trigger=') },
-      "Expected log with camera.shake.trigger on impulse, got: #{ruby_logs.inspect}"
+           "Expected log with camera.shake.trigger on impulse, got: #{ruby_logs.inspect}"
   end
 
   def test_log_includes_shake_intensity
@@ -99,13 +99,13 @@ class TestCameraControllerLogging < Test::Unit::TestCase
     @controller.update(analysis)
     ruby_logs = @log_messages.select { |m| m.include?('[Ruby]') }
     assert ruby_logs.any? { |m| m.include?('camera.shake.intensity=') },
-      "Expected log with camera.shake.intensity, got: #{ruby_logs.inspect}"
+           "Expected log with camera.shake.intensity, got: #{ruby_logs.inspect}"
   end
 
   def test_no_log_when_no_shake
     analysis = { bass: 0.1, impulse: { bass: 0.0 } }
     @controller.update(analysis)
     ruby_logs = @log_messages.select { |m| m.include?('[Ruby]') && m.include?('camera.shake.') }
-    assert_empty ruby_logs, "Expected no shake log when below threshold"
+    assert_empty ruby_logs, 'Expected no shake log when below threshold'
   end
 end

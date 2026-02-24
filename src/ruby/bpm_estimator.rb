@@ -15,7 +15,9 @@ class BPMEstimator
 
   def record_beat(frame_number, fps: 30.0)
     @beat_times << frame_number
-    @beat_times = @beat_times.last(VisualizerPolicy::BPM_HISTORY_LENGTH) if @beat_times.length > VisualizerPolicy::BPM_HISTORY_LENGTH
+    if @beat_times.length > VisualizerPolicy::BPM_HISTORY_LENGTH
+      @beat_times = @beat_times.last(VisualizerPolicy::BPM_HISTORY_LENGTH)
+    end
     recalculate(fps)
   end
 

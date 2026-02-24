@@ -129,14 +129,14 @@ class TestBloomControllerLogging < Test::Unit::TestCase
     @controller.update(make_analysis(bloom_flash: 0.8))
     ruby_logs = @log_messages.select { |m| m.include?('[Ruby]') }
     assert ruby_logs.any? { |m| m.include?('bloom.flash=true') },
-      "Expected log with bloom.flash=true, got: #{ruby_logs.inspect}"
+           "Expected log with bloom.flash=true, got: #{ruby_logs.inspect}"
   end
 
   def test_log_includes_bloom_strength_on_flash
     @controller.update(make_analysis(bloom_flash: 0.8))
     ruby_logs = @log_messages.select { |m| m.include?('[Ruby]') }
     assert ruby_logs.any? { |m| m.include?('bloom.strength=') },
-      "Expected log with bloom.strength, got: #{ruby_logs.inspect}"
+           "Expected log with bloom.strength, got: #{ruby_logs.inspect}"
   end
 
   def test_no_log_when_no_flash

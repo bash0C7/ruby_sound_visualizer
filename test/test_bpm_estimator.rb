@@ -178,7 +178,7 @@ class TestBPMEstimatorLogging < Test::Unit::TestCase
     @estimator.record_beat(30, fps: 30.0)
     ruby_logs = @log_messages.select { |m| m.include?('[Ruby]') }
     assert ruby_logs.any? { |m| m.include?('audio.bpm=120') },
-      "Expected log with audio.bpm=120, got: #{ruby_logs.inspect}"
+           "Expected log with audio.bpm=120, got: #{ruby_logs.inspect}"
   end
 
   def test_log_includes_beat_count
@@ -187,7 +187,7 @@ class TestBPMEstimatorLogging < Test::Unit::TestCase
     @estimator.record_beat(30, fps: 30.0)
     ruby_logs = @log_messages.select { |m| m.include?('[Ruby]') }
     assert ruby_logs.any? { |m| m.include?('audio.beat.count=') },
-      "Expected log with audio.beat.count, got: #{ruby_logs.inspect}"
+           "Expected log with audio.beat.count, got: #{ruby_logs.inspect}"
   end
 
   def test_no_log_when_bpm_unchanged

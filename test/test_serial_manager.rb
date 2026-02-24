@@ -218,25 +218,25 @@ class TestSerialManagerLogging < Test::Unit::TestCase
   end
 
   def test_logs_on_connect
-    @manager.on_connect(115200)
+    @manager.on_connect(115_200)
     ruby_logs = @log_messages.select { |m| m.include?('[Ruby]') }
     assert ruby_logs.any? { |m| m.include?('serial.state=connected') },
-      "Expected log with serial.state=connected, got: #{ruby_logs.inspect}"
+           "Expected log with serial.state=connected, got: #{ruby_logs.inspect}"
   end
 
   def test_connect_log_includes_baud_rate
-    @manager.on_connect(38400)
+    @manager.on_connect(38_400)
     ruby_logs = @log_messages.select { |m| m.include?('[Ruby]') }
     assert ruby_logs.any? { |m| m.include?('serial.baud_rate=38400') },
-      "Expected log with serial.baud_rate=38400, got: #{ruby_logs.inspect}"
+           "Expected log with serial.baud_rate=38400, got: #{ruby_logs.inspect}"
   end
 
   def test_logs_on_disconnect
-    @manager.on_connect(115200)
+    @manager.on_connect(115_200)
     @log_messages.clear
     @manager.on_disconnect
     ruby_logs = @log_messages.select { |m| m.include?('[Ruby]') }
     assert ruby_logs.any? { |m| m.include?('serial.state=disconnected') },
-      "Expected log with serial.state=disconnected, got: #{ruby_logs.inspect}"
+           "Expected log with serial.state=disconnected, got: #{ruby_logs.inspect}"
   end
 end

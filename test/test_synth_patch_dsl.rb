@@ -95,11 +95,11 @@ class TestSynthPatchDsl < Test::Unit::TestCase
 
     # Mixer inputs: carrier → mixer, sub → mixer
     connections = spec['connections']
-    assert connections.any? { |c| c['from'] == 'carrier' && c['to'] == 'mixer' }
-    assert connections.any? { |c| c['from'] == 'sub' && c['to'] == 'mixer' }
+    assert(connections.any? { |c| c['from'] == 'carrier' && c['to'] == 'mixer' })
+    assert(connections.any? { |c| c['from'] == 'sub' && c['to'] == 'mixer' })
     # Chain connections
-    assert connections.any? { |c| c['from'] == 'mixer' && c['to'] == 'main_filter' }
-    assert connections.any? { |c| c['from'] == 'main_filter' && c['to'] == 'master_gain' }
+    assert(connections.any? { |c| c['from'] == 'mixer' && c['to'] == 'main_filter' })
+    assert(connections.any? { |c| c['from'] == 'main_filter' && c['to'] == 'master_gain' })
   end
 
   def test_build_returns_patch_instance

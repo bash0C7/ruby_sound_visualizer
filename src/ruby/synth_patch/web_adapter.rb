@@ -20,7 +20,7 @@ class SynthPatch
     end
 
     def note_off
-      JS.global.synthPatchNoteOff()
+      JS.global.synthPatchNoteOff
     end
 
     def update_param(node_name, param, value)
