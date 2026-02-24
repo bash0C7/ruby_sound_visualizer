@@ -44,6 +44,8 @@ Real-time audio visualizer that analyzes microphone input and generates vivid 3D
   - Always start with failing test. Write test before production code.
   - Proceed carefully with test-first approach to avoid breaking existing functionality.
 - **Ruby-first implementation**: Implement logic in Ruby as much as possible
+- **VisualizerPolicy as single source of truth**: All tunable constants and parameters belong in `VisualizerPolicy`. Individual classes reference `VisualizerPolicy::CONSTANT_NAME` rather than defining their own. This centralizes tuning, enables runtime mutability via `RUNTIME_PARAMS`, and keeps JS/Ruby slider sync in one place.
+- **Observability**: Log key state transitions and quantitative parameter values via `JSBridge.log`. Follow OpenTelemetry semantic conventions for attribute naming (e.g., `audio.bpm`, `effect.type`, `synth.frequency`). Output destination is browser console. Log on state change, not every frame.
 - **Scope adherence**: Only modify files specified by user
 - **Build/deploy prohibition**: Do not execute unless explicitly instructed
 - **Minimal changes**: Targeted changes, not broad refactoring
