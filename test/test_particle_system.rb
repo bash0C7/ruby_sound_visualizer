@@ -123,3 +123,49 @@ class TestParticleSystem < Test::Unit::TestCase
     }
   end
 end
+
+class TestParticleSystemLogging < Test::Unit::TestCase
+  def setup
+    @system = ParticleSystem.new
+    @log_messages = []
+    captured = @log_messages
+    mock_console = Object.new
+    mock_console.define_singleton_method(:log) { |msg| captured << msg.to_s }
+    mock_console.define_singleton_method(:error) { |msg| }
+    JS.global['console'] = mock_console
+  end
+
+  def teardown
+    JS.reset_global!
+  end
+
+  def make_analysis(bass: 0.9, mid: 0.9, high: 0.9, impulse_bass: 1.0, impulse_mid: 1.0, impulse_high: 1.0)
+    {
+      overall_energy: 0.9,
+      bass: bass, mid: mid, high: high,
+      impulse: { bass: impulse_bass, mid: impulse_mid, high: impulse_high, overall: 1.0 }
+    }
+  end
+
+  def test_logs_when_explosion_occurs
+    # Run multiple updates to guarantee at least one explosion
+    5.times { @system.update(make_analysis) }
+    ruby_logs = @log_messages.select { |m| m.include?('[Ruby]') }
+    assert ruby_logs.any? { |m| m.include?('particle.explosion.bass=') },
+      "Expected log with particle.explosion.bass, got: #{ruby_logs.inspect}"
+  end
+
+  def test_log_includes_all_bands
+    5.times { @system.update(make_analysis) }
+    ruby_logs = @log_messages.select { |m| m.include?('[Ruby]') && m.include?('particle.explosion.bass=') }
+    assert ruby_logs.any? { |m| m.include?('particle.explosion.mid=') && m.include?('particle.explosion.high=') },
+      "Expected log with all band explosion counts, got: #{ruby_logs.inspect}"
+  end
+
+  def test_no_log_when_no_explosion
+    analysis = { overall_energy: 0.0, bass: 0.0, mid: 0.0, high: 0.0, impulse: { bass: 0.0, mid: 0.0, high: 0.0, overall: 0.0 } }
+    @system.update(analysis)
+    ruby_logs = @log_messages.select { |m| m.include?('[Ruby]') && m.include?('particle.explosion.') }
+    assert_empty ruby_logs, "Expected no explosion log when energy is zero"
+  end
+end

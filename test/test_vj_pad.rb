@@ -611,3 +611,39 @@ class TestVJPad < Test::Unit::TestCase
     assert_instance_of String, result[:msg]
   end
 end
+
+class TestVJPadLogging < Test::Unit::TestCase
+  def setup
+    @pad = VJPad.new
+    @log_messages = []
+    captured = @log_messages
+    mock_console = Object.new
+    mock_console.define_singleton_method(:log) { |msg| captured << msg.to_s }
+    mock_console.define_singleton_method(:error) { |msg| }
+    JS.global['console'] = mock_console
+  end
+
+  def teardown
+    JS.reset_global!
+  end
+
+  def test_logs_on_plugin_execution
+    @pad.exec('burst')
+    ruby_logs = @log_messages.select { |m| m.include?('[Ruby]') }
+    assert ruby_logs.any? { |m| m.include?('vj.plugin=burst') },
+      "Expected log with vj.plugin=burst, got: #{ruby_logs.inspect}"
+  end
+
+  def test_log_includes_command
+    @pad.exec('burst 0.8')
+    ruby_logs = @log_messages.select { |m| m.include?('[Ruby]') }
+    assert ruby_logs.any? { |m| m.include?('vj.command=') },
+      "Expected log with vj.command, got: #{ruby_logs.inspect}"
+  end
+
+  def test_no_plugin_log_for_param_commands
+    @pad.exec('s 1.2')
+    ruby_logs = @log_messages.select { |m| m.include?('[Ruby]') && m.include?('vj.plugin=') }
+    assert_empty ruby_logs, "Expected no vj.plugin log for param command"
+  end
+end

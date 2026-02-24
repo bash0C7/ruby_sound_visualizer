@@ -141,3 +141,47 @@ class TestEffectDispatcher < Test::Unit::TestCase
     assert_in_delta 3.0, @effect_manager.bloom_flash, 0.001
   end
 end
+
+class TestEffectDispatcherLogging < Test::Unit::TestCase
+  def setup
+    @effect_manager = EffectManager.new
+    @dispatcher = EffectDispatcher.new(@effect_manager)
+    @log_messages = []
+    captured = @log_messages
+    mock_console = Object.new
+    mock_console.define_singleton_method(:log) { |msg| captured << msg.to_s }
+    mock_console.define_singleton_method(:error) { |msg| }
+    JS.global['console'] = mock_console
+  end
+
+  def teardown
+    JS.reset_global!
+  end
+
+  def test_logs_impulse_dispatch
+    @dispatcher.dispatch({ impulse: { bass: 0.8, mid: 0.3, high: 0.1, overall: 0.6 } })
+    ruby_logs = @log_messages.select { |m| m.include?('[Ruby]') }
+    assert ruby_logs.any? { |m| m.include?('effect.type=impulse') },
+      "Expected log with effect.type=impulse, got: #{ruby_logs.inspect}"
+  end
+
+  def test_impulse_log_includes_band_magnitudes
+    @dispatcher.dispatch({ impulse: { bass: 0.8, mid: 0.3, high: 0.1, overall: 0.6 } })
+    ruby_logs = @log_messages.select { |m| m.include?('[Ruby]') }
+    assert ruby_logs.any? { |m| m.include?('effect.bass=') && m.include?('effect.overall=') },
+      "Expected log with band magnitudes, got: #{ruby_logs.inspect}"
+  end
+
+  def test_logs_bloom_flash_dispatch
+    @dispatcher.dispatch({ bloom_flash: 0.9 })
+    ruby_logs = @log_messages.select { |m| m.include?('[Ruby]') }
+    assert ruby_logs.any? { |m| m.include?('effect.type=bloom_flash') },
+      "Expected log with effect.type=bloom_flash, got: #{ruby_logs.inspect}"
+  end
+
+  def test_no_log_for_empty_effects
+    @dispatcher.dispatch({})
+    ruby_logs = @log_messages.select { |m| m.include?('[Ruby]') && m.include?('effect.type=') }
+    assert_empty ruby_logs, "Expected no effect log for empty dispatch"
+  end
+end

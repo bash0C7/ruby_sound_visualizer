@@ -215,6 +215,8 @@ class VJPad
 
     resolved = plugin.resolve_params(params)
     effects = plugin.execute(params)
+    cmd_str = args.empty? ? plugin.name.to_s : "#{plugin.name} #{args.join(' ')}"
+    JSBridge.log("vj.plugin=#{plugin.name} vj.command=\"#{cmd_str}\"")
     @pending_actions << { type: :plugin, name: plugin.name, effects: effects }
     plugin.format_result(args.empty? ? {} : resolved)
   end

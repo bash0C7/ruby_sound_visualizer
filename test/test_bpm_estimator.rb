@@ -156,3 +156,48 @@ class TestBPMEstimator < Test::Unit::TestCase
     assert_kind_of Integer, bpm
   end
 end
+
+class TestBPMEstimatorLogging < Test::Unit::TestCase
+  def setup
+    @estimator = BPMEstimator.new
+    @log_messages = []
+    captured = @log_messages
+    mock_console = Object.new
+    mock_console.define_singleton_method(:log) { |msg| captured << msg.to_s }
+    mock_console.define_singleton_method(:error) { |msg| }
+    JS.global['console'] = mock_console
+  end
+
+  def teardown
+    JS.reset_global!
+  end
+
+  def test_logs_bpm_when_calculated
+    @estimator.record_beat(0, fps: 30.0)
+    @estimator.record_beat(15, fps: 30.0)
+    @estimator.record_beat(30, fps: 30.0)
+    ruby_logs = @log_messages.select { |m| m.include?('[Ruby]') }
+    assert ruby_logs.any? { |m| m.include?('audio.bpm=120') },
+      "Expected log with audio.bpm=120, got: #{ruby_logs.inspect}"
+  end
+
+  def test_log_includes_beat_count
+    @estimator.record_beat(0, fps: 30.0)
+    @estimator.record_beat(15, fps: 30.0)
+    @estimator.record_beat(30, fps: 30.0)
+    ruby_logs = @log_messages.select { |m| m.include?('[Ruby]') }
+    assert ruby_logs.any? { |m| m.include?('audio.beat.count=') },
+      "Expected log with audio.beat.count, got: #{ruby_logs.inspect}"
+  end
+
+  def test_no_log_when_bpm_unchanged
+    @estimator.record_beat(0, fps: 30.0)
+    @estimator.record_beat(15, fps: 30.0)
+    @estimator.record_beat(30, fps: 30.0)
+    count_before = @log_messages.count { |m| m.include?('audio.bpm=') }
+    # Same interval → same BPM → no new log
+    @estimator.record_beat(45, fps: 30.0)
+    count_after = @log_messages.count { |m| m.include?('audio.bpm=') }
+    assert_equal count_before, count_after
+  end
+end

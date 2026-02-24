@@ -17,6 +17,8 @@ class CameraController
 
     if bass > SHAKE_BASS_THRESHOLD || imp_bass > SHAKE_IMPULSE_THRESHOLD
       shake_intensity = bass * (SHAKE_IMPULSE_THRESHOLD + imp_bass * SHAKE_IMPULSE_THRESHOLD)
+      trigger = bass > SHAKE_BASS_THRESHOLD ? 'bass' : 'impulse'
+      JSBridge.log("camera.shake.trigger=#{trigger} camera.shake.intensity=#{shake_intensity.round(3)} audio.bass=#{bass.round(3)} audio.impulse.bass=#{imp_bass.round(3)}")
       @shake_offset = [
         (rand - 0.5) * shake_intensity,
         (rand - 0.5) * shake_intensity,

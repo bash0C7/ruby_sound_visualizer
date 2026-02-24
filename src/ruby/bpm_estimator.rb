@@ -35,6 +35,11 @@ class BPMEstimator
     return if avg_interval <= 0
 
     bpm = (60.0 / (avg_interval / fps)).round(0)
-    @estimated_bpm = (bpm >= 40 && bpm <= 240) ? bpm : 0
+    new_bpm = (bpm >= 40 && bpm <= 240) ? bpm : 0
+    if new_bpm != @estimated_bpm && new_bpm > 0
+      interval_ms = (avg_interval / fps * 1000).round
+      JSBridge.log("audio.bpm=#{new_bpm} audio.beat.interval_ms=#{interval_ms} audio.beat.count=#{@beat_times.length}")
+    end
+    @estimated_bpm = new_bpm
   end
 end

@@ -27,12 +27,14 @@ class SerialManager
     @baud_rate = baud_rate.to_i
     @connected = true
     @rx_buffer = ''
+    JSBridge.log("serial.state=connected serial.baud_rate=#{@baud_rate}")
     "serial: connected at #{@baud_rate}bps"
   end
 
   def on_disconnect
     @connected = false
     @rx_buffer = ''
+    JSBridge.log("serial.state=disconnected")
     "serial: disconnected"
   end
 

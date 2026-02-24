@@ -101,3 +101,47 @@ class TestBloomController < Test::Unit::TestCase
     }
   end
 end
+
+class TestBloomControllerLogging < Test::Unit::TestCase
+  def setup
+    @controller = BloomController.new
+    @log_messages = []
+    captured = @log_messages
+    mock_console = Object.new
+    mock_console.define_singleton_method(:log) { |msg| captured << msg.to_s }
+    mock_console.define_singleton_method(:error) { |msg| }
+    JS.global['console'] = mock_console
+  end
+
+  def teardown
+    JS.reset_global!
+  end
+
+  def make_analysis(overall_energy: 0.5, impulse_overall: 0.0, bloom_flash: 0.0)
+    {
+      overall_energy: overall_energy,
+      impulse: { overall: impulse_overall },
+      bloom_flash: bloom_flash
+    }
+  end
+
+  def test_logs_on_bloom_flash
+    @controller.update(make_analysis(bloom_flash: 0.8))
+    ruby_logs = @log_messages.select { |m| m.include?('[Ruby]') }
+    assert ruby_logs.any? { |m| m.include?('bloom.flash=true') },
+      "Expected log with bloom.flash=true, got: #{ruby_logs.inspect}"
+  end
+
+  def test_log_includes_bloom_strength_on_flash
+    @controller.update(make_analysis(bloom_flash: 0.8))
+    ruby_logs = @log_messages.select { |m| m.include?('[Ruby]') }
+    assert ruby_logs.any? { |m| m.include?('bloom.strength=') },
+      "Expected log with bloom.strength, got: #{ruby_logs.inspect}"
+  end
+
+  def test_no_log_when_no_flash
+    @controller.update(make_analysis(bloom_flash: 0.0))
+    ruby_logs = @log_messages.select { |m| m.include?('[Ruby]') && m.include?('bloom.flash=') }
+    assert_empty ruby_logs, "Expected no bloom.flash log when flash is zero"
+  end
+end
