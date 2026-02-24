@@ -111,7 +111,7 @@ src/ruby/               # Ruby source files
 ├── vj_plugin.rb              # Plugin system core (VJPlugin + PluginDefinition)
 ├── vj_pad.rb                 # VJ Pad DSL (delegates to plugins)
 ├── vj_serial_commands.rb     # VJ Pad serial command handler
-├── vj_synth_commands.rb      # VJ Pad synth/oscilloscope command handler
+├── vj_synth_patch_commands.rb # VJ Pad synth patch command handler
 ├── effect_dispatcher.rb      # Plugin effects → EffectManager translator
 ├── effect_manager.rb         # Coordinates all visual effects
 ├── audio_input_manager.rb    # Microphone input management
@@ -129,7 +129,17 @@ src/ruby/               # Ruby source files
 ├── serial_protocol.rb        # ASCII serial frame format (encode/decode)
 ├── serial_manager.rb         # Serial connection state machine
 ├── serial_audio_source.rb    # Serial PWM audio output state management
-├── synth_engine.rb           # Analog monophonic synthesizer state management
+├── synth_patch/              # DSL-based synthesizer patch system
+│   ├── synth_patch.rb        # Patch DSL, node graph builder, note control
+│   ├── node.rb               # Base class for synthesis graph nodes
+│   ├── osc_node.rb           # Basic oscillator node (sine/square/saw/tri)
+│   ├── fm_op_node.rb         # FM modulation operator node
+│   ├── filter_node.rb        # Biquad filter node (lowpass/highpass/bandpass)
+│   ├── gain_node.rb          # Gain (volume) control node
+│   ├── mixer_node.rb         # Multi-input mixer node
+│   ├── audio_adapter.rb      # Abstract audio backend interface
+│   ├── web_adapter.rb        # Web Audio API adapter (production)
+│   └── mock_adapter.rb       # Test adapter (records calls)
 ├── oscilloscope_renderer.rb  # 3D oscilloscope waveform visualization state
 ├── wordart_renderer.rb       # 90s WordArt text animation engine
 ├── pen_input.rb              # Mouse pen drawing with fade-out
@@ -139,6 +149,8 @@ src/ruby/               # Ruby source files
 ├── debug_formatter.rb        # Debug output formatting utilities
 ├── frame_counter.rb          # Frame counting and timing
 └── math_helper.rb            # Mathematical utility functions
+lib/
+└── dev_server.rb       # Development HTTP server (used by rake server:start)
 picoruby/               # PicoRuby firmware (two apps)
 ├── CLAUDE.md                 # PicoRuby project instructions
 ├── AGENTS.md                 # Symlink to CLAUDE.md
@@ -158,11 +170,13 @@ picoruby/               # PicoRuby firmware (two apps)
                 ├── build_config/xtensa-esp.rb
                 └── mrbgems/{picoruby-ws2812,picoruby-irq}/
 .claude/                # Project-specific configuration & documentation
+├── settings.json       # Project-level hooks (rubocop + test, shared across environments)
 ├── ARCHITECTURE.md     # Architecture details
 ├── INVESTIGATION-PROTOCOL.md  # Investigation protocol
 ├── RUBY-WASM.md        # Ruby WASM specific knowledge
 ├── SETUP.md            # Setup & execution instructions
 ├── tasks.md            # Project task list
+├── plan.md             # Implementation plan scratch pad
 ├── guides/             # Technical reference guides
 │   ├── plugin-development.md  # VJ Pad plugin development guide
 │   ├── 3d-basics.md          # Three.js 3D fundamentals
@@ -177,7 +191,8 @@ picoruby/               # PicoRuby firmware (two apps)
     ├── browser-clean-session/  # Clean browser session
     ├── rake-picoruby/  # PicoRuby rake operations (build/flash/monitor)
     ├── troubleshoot/   # Basic troubleshooting
-    └── verify/         # TDD + Chrome browser confirmation loop
+    ├── verify/         # TDD + Chrome browser confirmation loop
+    └── visualizer-test/  # Browser-based visualizer smoke test
 ```
 
 ## Project Skills
@@ -191,8 +206,18 @@ Available skills:
 - **rake-picoruby**: Run PicoRuby build/flash/monitor operations (filters verbose rake output to key information only)
 - **troubleshoot**: Basic troubleshooting guide
 - **verify**: Full TDD + Chrome browser confirmation loop (rake test → hard refresh → screenshot → console check)
+- **visualizer-test**: Browser-based visualizer smoke test (VJ Pad, VRM, key input verification)
 
 Skills are project-local and defined within this repository.
+
+### Hooks (Automated Quality Checks)
+
+Project-level hooks are defined in `.claude/settings.json` (shared across Web and CLI environments). On every `Edit` or `Write` tool use, the following runs automatically:
+
+1. `bundle exec rubocop -a src/ruby/ test/` -- auto-fix style offenses
+2. `bundle exec rake test` -- run full test suite
+
+Environment-specific settings (permissions, UI preferences) live in `.claude/settings.local.json`.
 
 ### PicoRuby Build Operations
 
