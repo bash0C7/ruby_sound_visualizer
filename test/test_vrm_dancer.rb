@@ -193,4 +193,19 @@ class TestVRMDancer < Test::Unit::TestCase
       }
     }
   end
+
+  def test_constants_defined_in_visualizer_policy
+    assert_in_delta 4.0, VisualizerPolicy::VRM_MOTION_SPEED, 0.001
+    assert_in_delta 8.0, VisualizerPolicy::VRM_ROTATION_AMPLIFY, 0.001
+    assert_in_delta 8.0, VisualizerPolicy::VRM_SMOOTHING_FACTOR, 0.001
+  end
+
+  def test_vrm_dancer_uses_policy_constants
+    assert !defined?(VRMDancer::MOTION_SPEED),
+           'VRMDancer::MOTION_SPEED should be removed (use VisualizerPolicy)'
+    assert !defined?(VRMDancer::ROTATION_AMPLIFY),
+           'VRMDancer::ROTATION_AMPLIFY should be removed (use VisualizerPolicy)'
+    assert !defined?(VRMDancer::SMOOTHING_FACTOR),
+           'VRMDancer::SMOOTHING_FACTOR should be removed (use VisualizerPolicy)'
+  end
 end

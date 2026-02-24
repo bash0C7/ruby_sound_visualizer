@@ -2,8 +2,6 @@ class ColorPalette
   attr_reader :hue_offset, :last_hsv
   attr_reader :hue_mode
 
-  BASE_HUES = { 1 => 0.0, 2 => 60.0, 3 => 180.0 }
-  HUE_RANGE = 140.0
 
   def initialize
     @hue_mode = nil
@@ -44,8 +42,8 @@ class ColorPalette
     end
 
     position = (mid * 0.5 + high * 1.0) / total
-    base_hue = BASE_HUES[@hue_mode] || 0.0
-    hue_offset_deg = (position - 0.5) * HUE_RANGE
+    base_hue = VisualizerPolicy::COLOR_BASE_HUES[@hue_mode] || 0.0
+    hue_offset_deg = (position - 0.5) * VisualizerPolicy::COLOR_HUE_RANGE
     hue = ((base_hue + hue_offset_deg + @hue_offset) % 360.0) / 360.0
 
     saturation = VisualizerPolicy.cap_saturation(0.65 + Math.tanh(total * 0.5) * 0.15)
@@ -66,8 +64,8 @@ class ColorPalette
 
     return hsv_to_rgb(0, 0, value) if @hue_mode.nil?
 
-    base_hue = BASE_HUES[@hue_mode] || 0.0
-    hue_offset_deg = (distance - 0.5) * HUE_RANGE
+    base_hue = VisualizerPolicy::COLOR_BASE_HUES[@hue_mode] || 0.0
+    hue_offset_deg = (distance - 0.5) * VisualizerPolicy::COLOR_HUE_RANGE
     hue = ((base_hue + hue_offset_deg + @hue_offset) % 360.0) / 360.0
 
     saturation = VisualizerPolicy.cap_saturation(0.65 + Math.tanh(total * 0.5) * 0.15)

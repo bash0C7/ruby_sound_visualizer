@@ -168,4 +168,8 @@ class TestParticleSystemLogging < Test::Unit::TestCase
     ruby_logs = @log_messages.select { |m| m.include?('[Ruby]') && m.include?('particle.explosion.') }
     assert_empty ruby_logs, "Expected no explosion log when energy is zero"
   end
+
+  def test_color_cache_interval_constant_in_policy
+    assert_equal 3, VisualizerPolicy::PARTICLE_COLOR_CACHE_INTERVAL
+  end
 end

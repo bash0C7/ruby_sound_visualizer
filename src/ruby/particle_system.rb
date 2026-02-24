@@ -9,7 +9,7 @@ class ParticleSystem
       }
     end
     @color_cache_counter = 0
-    @color_cache_interval = 3
+    @color_cache_interval = VisualizerPolicy::PARTICLE_COLOR_CACHE_INTERVAL
   end
 
   def update(analysis)

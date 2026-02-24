@@ -5,10 +5,6 @@ class WordartRenderer
   PHASE_SUSTAIN = :sustain
   PHASE_EXIT = :exit
 
-  # Timing (in frames at ~60fps)
-  ENTRANCE_FRAMES = 30   # 0.5s entrance
-  SUSTAIN_FRAMES = 180   # 3s display
-  EXIT_FRAMES = 45       # 0.75s exit
 
   # WordArt style presets (rotated through)
   STYLES = [
@@ -104,17 +100,17 @@ class WordartRenderer
 
     case @phase
     when PHASE_ENTRANCE
-      if @frame >= ENTRANCE_FRAMES
+      if @frame >= VisualizerPolicy::WORDART_ENTRANCE_FRAMES
         @phase = PHASE_SUSTAIN
         @frame = 0
       end
     when PHASE_SUSTAIN
-      if @frame >= SUSTAIN_FRAMES
+      if @frame >= VisualizerPolicy::WORDART_SUSTAIN_FRAMES
         @phase = PHASE_EXIT
         @frame = 0
       end
     when PHASE_EXIT
-      if @frame >= EXIT_FRAMES
+      if @frame >= VisualizerPolicy::WORDART_EXIT_FRAMES
         @phase = PHASE_NONE
         @frame = 0
       end
@@ -173,11 +169,11 @@ class WordartRenderer
   def phase_progress
     case @phase
     when PHASE_ENTRANCE
-      @frame.to_f / ENTRANCE_FRAMES
+      @frame.to_f / VisualizerPolicy::WORDART_ENTRANCE_FRAMES
     when PHASE_SUSTAIN
       1.0
     when PHASE_EXIT
-      @frame.to_f / EXIT_FRAMES
+      @frame.to_f / VisualizerPolicy::WORDART_EXIT_FRAMES
     else
       0.0
     end

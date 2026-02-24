@@ -57,22 +57,22 @@ class TestWordartRenderer < Test::Unit::TestCase
     assert_equal :entrance, @renderer.phase
 
     # Advance through entrance
-    WordartRenderer::ENTRANCE_FRAMES.times { @renderer.update }
+    VisualizerPolicy::WORDART_ENTRANCE_FRAMES.times { @renderer.update }
     assert_equal :sustain, @renderer.phase
   end
 
   def test_sustain_transitions_to_exit
     @renderer.trigger("test")
-    WordartRenderer::ENTRANCE_FRAMES.times { @renderer.update }
+    VisualizerPolicy::WORDART_ENTRANCE_FRAMES.times { @renderer.update }
     assert_equal :sustain, @renderer.phase
 
-    WordartRenderer::SUSTAIN_FRAMES.times { @renderer.update }
+    VisualizerPolicy::WORDART_SUSTAIN_FRAMES.times { @renderer.update }
     assert_equal :exit, @renderer.phase
   end
 
   def test_exit_transitions_to_none
     @renderer.trigger("test")
-    total = WordartRenderer::ENTRANCE_FRAMES + WordartRenderer::SUSTAIN_FRAMES + WordartRenderer::EXIT_FRAMES
+    total = VisualizerPolicy::WORDART_ENTRANCE_FRAMES + VisualizerPolicy::WORDART_SUSTAIN_FRAMES + VisualizerPolicy::WORDART_EXIT_FRAMES
     total.times { @renderer.update }
     assert_equal :none, @renderer.phase
     assert_equal false, @renderer.active?
@@ -80,7 +80,7 @@ class TestWordartRenderer < Test::Unit::TestCase
 
   def test_full_lifecycle_frame_count
     @renderer.trigger("test")
-    total = WordartRenderer::ENTRANCE_FRAMES + WordartRenderer::SUSTAIN_FRAMES + WordartRenderer::EXIT_FRAMES
+    total = VisualizerPolicy::WORDART_ENTRANCE_FRAMES + VisualizerPolicy::WORDART_SUSTAIN_FRAMES + VisualizerPolicy::WORDART_EXIT_FRAMES
     total.times { @renderer.update }
     assert_equal false, @renderer.active?
   end
@@ -152,16 +152,16 @@ class TestWordartRenderer < Test::Unit::TestCase
 
   def test_render_data_sustain_has_full_opacity
     @renderer.trigger("test")
-    WordartRenderer::ENTRANCE_FRAMES.times { @renderer.update }
+    VisualizerPolicy::WORDART_ENTRANCE_FRAMES.times { @renderer.update }
     data = @renderer.render_data
     assert_in_delta 1.0, data[:opacity], 0.01
   end
 
   def test_render_data_exit_fading
     @renderer.trigger("test")
-    (WordartRenderer::ENTRANCE_FRAMES + WordartRenderer::SUSTAIN_FRAMES).times { @renderer.update }
+    (VisualizerPolicy::WORDART_ENTRANCE_FRAMES + VisualizerPolicy::WORDART_SUSTAIN_FRAMES).times { @renderer.update }
     # Advance partway through exit
-    (WordartRenderer::EXIT_FRAMES / 2).times { @renderer.update }
+    (VisualizerPolicy::WORDART_EXIT_FRAMES / 2).times { @renderer.update }
     data = @renderer.render_data
     assert data[:opacity] < 1.0 if data[:opacity]
   end
@@ -231,5 +231,20 @@ class TestWordartRenderer < Test::Unit::TestCase
     end
     # Should cycle back to beginning
     assert_equal indices[0], indices[WordartRenderer::STYLES.length]
+  end
+
+  def test_constants_defined_in_visualizer_policy
+    assert_equal 30,  VisualizerPolicy::WORDART_ENTRANCE_FRAMES
+    assert_equal 180, VisualizerPolicy::WORDART_SUSTAIN_FRAMES
+    assert_equal 45,  VisualizerPolicy::WORDART_EXIT_FRAMES
+  end
+
+  def test_wordart_renderer_uses_policy_constants
+    assert !defined?(WordartRenderer::ENTRANCE_FRAMES),
+           'WordartRenderer::ENTRANCE_FRAMES should be removed (use VisualizerPolicy)'
+    assert !defined?(WordartRenderer::SUSTAIN_FRAMES),
+           'WordartRenderer::SUSTAIN_FRAMES should be removed (use VisualizerPolicy)'
+    assert !defined?(WordartRenderer::EXIT_FRAMES),
+           'WordartRenderer::EXIT_FRAMES should be removed (use VisualizerPolicy)'
   end
 end
