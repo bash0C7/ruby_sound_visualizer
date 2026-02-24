@@ -440,11 +440,17 @@
   <script type="text/ruby" src="src/ruby/keyboard_handler.rb"></script>
   <script type="text/ruby" src="src/ruby/vj_plugin.rb"></script>
   <script type="text/ruby" src="src/ruby/vj_serial_commands.rb"></script>
-  <script type="text/ruby" src="src/ruby/synth_engine.rb"></script>
-  <script type="text/ruby" src="src/ruby/synth_effects.rb"></script>
   <script type="text/ruby" src="src/ruby/oscilloscope_renderer.rb"></script>
-  <script type="text/ruby" src="src/ruby/vj_synth_commands.rb"></script>
-  <script type="text/ruby" src="src/ruby/vj_synth_effects_commands.rb"></script>
+  <script type="text/ruby" src="src/ruby/synth_patch/audio_adapter.rb"></script>
+  <script type="text/ruby" src="src/ruby/synth_patch/node.rb"></script>
+  <script type="text/ruby" src="src/ruby/synth_patch/osc_node.rb"></script>
+  <script type="text/ruby" src="src/ruby/synth_patch/fm_op_node.rb"></script>
+  <script type="text/ruby" src="src/ruby/synth_patch/filter_node.rb"></script>
+  <script type="text/ruby" src="src/ruby/synth_patch/gain_node.rb"></script>
+  <script type="text/ruby" src="src/ruby/synth_patch/mixer_node.rb"></script>
+  <script type="text/ruby" src="src/ruby/synth_patch/synth_patch.rb"></script>
+  <script type="text/ruby" src="src/ruby/synth_patch/web_adapter.rb"></script>
+  <script type="text/ruby" src="src/ruby/vj_synth_patch_commands.rb"></script>
   <script type="text/ruby" src="src/ruby/vj_pad.rb"></script>
 
   <!-- VJ Pad Plugins (src/ruby/plugins/vj_*.rb) -->
@@ -584,6 +590,10 @@
         const bufferLength = analyser.frequencyBinCount;
         dataArray = new Uint8Array(bufferLength);
         console.log('[JS] Web Audio API initialized (no mic auto-connect), state:', audioContext.state);
+        if (_pendingSynthPatchSpec) {
+          console.log('[SynthPatch] Rebuilding graph after audioContext init');
+          window.synthPatchBuild(_pendingSynthPatchSpec);
+        }
       } catch (error) {
         console.error('[JS] Audio init error:', error);
         throw error;
@@ -1085,258 +1095,188 @@
     //   → AnalyserNode (Oscilloscope tap)
     //   → main analyser + AudioContext.destination
 
-    // Per-voice state: { voiceId: { osc, envGain, timeoutId, state } }
-    const _polyVoices = {};
+    // SynthPatch runtime state: nodes keyed by id, output info, pitch nodes
+    let _pendingSynthPatchSpec = null;
+    let _synthPatchMasterGainTarget = 1.0; // Tracks sp_gain slider value (used in ADSR peak)
+    const synthPatchRuntime = { nodes: {}, outputId: null, pitchNodeIds: [] };
+    let _synthPatchAnalyser = null;
+    let _synthPatchTimeDomain = null;
+    let _synthPatchRelease = 0.3;
 
-    // Shared effects chain nodes (initialized once)
-    let _synthInputBus    = null;
-    let _synthDistortion  = null;
-    let _synthMasterFilter= null;
-    let _synthDelayNode   = null;
-    let _synthDelayFeedback = null;
-    let _synthDelayDry    = null;
-    let _synthDelayWet    = null;
-    let _synthDelayMix    = null;
-    let _synthReverbNode  = null;
-    let _synthReverbDry   = null;
-    let _synthReverbWet   = null;
-    let _synthCompressor  = null;
-    let _synthOutputGain  = null;
-    let _synthAnalyser    = null;
-    let _synthTimeDomain  = null;
-    let _synthEffectsReady = false;
-
-    // Shared synth params (updated by updateSynthParams)
-    let _synthParams = {
-      waveform: 'sawtooth', attack: 0.01, decay: 0.3,
-      sustain: 0.6, release: 0.3, gain: 0.3, maxSustainMs: 500
-    };
-
-    // Current reverb config (to avoid rebuilding IR on every frame)
-    let _reverbCurrentSize = -1;
-    let _reverbCurrentDecay = -1;
-
-    function createDistortionCurve(amount) {
-      if (amount <= 0) return null;
-      const samples = 512;
-      const curve = new Float32Array(samples);
-      const k = amount;
-      for (let i = 0; i < samples; i++) {
-        const x = (i * 2) / samples - 1;
-        curve[i] = ((Math.PI + k) * x) / (Math.PI + k * Math.abs(x));
+    // Build Web Audio API graph from Ruby-compiled JSON spec
+    window.synthPatchBuild = function(jsonStr) {
+      if (!audioContext) {
+        console.warn('[SynthPatch] No audioContext - queued for rebuild');
+        _pendingSynthPatchSpec = jsonStr;
+        return;
       }
-      return curve;
-    }
+      _pendingSynthPatchSpec = null;
 
-    function createReverbBuffer(size, decay) {
-      const sampleRate = audioContext.sampleRate;
-      const length = Math.max(1, Math.floor(sampleRate * size));
-      const buffer = audioContext.createBuffer(2, length, sampleRate);
-      for (let ch = 0; ch < 2; ch++) {
-        const data = buffer.getChannelData(ch);
-        for (let i = 0; i < length; i++) {
-          data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, decay);
+      // Tear down previous graph
+      Object.values(synthPatchRuntime.nodes).forEach(n => { try { n.disconnect(); } catch(_e) {} });
+      if (_synthPatchAnalyser) { try { _synthPatchAnalyser.disconnect(); } catch(_e) {} }
+      synthPatchRuntime.nodes = {};
+      synthPatchRuntime.outputId = null;
+      synthPatchRuntime.pitchNodeIds = [];
+
+      const spec = JSON.parse(jsonStr);
+
+      // Create nodes
+      spec.nodes.forEach(nodeSpec => {
+        let node;
+        switch (nodeSpec.type) {
+          case 'oscillator':
+          case 'fm_op':
+            node = audioContext.createOscillator();
+            node.type = nodeSpec.params.waveform || 'sine';
+            node.frequency.value = parseFloat(nodeSpec.params.frequency || 440);
+            if (nodeSpec.params.amplitude !== undefined) {
+              const ampGain = audioContext.createGain();
+              ampGain.gain.value = parseFloat(nodeSpec.params.amplitude);
+              node.connect(ampGain);
+              synthPatchRuntime.nodes['_amp_' + nodeSpec.id] = ampGain;
+            }
+            break;
+          case 'filter':
+            node = audioContext.createBiquadFilter();
+            node.type = nodeSpec.params.filter_type || 'lowpass';
+            node.frequency.value = parseFloat(nodeSpec.params.cutoff || 1000);
+            node.Q.value = parseFloat(nodeSpec.params.q || 1.0);
+            break;
+          case 'gain':
+            node = audioContext.createGain();
+            node.gain.value = parseFloat(nodeSpec.params.gain || 1.0);
+            break;
+          case 'mixer':
+            node = audioContext.createGain();
+            node.gain.value = 1.0;
+            break;
+          default:
+            console.warn('[SynthPatch] Unknown node type:', nodeSpec.type);
+            return;
+        }
+        synthPatchRuntime.nodes[nodeSpec.id] = node;
+      });
+
+      // Wire connections (Ruby-computed connections include chain and mixer inputs)
+      spec.connections.forEach(conn => {
+        const from = synthPatchRuntime.nodes['_amp_' + conn.from] || synthPatchRuntime.nodes[conn.from];
+        const to = synthPatchRuntime.nodes[conn.to];
+        if (from && to) from.connect(to);
+        else console.warn('[SynthPatch] Connection failed:', conn.from, '->', conn.to);
+      });
+
+      // FM modulation: modulator osc → carrier frequency AudioParam
+      spec.fm_connections.forEach(fm => {
+        const mod = synthPatchRuntime.nodes['_amp_' + fm.mod] || synthPatchRuntime.nodes[fm.mod];
+        const carrier = synthPatchRuntime.nodes[fm.carrier];
+        if (mod && carrier && carrier.frequency) mod.connect(carrier.frequency);
+        else console.warn('[SynthPatch] FM connection failed:', fm.mod, '->', fm.carrier);
+      });
+
+      // Connect output to analyser → main analyser + destination
+      if (spec.output_node) {
+        synthPatchRuntime.outputId = spec.output_node;
+        const outputNode = synthPatchRuntime.nodes[spec.output_node];
+        if (outputNode) {
+          _synthPatchAnalyser = audioContext.createAnalyser();
+          _synthPatchAnalyser.fftSize = 512;
+          _synthPatchTimeDomain = new Float32Array(_synthPatchAnalyser.fftSize);
+          outputNode.connect(_synthPatchAnalyser);
+          _synthPatchAnalyser.connect(analyser);
+          _synthPatchAnalyser.connect(audioContext.destination);
         }
       }
-      return buffer;
-    }
 
-    function initSynthEffectsChain() {
-      if (!audioContext) return;
+      // Identify pitch nodes (oscillators/fm_ops that are NOT FM modulators)
+      const modIds = new Set(spec.fm_connections.map(fm => fm.mod));
+      synthPatchRuntime.pitchNodeIds = spec.nodes
+        .filter(n => (n.type === 'oscillator' || n.type === 'fm_op') && !modIds.has(n.id))
+        .map(n => n.id);
 
-      _synthInputBus = audioContext.createGain();
-      _synthInputBus.gain.value = 1.0;
-
-      // Distortion (WaveShaper)
-      _synthDistortion = audioContext.createWaveShaper();
-      _synthDistortion.curve = null; // bypass
-      _synthDistortion.oversample = '4x';
-
-      // Master filter (allpass = bypass by default)
-      _synthMasterFilter = audioContext.createBiquadFilter();
-      _synthMasterFilter.type = 'allpass';
-      _synthMasterFilter.frequency.value = 20000;
-      _synthMasterFilter.Q.value = 1;
-
-      // Delay (echo): DelayNode + feedback loop + wet/dry mix
-      _synthDelayNode = audioContext.createDelay(2.0);
-      _synthDelayNode.delayTime.value = 0.25;
-      _synthDelayFeedback = audioContext.createGain();
-      _synthDelayFeedback.gain.value = 0.0;
-      _synthDelayDry = audioContext.createGain();
-      _synthDelayDry.gain.value = 1.0;
-      _synthDelayWet = audioContext.createGain();
-      _synthDelayWet.gain.value = 0.0;
-      _synthDelayMix = audioContext.createGain(); // summing point after dry+wet
-      _synthDelayMix.gain.value = 1.0;
-
-      // Reverb (ConvolverNode): wet/dry mix
-      _synthReverbNode = audioContext.createConvolver();
-      _synthReverbNode.buffer = createReverbBuffer(1.0, 2.0);
-      _reverbCurrentSize = 1.0; _reverbCurrentDecay = 2.0;
-      _synthReverbDry = audioContext.createGain();
-      _synthReverbDry.gain.value = 1.0;
-      _synthReverbWet = audioContext.createGain();
-      _synthReverbWet.gain.value = 0.0;
-
-      // Compressor
-      _synthCompressor = audioContext.createDynamicsCompressor();
-      _synthCompressor.threshold.value = -3;
-      _synthCompressor.ratio.value = 1.0;
-      _synthCompressor.attack.value = 0.003;
-      _synthCompressor.release.value = 0.25;
-
-      // Master output + analyser tap for oscilloscope
-      _synthOutputGain = audioContext.createGain();
-      _synthOutputGain.gain.value = _synthParams.gain;
-      _synthAnalyser = audioContext.createAnalyser();
-      _synthAnalyser.fftSize = 512;
-      _synthTimeDomain = new Float32Array(_synthAnalyser.fftSize);
-
-      // --- Wire signal chain ---
-      // InputBus → Distortion → MasterFilter
-      _synthInputBus.connect(_synthDistortion);
-      _synthDistortion.connect(_synthMasterFilter);
-
-      // MasterFilter → DelayDry (bypass) + DelayNode (wet path)
-      _synthMasterFilter.connect(_synthDelayDry);
-      _synthMasterFilter.connect(_synthDelayNode);
-      // Delay feedback loop
-      _synthDelayNode.connect(_synthDelayFeedback);
-      _synthDelayFeedback.connect(_synthDelayNode);
-      // Delay wet output
-      _synthDelayNode.connect(_synthDelayWet);
-      // Merge dry + wet into DelayMix
-      _synthDelayDry.connect(_synthDelayMix);
-      _synthDelayWet.connect(_synthDelayMix);
-
-      // DelayMix → ReverbDry (bypass) + ReverbNode (wet path)
-      _synthDelayMix.connect(_synthReverbDry);
-      _synthDelayMix.connect(_synthReverbNode);
-      _synthReverbNode.connect(_synthReverbWet);
-
-      // ReverbDry + ReverbWet → Compressor
-      _synthReverbDry.connect(_synthCompressor);
-      _synthReverbWet.connect(_synthCompressor);
-
-      // Compressor → OutputGain → Analyser → main analyser + destination
-      _synthCompressor.connect(_synthOutputGain);
-      _synthOutputGain.connect(_synthAnalyser);
-      _synthAnalyser.connect(analyser);
-      _synthAnalyser.connect(audioContext.destination);
-
-      _synthEffectsReady = true;
-      console.log('[Synth] Effects chain initialized');
-    }
-
-    // Start a new polyphonic voice (called from Ruby JSBridge)
-    window.startPolyVoice = function(voiceId, freq, duty) {
-      if (!audioContext) return;
-      if (!_synthEffectsReady) initSynthEffectsChain();
-
-      // Clean up existing voice with same id (shouldn't happen, safety)
-      if (_polyVoices[voiceId]) _cleanupPolyVoice(voiceId);
-
-      const osc = audioContext.createOscillator();
-      osc.type = _synthParams.waveform;
-      osc.frequency.value = freq;
-
-      const envGain = audioContext.createGain();
-      const now = audioContext.currentTime;
-      envGain.gain.setValueAtTime(0.001, now);
-      envGain.gain.linearRampToValueAtTime(1.0, now + _synthParams.attack);
-      envGain.gain.linearRampToValueAtTime(_synthParams.sustain, now + _synthParams.attack + _synthParams.decay);
-
-      osc.connect(envGain);
-      envGain.connect(_synthInputBus);
-      osc.start();
-
-      const timeoutId = setTimeout(() => {
-        window.releasePolyVoice(voiceId);
-      }, _synthParams.maxSustainMs);
-
-      _polyVoices[voiceId] = { osc, envGain, timeoutId, state: 'active' };
-      console.log('[Synth] Voice ' + voiceId + ' started: ' + freq + 'Hz ' + _synthParams.waveform);
-    };
-
-    // Release a voice with ADSR release envelope (called from Ruby JSBridge)
-    window.releasePolyVoice = function(voiceId) {
-      const voice = _polyVoices[voiceId];
-      if (!voice || voice.state !== 'active') return;
-      voice.state = 'releasing';
-      if (voice.timeoutId) clearTimeout(voice.timeoutId);
-
-      const now = audioContext.currentTime;
-      const rel = _synthParams.release;
-      voice.envGain.gain.cancelScheduledValues(now);
-      voice.envGain.gain.setValueAtTime(voice.envGain.gain.value, now);
-      voice.envGain.gain.linearRampToValueAtTime(0.001, now + rel);
-
-      setTimeout(() => { _cleanupPolyVoice(voiceId); }, Math.ceil(rel * 1000) + 100);
-    };
-
-    function _cleanupPolyVoice(voiceId) {
-      const voice = _polyVoices[voiceId];
-      if (!voice) return;
-      try { voice.osc.stop(); } catch (_e) {}
-      try { voice.osc.disconnect(); } catch (_e) {}
-      try { voice.envGain.disconnect(); } catch (_e) {}
-      delete _polyVoices[voiceId];
-    }
-
-    // Update shared synth oscillator params (called from Ruby JSBridge when params change)
-    window.updateSynthParams = function(waveform, attack, decay, sustain, release, gain, maxSustainMs) {
-      _synthParams = { waveform, attack, decay, sustain, release, gain, maxSustainMs };
-      if (_synthOutputGain) _synthOutputGain.gain.setValueAtTime(gain, audioContext.currentTime);
-      // Update waveform of all running voices
-      Object.values(_polyVoices).forEach(v => {
-        if (v.osc) v.osc.type = waveform;
+      // Start all oscillators (gain = 0 initially via output node)
+      const outputNode = synthPatchRuntime.nodes[spec.output_node];
+      if (outputNode && outputNode.gain) {
+        // Capture initial gain as master gain target for ADSR peak
+        const outputSpec = spec.nodes.find(n => n.id === spec.output_node);
+        if (outputSpec && outputSpec.params.gain !== undefined) {
+          _synthPatchMasterGainTarget = parseFloat(outputSpec.params.gain);
+        }
+        outputNode.gain.value = 0;
+      }
+      spec.nodes.forEach(n => {
+        if (n.type === 'oscillator' || n.type === 'fm_op') {
+          const osc = synthPatchRuntime.nodes[n.id];
+          if (osc) try { osc.start(); } catch(_e) {}
+        }
       });
+
+      console.log('[SynthPatch] Graph built:', Object.keys(synthPatchRuntime.nodes).filter(k => !k.startsWith('_amp_')).join(', '));
     };
 
-    // Update effects chain parameters (called from Ruby JSBridge when effects change)
-    window.updateSynthEffects = function(distortion, filterType, filterCutoff, filterQ,
-                                         delayTime, delayFeedback, delayWet,
-                                         reverbSize, reverbDecay, reverbWet,
-                                         compThreshold, compRatio, compAttack, compRelease) {
-      if (!audioContext) return;
-      if (!_synthEffectsReady) initSynthEffectsChain();
+    // Trigger note: set carrier freq + apply ADSR to output gain
+    window.synthPatchNoteOn = function(freq, duty, attack, decay, sustain, release) {
+      if (!audioContext || !synthPatchRuntime.outputId) return;
+      console.log('[SynthPatch] noteOn: freq=' + freq + ' duty=' + duty + ' A/D/S/R=' + attack + '/' + decay + '/' + sustain + '/' + release);
+      _synthPatchRelease = release;
       const now = audioContext.currentTime;
 
-      if (_synthDistortion) _synthDistortion.curve = createDistortionCurve(distortion);
+      // Update pitch nodes (non-modulator oscillators)
+      synthPatchRuntime.pitchNodeIds.forEach(id => {
+        const node = synthPatchRuntime.nodes[id];
+        if (node && node.frequency) node.frequency.setValueAtTime(freq, now);
+      });
 
-      if (_synthMasterFilter) {
-        _synthMasterFilter.type = filterType;
-        _synthMasterFilter.frequency.setValueAtTime(filterCutoff, now);
-        _synthMasterFilter.Q.setValueAtTime(filterQ, now);
+      // Apply ADSR envelope to output gain node
+      const outputNode = synthPatchRuntime.nodes[synthPatchRuntime.outputId];
+      if (!outputNode || !outputNode.gain) return;
+      const gainParam = outputNode.gain;
+      gainParam.cancelScheduledValues(now);
+      gainParam.setValueAtTime(0.001, now);
+      gainParam.linearRampToValueAtTime(_synthPatchMasterGainTarget, now + Math.max(0.001, attack));
+      gainParam.linearRampToValueAtTime(Math.max(0.001, sustain * _synthPatchMasterGainTarget), now + Math.max(0.001, attack) + Math.max(0.001, decay));
+    };
+
+    // Release note: apply ADSR release to output gain
+    window.synthPatchNoteOff = function() {
+      if (!audioContext || !synthPatchRuntime.outputId) return;
+      console.log('[SynthPatch] noteOff (release=' + _synthPatchRelease + ')');
+      const outputNode = synthPatchRuntime.nodes[synthPatchRuntime.outputId];
+      if (!outputNode || !outputNode.gain) return;
+      const now = audioContext.currentTime;
+      const gainParam = outputNode.gain;
+      gainParam.cancelScheduledValues(now);
+      gainParam.setValueAtTime(gainParam.value, now);
+      gainParam.linearRampToValueAtTime(0.001, now + Math.max(0.001, _synthPatchRelease));
+    };
+
+    // Real-time parameter update (called from sp_* VJPad commands)
+    window.synthPatchUpdateParam = function(nodeName, param, value) {
+      const node = synthPatchRuntime.nodes[nodeName];
+      if (!node) { console.warn('[SynthPatch] Node not found:', nodeName); return; }
+      console.log('[SynthPatch] updateParam: ' + nodeName + '.' + param + ' = ' + value);
+
+      // Map Ruby param name → Web Audio API property
+      const paramMap = { frequency: 'frequency', cutoff: 'frequency', gain: 'gain', q: 'Q',
+                         waveform: 'type', filter_type: 'type' };
+      const apiProp = paramMap[param] || param;
+      const target = node[apiProp];
+      if (target && typeof target.setValueAtTime === 'function') {
+        target.setValueAtTime(parseFloat(value), audioContext.currentTime);
+      } else if (node[apiProp] !== undefined) {
+        node[apiProp] = value;
       }
-
-      if (_synthDelayNode)     _synthDelayNode.delayTime.setValueAtTime(delayTime, now);
-      if (_synthDelayFeedback) _synthDelayFeedback.gain.setValueAtTime(delayFeedback, now);
-      if (_synthDelayWet)      _synthDelayWet.gain.setValueAtTime(delayWet, now);
-      if (_synthDelayDry)      _synthDelayDry.gain.setValueAtTime(Math.max(0, 1 - delayWet), now);
-
-      // Rebuild reverb IR only when size or decay changes
-      if (_synthReverbNode && (reverbSize !== _reverbCurrentSize || reverbDecay !== _reverbCurrentDecay)) {
-        _synthReverbNode.buffer = createReverbBuffer(reverbSize, reverbDecay);
-        _reverbCurrentSize = reverbSize; _reverbCurrentDecay = reverbDecay;
-      }
-      if (_synthReverbWet) _synthReverbWet.gain.setValueAtTime(reverbWet, now);
-      if (_synthReverbDry) _synthReverbDry.gain.setValueAtTime(Math.max(0, 1 - reverbWet), now);
-
-      if (_synthCompressor) {
-        _synthCompressor.threshold.setValueAtTime(compThreshold, now);
-        _synthCompressor.ratio.setValueAtTime(compRatio, now);
-        _synthCompressor.attack.setValueAtTime(compAttack, now);
-        _synthCompressor.release.setValueAtTime(compRelease, now);
+      // Track master gain target so ADSR noteOn respects sp_gain slider
+      if (nodeName === synthPatchRuntime.outputId && param === 'gain') {
+        _synthPatchMasterGainTarget = parseFloat(value);
       }
     };
 
-    // Get synth time-domain waveform for oscilloscope (called from animation loop)
+    // Get synth time-domain waveform for oscilloscope
     function getSynthWaveform() {
-      if (!_synthAnalyser || !_synthTimeDomain) return null;
-      _synthAnalyser.getFloatTimeDomainData(_synthTimeDomain);
-      return _synthTimeDomain;
+      if (!_synthPatchAnalyser || !_synthPatchTimeDomain) return null;
+      _synthPatchAnalyser.getFloatTimeDomainData(_synthPatchTimeDomain);
+      return _synthPatchTimeDomain;
     }
 
     // === Oscilloscope 3D Waveform (Three.js) ===
@@ -2256,7 +2196,10 @@
     }
 
     // Initialize everything (auto-start flow)
+    let _initCallCount = 0;
     async function init() {
+      _initCallCount++;
+      console.log('[JS] init() called, count=' + _initCallCount + ' stack=' + new Error().stack.split('\n').slice(1,4).join('|'));
       try {
         // Phase 1: Wait for Ruby WASM to finish loading
         updateLoadingStatus('Loading Ruby WASM...');
@@ -2889,7 +2832,7 @@
           const wave = btn.dataset.wave;
           document.querySelectorAll('.cp-synth-wave').forEach(b => b.classList.remove('active'));
           btn.classList.add('active');
-          if (window.rubyExecPrompt) window.rubyExecPrompt('syn_w ' + wave);
+          if (window.rubyExecPrompt) window.rubyExecPrompt('sp_osc_w ' + wave);
         });
       });
       // Set initial active waveform button
@@ -2901,20 +2844,20 @@
           const ft = btn.dataset.filter;
           document.querySelectorAll('.cp-synth-filter').forEach(b => b.classList.remove('active'));
           btn.classList.add('active');
-          if (window.rubyExecPrompt) window.rubyExecPrompt('sfx_ft ' + ft);
+          if (window.rubyExecPrompt) window.rubyExecPrompt('sp_ft ' + ft);
         });
       });
       document.querySelector('.cp-synth-filter[data-filter="lowpass"]')?.classList.add('active');
 
       // ADSR + Filter sliders
       const synthSliders = [
-        { id: 'cpSynthAttack',  valId: 'cpSynthAttackVal',  cmd: 'syn_a',  fmt: v => (v/1000).toFixed(2) + 's', scale: v => v/1000 },
-        { id: 'cpSynthDecay',   valId: 'cpSynthDecayVal',   cmd: 'syn_d',  fmt: v => (v/1000).toFixed(2) + 's', scale: v => v/1000 },
-        { id: 'cpSynthSustain', valId: 'cpSynthSustainVal', cmd: 'syn_s',  fmt: v => (v/100).toFixed(2),         scale: v => v/100 },
-        { id: 'cpSynthRelease', valId: 'cpSynthReleaseVal', cmd: 'syn_r',  fmt: v => (v/1000).toFixed(2) + 's', scale: v => v/1000 },
-        { id: 'cpSynthCutoff',  valId: 'cpSynthCutoffVal',  cmd: 'sfx_filt', fmt: v => v + '',                    scale: v => v },
-        { id: 'cpSynthReso',    valId: 'cpSynthResoVal',    cmd: 'sfx_q',    fmt: v => (v/10).toFixed(1),          scale: v => v/10 },
-        { id: 'cpSynthGain',    valId: 'cpSynthGainVal',    cmd: 'syn_g',  fmt: v => v + '%',                   scale: v => v },
+        { id: 'cpSynthAttack',  valId: 'cpSynthAttackVal',  cmd: 'sp_a',    fmt: v => (v/1000).toFixed(2) + 's', scale: v => v/1000 },
+        { id: 'cpSynthDecay',   valId: 'cpSynthDecayVal',   cmd: 'sp_d',    fmt: v => (v/1000).toFixed(2) + 's', scale: v => v/1000 },
+        { id: 'cpSynthSustain', valId: 'cpSynthSustainVal', cmd: 'sp_s',    fmt: v => (v/100).toFixed(2),         scale: v => v/100 },
+        { id: 'cpSynthRelease', valId: 'cpSynthReleaseVal', cmd: 'sp_r',    fmt: v => (v/1000).toFixed(2) + 's', scale: v => v/1000 },
+        { id: 'cpSynthCutoff',  valId: 'cpSynthCutoffVal',  cmd: 'sp_co',   fmt: v => v + '',                    scale: v => v },
+        { id: 'cpSynthReso',    valId: 'cpSynthResoVal',    cmd: 'sp_q',    fmt: v => (v/10).toFixed(1),          scale: v => v/10 },
+        { id: 'cpSynthGain',    valId: 'cpSynthGainVal',    cmd: 'sp_gain', fmt: v => v + '%',                   scale: v => v/100 },
       ];
       synthSliders.forEach(s => {
         const slider = document.getElementById(s.id);
