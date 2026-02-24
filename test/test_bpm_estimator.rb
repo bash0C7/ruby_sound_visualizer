@@ -200,4 +200,10 @@ class TestBPMEstimatorLogging < Test::Unit::TestCase
     count_after = @log_messages.count { |m| m.include?('audio.bpm=') }
     assert_equal count_before, count_after
   end
+
+  def test_constants_defined_in_visualizer_policy
+    assert_equal 16,  VisualizerPolicy::BPM_HISTORY_LENGTH
+    assert_equal 40,  VisualizerPolicy::BPM_MIN
+    assert_equal 240, VisualizerPolicy::BPM_MAX
+  end
 end

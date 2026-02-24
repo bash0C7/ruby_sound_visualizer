@@ -147,7 +147,7 @@ class AudioAnalyzer
     @beat_overall = @beat_bass
 
     if @beat_overall || @beat_bass
-      @beat_cooldown = 3
+      @beat_cooldown = VisualizerPolicy::BEAT_COOLDOWN_FRAMES
     end
   end
 
