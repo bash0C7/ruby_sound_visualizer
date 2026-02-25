@@ -223,7 +223,7 @@ class TestVJPadSerial < Test::Unit::TestCase
     pad = VJPad.new(nil, serial_manager: @serial, serial_audio_source: source)
     result = pad.exec("sav")
     assert result[:ok]
-    assert_match(/10/, result[:msg])
+    assert_match(/30/, result[:msg])
   end
 
   def test_sav_setter

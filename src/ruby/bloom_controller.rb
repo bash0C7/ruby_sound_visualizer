@@ -12,7 +12,10 @@ class BloomController
     @strength = VisualizerPolicy.bloom_base_strength + Math.tanh(energy * VisualizerPolicy.bloom_energy_scale) * VisualizerPolicy.bloom_strength_scale
     @strength += Math.tanh(imp_overall) * VisualizerPolicy.bloom_impulse_scale
     bloom_flash = analysis[:bloom_flash] || 0.0
-    @strength += bloom_flash * VisualizerPolicy.bloom_flash_multiplier if bloom_flash > 0.01
+    if bloom_flash > 0.01
+      @strength += bloom_flash * VisualizerPolicy.bloom_flash_multiplier
+      JSBridge.log("bloom.flash=true bloom.strength=#{@strength.round(3)} bloom.flash_magnitude=#{bloom_flash.round(3)}")
+    end
     @strength = [@strength, 0.0].max
     @strength = VisualizerPolicy.cap_bloom(@strength)
 

@@ -27,19 +27,19 @@ class TestVjSynthPatch < Test::Unit::TestCase
 
   def test_vj_pad_without_synth_patch
     pad = VJPad.new(nil)
-    result = pad.exec("sp_i")
+    result = pad.exec('sp_i')
     assert_equal true, result[:ok]
     assert_match(/not available/, result[:msg])
   end
 
   def test_sp_i_returns_status
-    result = @pad.exec("sp_i")
+    result = @pad.exec('sp_i')
     assert_equal true, result[:ok]
     assert_match(/adsr=/, result[:msg])
   end
 
   def test_sp_co_updates_filter_cutoff
-    result = @pad.exec("sp_co 3000")
+    result = @pad.exec('sp_co 3000')
     assert_equal true, result[:ok]
     assert_equal 1, @adapter.calls.length
     call = @adapter.calls[0]
@@ -50,28 +50,28 @@ class TestVjSynthPatch < Test::Unit::TestCase
   end
 
   def test_sp_a_sets_attack
-    result = @pad.exec("sp_a 0.5")
+    result = @pad.exec('sp_a 0.5')
     assert_equal true, result[:ok]
     assert_equal 0.5, @patch.attack
   end
 
   def test_sp_d_sets_decay
-    @pad.exec("sp_d 0.8")
+    @pad.exec('sp_d 0.8')
     assert_equal 0.8, @patch.decay
   end
 
   def test_sp_s_sets_sustain
-    @pad.exec("sp_s 0.7")
+    @pad.exec('sp_s 0.7')
     assert_equal 0.7, @patch.sustain
   end
 
   def test_sp_r_sets_release
-    @pad.exec("sp_r 1.2")
+    @pad.exec('sp_r 1.2')
     assert_equal 1.2, @patch.release
   end
 
   def test_sp_gain_updates_master_gain
-    @pad.exec("sp_gain 0.5")
+    @pad.exec('sp_gain 0.5')
     assert_equal 1, @adapter.calls.length
     call = @adapter.calls[0]
     assert_equal :master_gain, call[:node]
@@ -80,7 +80,7 @@ class TestVjSynthPatch < Test::Unit::TestCase
   end
 
   def test_sp_q_updates_filter_q
-    @pad.exec("sp_q 2.0")
+    @pad.exec('sp_q 2.0')
     call = @adapter.calls[0]
     assert_equal :main_filter, call[:node]
     assert_equal :q, call[:param]
@@ -97,7 +97,7 @@ class TestVjSynthPatch < Test::Unit::TestCase
   end
 
   def test_sp_osc_freq_updates_carrier_frequency
-    @pad.exec("sp_osc_freq 880")
+    @pad.exec('sp_osc_freq 880')
     call = @adapter.calls[0]
     assert_equal :carrier, call[:node]
     assert_equal :frequency, call[:param]

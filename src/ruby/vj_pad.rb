@@ -202,8 +202,7 @@ class VJPad
   def preprocess_text_command(input)
     # Quote bare string arguments for wordart and synth commands
     input = input.sub(/\A(wa)\s+(?!["'])(.+)/) { "#{$1} \"#{$2.gsub('\\', '\\\\\\\\').gsub('"', '\\"')}\"" }
-    input = input.sub(/\A(sp_osc_w|sp_ft)\s+(?!["'])([a-z]+)\s*\z/) { "#{$1} \"#{$2}\"" }
-    input
+    input.sub(/\A(sp_osc_w|sp_ft)\s+(?!["'])([a-z]+)\s*\z/) { "#{$1} \"#{$2}\"" }
   end
 
   def execute_plugin(plugin, args)
@@ -215,6 +214,8 @@ class VJPad
 
     resolved = plugin.resolve_params(params)
     effects = plugin.execute(params)
+    cmd_str = args.empty? ? plugin.name.to_s : "#{plugin.name} #{args.join(' ')}"
+    JSBridge.log("vj.plugin=#{plugin.name} vj.command=\"#{cmd_str}\"")
     @pending_actions << { type: :plugin, name: plugin.name, effects: effects }
     plugin.format_result(args.empty? ? {} : resolved)
   end

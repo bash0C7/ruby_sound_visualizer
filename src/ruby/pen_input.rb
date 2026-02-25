@@ -4,11 +4,6 @@
 # Color matches current visualizer particle color palette for
 # a "Gakuen Idolmaster" girly handwritten font aesthetic.
 class PenInput
-  # Fade-out timing
-  FADE_DURATION_FRAMES = 180  # 3 seconds at 60fps
-  STROKE_WIDTH = 3.0
-  MAX_STROKES = 50
-
   Stroke = Struct.new(:points, :color, :width, :opacity, :created_frame, keyword_init: true)
 
   attr_reader :strokes
@@ -29,13 +24,13 @@ class PenInput
     @current_stroke = Stroke.new(
       points: [[x, y]],
       color: color,
-      width: STROKE_WIDTH,
+      width: VisualizerPolicy::PEN_STROKE_WIDTH,
       opacity: 1.0,
       created_frame: @frame
     )
     @strokes << @current_stroke
     # Limit total strokes
-    @strokes.shift while @strokes.length > MAX_STROKES
+    @strokes.shift while @strokes.length > VisualizerPolicy::PEN_MAX_STROKES
   end
 
   # Add a point to the current stroke
@@ -59,10 +54,10 @@ class PenInput
     @frame += 1
     @strokes.each do |stroke|
       age = @frame - stroke.created_frame
-      if age >= FADE_DURATION_FRAMES
+      if age >= VisualizerPolicy::PEN_FADE_DURATION_FRAMES
         stroke.opacity = 0.0
       else
-        stroke.opacity = 1.0 - (age.to_f / FADE_DURATION_FRAMES)
+        stroke.opacity = 1.0 - (age.to_f / VisualizerPolicy::PEN_FADE_DURATION_FRAMES)
       end
     end
     # Remove fully faded strokes

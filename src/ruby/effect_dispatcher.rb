@@ -8,8 +8,15 @@ class EffectDispatcher
   def dispatch(effects)
     return unless effects.is_a?(Hash)
 
-    dispatch_impulse(effects[:impulse]) if effects[:impulse]
-    dispatch_bloom_flash(effects[:bloom_flash]) if effects[:bloom_flash]
+    if effects[:impulse]
+      imp = effects[:impulse]
+      JSBridge.log("effect.type=impulse effect.bass=#{(imp[:bass] || 0.0).round(3)} effect.mid=#{(imp[:mid] || 0.0).round(3)} effect.high=#{(imp[:high] || 0.0).round(3)} effect.overall=#{(imp[:overall] || 0.0).round(3)}")
+      dispatch_impulse(imp)
+    end
+    if effects[:bloom_flash]
+      JSBridge.log("effect.type=bloom_flash effect.magnitude=#{effects[:bloom_flash].round(3)}")
+      dispatch_bloom_flash(effects[:bloom_flash])
+    end
     dispatch_set_param(effects[:set_param]) if effects[:set_param]
   end
 

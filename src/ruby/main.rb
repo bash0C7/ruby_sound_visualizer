@@ -68,6 +68,11 @@ class VisualizerApp
       app.on_exec_prompt(input)
     end
 
+    JS.global[:rubyVJHistoryAt] = lambda do |idx|
+      entry = app.vj_history_at(idx.to_i)
+      entry ? entry : ''
+    end
+
     JS.global[:rubyUpdateVisuals] = lambda do |freq_array, timestamp|
       app.update_visuals(freq_array, timestamp)
     end
@@ -106,6 +111,10 @@ class VisualizerApp
 
   def on_pen_up
     @pen_input.end_stroke
+  end
+
+  def vj_history_at(idx)
+    @vj_pad.history[-(idx + 1)]
   end
 
   def on_exec_prompt(input)

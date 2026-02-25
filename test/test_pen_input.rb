@@ -61,11 +61,11 @@ class TestPenInput < Test::Unit::TestCase
   end
 
   def test_max_strokes_limit
-    (PenInput::MAX_STROKES + 5).times do |i|
+    (VisualizerPolicy::PEN_MAX_STROKES + 5).times do |i|
       @pen.start_stroke(i.to_f, i.to_f)
       @pen.end_stroke
     end
-    assert @pen.strokes.length <= PenInput::MAX_STROKES
+    assert @pen.strokes.length <= VisualizerPolicy::PEN_MAX_STROKES
   end
 
   # --- Fade-out ---
@@ -78,7 +78,7 @@ class TestPenInput < Test::Unit::TestCase
   def test_stroke_fades_over_time
     @pen.start_stroke(100.0, 200.0)
     @pen.end_stroke
-    (PenInput::FADE_DURATION_FRAMES / 2).times { @pen.update }
+    (VisualizerPolicy::PEN_FADE_DURATION_FRAMES / 2).times { @pen.update }
     assert @pen.strokes[0].opacity < 1.0
     assert @pen.strokes[0].opacity > 0.0
   end
@@ -86,7 +86,7 @@ class TestPenInput < Test::Unit::TestCase
   def test_stroke_removed_after_full_fade
     @pen.start_stroke(100.0, 200.0)
     @pen.end_stroke
-    PenInput::FADE_DURATION_FRAMES.times { @pen.update }
+    VisualizerPolicy::PEN_FADE_DURATION_FRAMES.times { @pen.update }
     assert_equal 0, @pen.strokes.length
     assert_equal false, @pen.has_visible_strokes?
   end
@@ -165,7 +165,22 @@ class TestPenInput < Test::Unit::TestCase
   def test_has_visible_strokes_false_after_fade
     @pen.start_stroke(100.0, 200.0)
     @pen.end_stroke
-    (PenInput::FADE_DURATION_FRAMES + 1).times { @pen.update }
+    (VisualizerPolicy::PEN_FADE_DURATION_FRAMES + 1).times { @pen.update }
     assert_equal false, @pen.has_visible_strokes?
+  end
+
+  def test_constants_defined_in_visualizer_policy
+    assert_equal 180, VisualizerPolicy::PEN_FADE_DURATION_FRAMES
+    assert_in_delta 3.0, VisualizerPolicy::PEN_STROKE_WIDTH, 0.001
+    assert_equal 50, VisualizerPolicy::PEN_MAX_STROKES
+  end
+
+  def test_pen_input_uses_policy_constants
+    assert !defined?(PenInput::FADE_DURATION_FRAMES),
+           'PenInput::FADE_DURATION_FRAMES should be removed (use VisualizerPolicy)'
+    assert !defined?(PenInput::STROKE_WIDTH),
+           'PenInput::STROKE_WIDTH should be removed (use VisualizerPolicy)'
+    assert !defined?(PenInput::MAX_STROKES),
+           'PenInput::MAX_STROKES should be removed (use VisualizerPolicy)'
   end
 end

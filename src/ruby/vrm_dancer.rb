@@ -7,10 +7,6 @@ class VRMDancer
     rightUpperLeg rightLowerLeg
   ]
 
-  MOTION_SPEED = 4.0
-  ROTATION_AMPLIFY = 8.0
-  SMOOTHING_FACTOR = 8.0
-
   def initialize
     @time = 0.0
     @beat_phase = 0.0
@@ -43,7 +39,7 @@ class VRMDancer
     smoothed = apply_smoothing(rotations, delta)
 
     {
-      rotations: smoothed.map { |r| r * ROTATION_AMPLIFY },
+      rotations: smoothed.map { |r| r * VisualizerPolicy::VRM_ROTATION_AMPLIFY },
       hips_position_y: 0.0,
       blink: @blink_value,
       mouth_open_vertical: @mouth_open_vertical,
@@ -54,10 +50,10 @@ class VRMDancer
   private
 
   def update_phases(delta)
-    @beat_phase += delta * 0.8 * MOTION_SPEED
-    @sway_phase += delta * 0.5 * MOTION_SPEED
-    @head_nod_phase += delta * 1.2 * MOTION_SPEED
-    @step_phase += delta * Math::PI / 2.0 * MOTION_SPEED
+    @beat_phase += delta * 0.8 * VisualizerPolicy::VRM_MOTION_SPEED
+    @sway_phase += delta * 0.5 * VisualizerPolicy::VRM_MOTION_SPEED
+    @head_nod_phase += delta * 1.2 * VisualizerPolicy::VRM_MOTION_SPEED
+    @step_phase += delta * Math::PI / 2.0 * VisualizerPolicy::VRM_MOTION_SPEED
 
     arm_target = (Math.sin(@time * 0.8) + 1.0) * 0.10
     @arm_raise = MathHelper.lerp(@arm_raise, arm_target, 2.0 * delta)
@@ -174,7 +170,7 @@ class VRMDancer
 
   def apply_smoothing(rotations, delta)
     rotations.each_with_index.map do |target, i|
-      smoothed = MathHelper.lerp(@prev_rotations[i], target, SMOOTHING_FACTOR * delta)
+      smoothed = MathHelper.lerp(@prev_rotations[i], target, VisualizerPolicy::VRM_SMOOTHING_FACTOR * delta)
       @prev_rotations[i] = smoothed
       smoothed
     end

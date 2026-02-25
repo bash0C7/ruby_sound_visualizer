@@ -2,7 +2,7 @@
 # Receives frequency/duty data from PicoRuby via serial and tracks state
 # for Web Audio API oscillator updates. Pure Ruby state - no JavaScript calls.
 class SerialAudioSource
-  DEFAULT_VOLUME = 0.1
+  DEFAULT_VOLUME = 0.30
 
   attr_reader :frequency, :duty, :volume
 

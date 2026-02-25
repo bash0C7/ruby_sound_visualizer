@@ -15,6 +15,10 @@ module VisualizerPolicy
   BEAT_MIN_BASS = 0.25
   BEAT_MIN_MID = 0.20
   BEAT_MIN_HIGH = 0.20
+  BEAT_COOLDOWN_FRAMES = 3
+  BPM_HISTORY_LENGTH = 16
+  BPM_MIN = 40
+  BPM_MAX = 240
 
   # Smoothing
   VISUAL_SMOOTHING_FACTOR = 0.70
@@ -31,11 +35,40 @@ module VisualizerPolicy
   PARTICLE_FRICTION = 0.86
   PARTICLE_BOUNDARY = 10
   PARTICLE_SPAWN_RANGE = 5
+  PARTICLE_COLOR_CACHE_INTERVAL = 3
 
   # Geometry
   GEOMETRY_BASE_SCALE = 1.0
   GEOMETRY_SCALE_MULTIPLIER = 2.5
   GEOMETRY_MAX_EMISSIVE = 2.0
+  GEOMETRY_IMPULSE_SCALE          = 0.8
+  GEOMETRY_ROTATION_BASS          = 0.15
+  GEOMETRY_ROTATION_MID           = 0.10
+  GEOMETRY_ROTATION_HIGH          = 0.08
+  GEOMETRY_IMPULSE_ROTATION_BASS  = 0.5
+  GEOMETRY_IMPULSE_ROTATION_MID   = 0.4
+  GEOMETRY_IMPULSE_ROTATION_HIGH  = 0.3
+  GEOMETRY_EMISSIVE_SCALE         = 1.5
+  GEOMETRY_EMISSIVE_IMPULSE       = 0.8
+
+  # Color
+  COLOR_BASE_HUES = { 1 => 0.0, 2 => 60.0, 3 => 180.0 }.freeze
+  COLOR_HUE_RANGE = 140.0
+
+  # Pen
+  PEN_FADE_DURATION_FRAMES = 180
+  PEN_STROKE_WIDTH         = 3.0
+  PEN_MAX_STROKES          = 50
+
+  # WordArt
+  WORDART_ENTRANCE_FRAMES = 30
+  WORDART_SUSTAIN_FRAMES  = 180
+  WORDART_EXIT_FRAMES     = 45
+
+  # VRM
+  VRM_MOTION_SPEED     = 4.0
+  VRM_ROTATION_AMPLIFY = 8.0
+  VRM_SMOOTHING_FACTOR = 8.0
 
   # Bloom
   BLOOM_BASE_STRENGTH = 0.5
@@ -67,6 +100,9 @@ module VisualizerPolicy
     particle_friction:               { default: PARTICLE_FRICTION,            type: :float, min: 0.50, max: 0.99 },
     visual_smoothing:                { default: VISUAL_SMOOTHING_FACTOR,      type: :float, min: 0.0,  max: 0.99 },
     impulse_decay:                   { default: IMPULSE_DECAY_EFFECT,         type: :float, min: 0.50, max: 0.99 },
+    capture_overlay_opacity:         { default: 0.5,                          type: :float, min: 0.0,  max: 1.0  },
+    capture_video_opacity:           { default: 1.0,                          type: :float, min: 0.0,  max: 1.0  },
+    serial_audio_volume:             { default: 30,                           type: :int,   min: 0,    max: 100  },
   }.freeze
 
   # Auto-generate class variables, getters, and clamped setters
@@ -144,7 +180,10 @@ module VisualizerPolicy
     'max_emissive' => { min: 0.0, max: 4.0, type: :float, default: 2.0, group: 'Rendering', step: 0.1 },
     'visual_smoothing' => { min: 0.41, max: 0.99, type: :float, default: 0.70, group: 'Audio', step: 0.01 },
     'impulse_decay' => { min: 0.65, max: 0.99, type: :float, default: 0.82, group: 'Audio', step: 0.01 },
-    'exclude_max' => { min: 0, max: 1, type: :bool, default: false, group: 'Master', step: 1 }
+    'exclude_max' => { min: 0, max: 1, type: :bool, default: false, group: 'Master', step: 1 },
+    'capture_overlay_opacity' => { min: 0.0, max: 1.0, type: :float, default: 0.5, group: 'Capture', step: 0.01 },
+    'capture_video_opacity' => { min: 0.0, max: 1.0, type: :float, default: 1.0, group: 'Capture', step: 0.01 },
+    'serial_audio_volume' => { min: 0, max: 100, type: :int, default: 30, group: 'Serial', step: 1 }
   }.freeze
 
   def self.set_by_key(key, value)

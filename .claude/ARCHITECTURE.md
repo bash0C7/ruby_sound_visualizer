@@ -56,7 +56,7 @@ Ruby WASM VM
   - SerialManager.receive_data → SerialProtocol.extract_frames
   - Frequency frame detected (type: :frequency)
   - SerialAudioSource.update(freq, duty)  [legacy PWM path]
-  - SynthEngine.note_on(freq, duty)       [synth path]
+  - SynthPatch.note_on(freq, duty)         [synth path]
   ↓ pending_update? in main loop
 JavaScript
   - updateSynthAudio(freq, duty, active, gain, waveform, attack, decay,
@@ -75,17 +75,18 @@ JavaScript (oscilloscope)
 Three.js Rendering (renderOrder=999, foreground layer)
 ```
 
-## Synth Engine (Ruby)
+## SynthPatch (Ruby)
 
-`SynthEngine` manages analog monophonic synthesizer state:
+`SynthPatch` provides a DSL-based synthesizer patch system with node graph architecture:
 
-- **Waveform**: sine, square, sawtooth, triangle
-- **ADSR Envelope**: attack (0.001-5s), decay (0.001-5s), sustain (0-1), release (0.001-5s)
-- **Filter**: cutoff (20-20000 Hz), resonance/Q (0-30), type (lowpass/highpass/bandpass)
+- **Node types**: OscNode (sine/square/saw/tri), FMOpNode (FM modulation), FilterNode (biquad), GainNode, MixerNode
+- **ADSR Envelope**: attack, decay, sustain, release (configurable per patch)
+- **Filter**: cutoff, resonance/Q, type (lowpass/highpass/bandpass) via FilterNode
 - **Note control**: note_on(freq, duty) from serial, note_off on zero duty
-- **Pending update pattern**: same as SerialAudioSource for efficient JS bridge calls
+- **Graph compilation**: DSL builds node graph, compiles to JSON spec for WebAdapter (Web Audio API)
+- **Adapter pattern**: WebAdapter (production), MockAdapter (tests)
 
-VJ Pad commands: syn_w, syn_a, syn_d, syn_s, syn_r, syn_fc, syn_fq, syn_ft, syn_g, syn_i
+VJ Pad commands: sp_osc_w, sp_osc_freq, sp_a, sp_d, sp_s, sp_r, sp_co, sp_q, sp_ft, sp_gain, sp_i
 
 ## Oscilloscope Renderer (Ruby)
 
@@ -319,9 +320,9 @@ Ruby Code (lines Y-Z)
   ├── BloomController
   ├── AudioInputManager
   ├── SerialAudioSource
-  ├── SynthEngine (analog monophonic synth state)
+  ├── SynthPatch (DSL-based synth patch system)
   ├── OscilloscopeRenderer (3D waveform visualization state)
   ├── VisualizerPolicy (constants + mutable params)
-  ├── VJPad (DSL commands + VJSynthCommands)
+  ├── VJPad (DSL commands + VJSynthPatchCommands)
   └── Main (initialization & main loop)
 ```
