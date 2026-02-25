@@ -29,9 +29,7 @@ class SynthPatch
       self
     end
 
-    def fm_modulator
-      @fm_modulator
-    end
+    attr_reader :fm_modulator
 
     def filter(type, cutoff:, q: 1.0, name: nil)
       node = FilterNode.new(type, cutoff: cutoff, q: q, name: name)
@@ -64,7 +62,8 @@ class SynthPatch
     end
 
     def set_param(param, value)
-      raise RuntimeError, "Node not compiled yet. Call SynthPatch.build first." unless compiled?
+      raise 'Node not compiled yet. Call SynthPatch.build first.' unless compiled?
+
       @adapter.update_param(@name, param, value)
     end
 

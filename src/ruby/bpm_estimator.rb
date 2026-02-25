@@ -15,7 +15,9 @@ class BPMEstimator
 
   def record_beat(frame_number, fps: 30.0)
     @beat_times << frame_number
-    @beat_times = @beat_times.last(16) if @beat_times.length > 16
+    if @beat_times.length > VisualizerPolicy::BPM_HISTORY_LENGTH
+      @beat_times = @beat_times.last(VisualizerPolicy::BPM_HISTORY_LENGTH)
+    end
     recalculate(fps)
   end
 
@@ -35,6 +37,11 @@ class BPMEstimator
     return if avg_interval <= 0
 
     bpm = (60.0 / (avg_interval / fps)).round(0)
-    @estimated_bpm = (bpm >= 40 && bpm <= 240) ? bpm : 0
+    new_bpm = (bpm >= VisualizerPolicy::BPM_MIN && bpm <= VisualizerPolicy::BPM_MAX) ? bpm : 0
+    if new_bpm != @estimated_bpm && new_bpm > 0
+      interval_ms = (avg_interval / fps * 1000).round
+      JSBridge.log("audio.bpm=#{new_bpm} audio.beat.interval_ms=#{interval_ms} audio.beat.count=#{@beat_times.length}")
+    end
+    @estimated_bpm = new_bpm
   end
 end

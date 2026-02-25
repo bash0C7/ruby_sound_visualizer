@@ -78,7 +78,7 @@ class TestDebugFormatter < Test::Unit::TestCase
   def test_format_param_text_returns_empty_string
     formatter = DebugFormatter.new
     result = formatter.format_param_text
-    assert_equal "", result
+    assert_equal '', result
   end
 
   def test_format_key_guide_returns_string
@@ -121,7 +121,7 @@ class TestDebugFormatter < Test::Unit::TestCase
     manager = AudioInputManager.new
     formatter = DebugFormatter.new(manager)
     result = formatter.format_param_text
-    assert_equal "", result
+    assert_equal '', result
   end
 
   def test_format_key_guide_contains_mic_key
@@ -150,7 +150,7 @@ class TestDebugFormatter < Test::Unit::TestCase
     manager.mute_mic
     manager.switch_to_tab
     result = formatter.format_param_text
-    assert_equal "", result
+    assert_equal '', result
   end
 
   def test_debug_formatter_backward_compatibility_without_audio_input_manager

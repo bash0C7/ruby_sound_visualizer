@@ -71,6 +71,7 @@ class SynthPatch
 
   def note_off
     return unless @active
+
     @active = false
     @adapter.note_off
   end
@@ -78,6 +79,7 @@ class SynthPatch
   def check_timeout(current_ms:, threshold_ms: 200)
     return unless @active
     return unless @last_note_time
+
     note_off if (current_ms - @last_note_time) > threshold_ms
   end
 
@@ -109,7 +111,7 @@ class SynthPatch
     node_lines = @named_nodes.map { |_name, node| node.status_line }
     adsr_str = "adsr=#{@attack}/#{@decay}/#{@sustain}/#{@release}"
     active_str = "active=#{@active}"
-    (node_lines + [adsr_str, active_str]).join(" ")
+    (node_lines + [adsr_str, active_str]).join(' ')
   end
 
   def to_h
@@ -142,9 +144,7 @@ class SynthPatch
       end
 
       # Chain connections: node → first chain node (linear chain)
-      unless node.chain.empty?
-        spec[:connections] << { from: node.name.to_s, to: node.chain.first.name.to_s }
-      end
+      spec[:connections] << { from: node.name.to_s, to: node.chain.first.name.to_s } unless node.chain.empty?
 
       # Mixer input connections
       if node.respond_to?(:inputs)

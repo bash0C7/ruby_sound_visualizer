@@ -11,7 +11,6 @@
       "Bash(pgrep:*)",
       "Bash(git log:*)",
       "WebFetch(domain:pixiv.github.io)",
-      "Bash(git -C /Users/bash/dev/src/github.com/bash0C7/ruby_sound_visualizer log --oneline --all)",
       "Bash(ruby:*)",
       "Bash(rake test:*)",
       "Bash(bundle exec rake test:*)",
@@ -33,20 +32,8 @@
       "Bash(tee:*)",
       "Read(//private/tmp/**)",
       "WebFetch(domain:support.claude.com)",
-      "Read(//Users/bash/.claude/skills/commit/**)"
-    ]
-  },
-  "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "Edit|Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "cd /Users/bash/dev/src/github.com/bash0C7/ruby_sound_visualizer && bundle exec rake test 2>&1 | tail -8"
-          }
-        ]
-      }
+      "Read(//Users/bash/.claude/skills/commit/**)",
+      "Bash(bundle exec rubocop:*)"
     ]
   },
   "spinnerTipsEnabled": false,

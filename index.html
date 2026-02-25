@@ -552,10 +552,6 @@
     // Performance view mode (URL has ?perf=1)
     const IS_PERF_VIEW = new URLSearchParams(window.location.search).has('perf');
 
-    // Capture opacity state
-    let capOverlayOpacity = 0.5;
-    let capVideoOpacity   = 1.0;
-
     // Audio input state
     let micGain = null;
     let micDeviceId = null;  // null = default mic
@@ -994,7 +990,6 @@
     let _serialGain = null;
     let _serialOutputGain = null;
     let _serialAudioActive = false;
-    let _serialAudioVolume = 30;
 
     // Create PWM-like PeriodicWave from duty cycle (0-100)
     function createPWMWave(dutyCycle) {
@@ -1046,8 +1041,9 @@
     window.updateSerialAudio = function(freq, duty, active, volume) {
       // Sync slider display when volume changes from Ruby side
       const volPercent = Math.round(volume * 100);
-      if (volPercent !== _serialAudioVolume) {
-        _serialAudioVolume = volPercent;
+      const _prevVol = window.rubyConfigGet ? (window.rubyConfigGet('serial_audio_volume') || 30) : 30;
+      if (volPercent !== _prevVol) {
+        if (window.rubyConfigSet) window.rubyConfigSet('serial_audio_volume', volPercent);
         const slider = document.getElementById('cpSlider_serial_audio_volume');
         const valEl = document.getElementById('cpVal_serial_audio_volume');
         if (slider) slider.value = volPercent;
@@ -1601,8 +1597,8 @@
       if (!_perfChannel) return;
       // Always include ov/vv even if URL params are missing (e.g. fresh load before any slider move)
       const _bp = new URLSearchParams(window.location.search);
-      _bp.set('ov', capOverlayOpacity.toFixed(2));
-      _bp.set('vv', capVideoOpacity.toFixed(2));
+      _bp.set('ov', ((window.rubyConfigGet ? window.rubyConfigGet('capture_overlay_opacity') : 0.5) || 0.5).toFixed(2));
+      _bp.set('vv', ((window.rubyConfigGet ? window.rubyConfigGet('capture_video_opacity') : 1.0) || 1.0).toFixed(2));
       const qs = '?' + _bp.toString();
       _perfChannel.postMessage({ type: 'state', qs });
     }
@@ -1874,7 +1870,7 @@
           cameraRadius,
           Math.round(cameraTheta * 180 / Math.PI),
           Math.round(cameraPhi * 180 / Math.PI)
-        )) + '&ov=' + capOverlayOpacity.toFixed(2) + '&vv=' + capVideoOpacity.toFixed(2);
+        )) + '&ov=' + ((window.rubyConfigGet ? window.rubyConfigGet('capture_overlay_opacity') : 0.5) || 0.5).toFixed(2) + '&vv=' + ((window.rubyConfigGet ? window.rubyConfigGet('capture_video_opacity') : 1.0) || 1.0).toFixed(2);
         history.replaceState(null, '', window.location.pathname + qs);
         broadcastState();
       }, 500);
@@ -2222,10 +2218,7 @@
     }
 
     // Initialize everything (auto-start flow)
-    let _initCallCount = 0;
     async function init() {
-      _initCallCount++;
-      console.log('[JS] init() called, count=' + _initCallCount + ' stack=' + new Error().stack.split('\n').slice(1,4).join('|'));
       try {
         // Phase 1: Wait for Ruby WASM to finish loading
         updateLoadingStatus('Loading Ruby WASM...');
@@ -2294,8 +2287,8 @@
               const _p = new URLSearchParams(e.data.qs);
               const _ov = parseFloat(_p.get('ov'));
               const _vv = parseFloat(_p.get('vv'));
-              if (!isNaN(_ov)) { capOverlayOpacity = _ov; document.getElementById('tabOverlay').style.opacity = _ov; }
-              if (!isNaN(_vv)) { capVideoOpacity = _vv; document.getElementById('captureVideoMirror').style.opacity = _vv; }
+              if (!isNaN(_ov)) { if (window.rubyConfigSet) window.rubyConfigSet('capture_overlay_opacity', _ov); document.getElementById('tabOverlay').style.opacity = _ov; }
+              if (!isNaN(_vv)) { if (window.rubyConfigSet) window.rubyConfigSet('capture_video_opacity', _vv); document.getElementById('captureVideoMirror').style.opacity = _vv; }
               // Apply camera snapshot only when Ruby is ready
               if (window.rubySnapshotApply) {
                 const _snapRaw = String(window.rubySnapshotApply(e.data.qs) || '');
@@ -2328,15 +2321,13 @@
         controlPanelOpen = true;
 
         // VJ Pad section: minimal JS, all logic delegated to window.rubyExecPrompt (Ruby)
+        // History is managed by Ruby (VJPad#history). JS only tracks navigation index.
         const vjResult = document.getElementById('vjPromptResult');
-        const vjHistory = [];
         let vjHistoryIdx = -1;
 
         function vjExec(cmd) {
           cmd = (cmd || '').trim();
           if (!cmd) return;
-          vjHistory.unshift(cmd);
-          if (vjHistory.length > 50) vjHistory.pop();
           vjHistoryIdx = -1;
           let result = '';
           if (window.rubyExecPrompt) {
@@ -2356,13 +2347,16 @@
           if (e.key === 'Enter') { vjExec(this.value); this.value = ''; }
           else if (e.key === 'ArrowUp') {
             e.preventDefault();
-            if (vjHistory.length > 0 && vjHistoryIdx < vjHistory.length - 1) {
-              vjHistoryIdx++; this.value = vjHistory[vjHistoryIdx];
+            if (window.rubyVJHistoryAt) {
+              const cmd = window.rubyVJHistoryAt(vjHistoryIdx + 1);
+              if (cmd) { vjHistoryIdx++; this.value = cmd; }
             }
           } else if (e.key === 'ArrowDown') {
             e.preventDefault();
-            if (vjHistoryIdx > 0) { vjHistoryIdx--; this.value = vjHistory[vjHistoryIdx]; }
-            else { vjHistoryIdx = -1; this.value = ''; }
+            if (vjHistoryIdx > 0) {
+              vjHistoryIdx--;
+              this.value = window.rubyVJHistoryAt ? (window.rubyVJHistoryAt(vjHistoryIdx) || '') : '';
+            } else { vjHistoryIdx = -1; this.value = ''; }
           }
         });
         document.getElementById('cpVJExecBtn').addEventListener('click', () => {
@@ -2438,7 +2432,7 @@
         const _ov = parseFloat(_urlParams.get('ov'));
         const _vv = parseFloat(_urlParams.get('vv'));
         if (!isNaN(_ov)) {
-          capOverlayOpacity = _ov;
+          if (window.rubyConfigSet) window.rubyConfigSet('capture_overlay_opacity', _ov);
           document.getElementById('tabOverlay').style.opacity = _ov;
           const _ovSlider = document.getElementById('cpSlider_cap_overlay_opacity');
           const _ovVal = document.getElementById('cpVal_cap_overlay_opacity');
@@ -2446,7 +2440,7 @@
           if (_ovVal) _ovVal.textContent = _ov.toFixed(2);
         }
         if (!isNaN(_vv)) {
-          capVideoOpacity = _vv;
+          if (window.rubyConfigSet) window.rubyConfigSet('capture_video_opacity', _vv);
           document.getElementById('tabVideo').style.opacity = _vv;
           const _vvSlider = document.getElementById('cpSlider_cap_video_opacity');
           const _vvVal = document.getElementById('cpVal_cap_video_opacity');
@@ -2572,20 +2566,20 @@
       ],
       'Capture': [
         { key: 'cap_overlay_opacity', label: 'Overlay Opacity', min: 0, max: 1, step: 0.01, default: 0.5,
-          setter: v => { capOverlayOpacity = v; document.getElementById('tabOverlay').style.opacity = v; },
-          getter: () => capOverlayOpacity },
+          setter: v => { if (window.rubyConfigSet) window.rubyConfigSet('capture_overlay_opacity', v); document.getElementById('tabOverlay').style.opacity = v; },
+          getter: () => window.rubyConfigGet ? window.rubyConfigGet('capture_overlay_opacity') : 0.5 },
         { key: 'cap_video_opacity', label: 'Video Opacity', min: 0, max: 1, step: 0.01, default: 1.0,
-          setter: v => { capVideoOpacity = v; document.getElementById('tabVideo').style.opacity = v; },
-          getter: () => capVideoOpacity },
+          setter: v => { if (window.rubyConfigSet) window.rubyConfigSet('capture_video_opacity', v); document.getElementById('tabVideo').style.opacity = v; },
+          getter: () => window.rubyConfigGet ? window.rubyConfigGet('capture_video_opacity') : 1.0 },
         { key: 'tab_audio_gain', label: 'Tab Audio Vol', min: 0.0, max: 2.0, step: 0.1, default: 1.0,
           setter: v => { if (tabAudioGain) tabAudioGain.gain.value = v; },
           getter: () => tabAudioGain ? tabAudioGain.gain.value : 1.0 },
         { key: 'cam_mic_gain', label: 'Cam Mic Vol', min: 0.0, max: 2.0, step: 0.1, default: 1.0,
           setter: v => { if (camMicGain) camMicGain.gain.value = v; },
           getter: () => camMicGain ? camMicGain.gain.value : 1.0 },
-        { key: 'serial_audio_volume', label: 'PWM Volume', min: 0, max: 100, step: 1, default: 10,
-          setter: v => { _serialAudioVolume = v; if (window.rubyExecPrompt) window.rubyExecPrompt('sav ' + Math.round(v)); },
-          getter: () => _serialAudioVolume },
+        { key: 'serial_audio_volume', label: 'PWM Volume', min: 0, max: 100, step: 1, default: 30,
+          setter: v => { if (window.rubyConfigSet) window.rubyConfigSet('serial_audio_volume', Math.round(v)); if (window.rubyExecPrompt) window.rubyExecPrompt('sav ' + Math.round(v)); },
+          getter: () => window.rubyConfigGet ? window.rubyConfigGet('serial_audio_volume') : 30 },
       ],
     };
 

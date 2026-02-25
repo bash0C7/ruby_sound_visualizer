@@ -21,10 +21,8 @@ class OscilloscopeRenderer
   # Default green oscilloscope color
   DEFAULT_COLOR = [0.0, 1.0, 0.4].freeze
 
-  attr_reader :buffer_size, :waveform_buffer, :scroll_offset, :intensity
-  attr_reader :color, :scroll_speed, :ribbon_width, :ribbon_height
-  attr_reader :z_position, :y_position, :history_depth
-  attr_reader :tube_radius, :spark_intensity, :spark_color
+  attr_reader :buffer_size, :waveform_buffer, :scroll_offset, :intensity, :color, :scroll_speed, :ribbon_width,
+              :ribbon_height, :z_position, :y_position, :history_depth, :tube_radius, :spark_intensity, :spark_color
 
   def initialize(buffer_size: DEFAULT_BUFFER_SIZE, history_depth: DEFAULT_HISTORY_DEPTH)
     @buffer_size = buffer_size
@@ -132,7 +130,7 @@ class OscilloscopeRenderer
   end
 
   def status
-    state = @enabled ? "on" : "off"
+    state = @enabled ? 'on' : 'off'
     "oscilloscope: #{state} speed=#{@scroll_speed} intensity=#{@intensity.round(2)} " \
       "history=#{@history.length}/#{@history_depth}"
   end

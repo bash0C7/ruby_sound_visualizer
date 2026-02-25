@@ -500,4 +500,8 @@ class TestAudioAnalyzer < Test::Unit::TestCase
     assert bass_beat_detected || high_beat_detected,
       "Beat detection should work for separate frequency bands"
   end
+
+  def test_beat_cooldown_frames_constant_in_policy
+    assert_equal 3, VisualizerPolicy::BEAT_COOLDOWN_FRAMES
+  end
 end

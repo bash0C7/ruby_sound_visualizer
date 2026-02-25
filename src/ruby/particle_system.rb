@@ -9,7 +9,7 @@ class ParticleSystem
       }
     end
     @color_cache_counter = 0
-    @color_cache_interval = 3
+    @color_cache_interval = VisualizerPolicy::PARTICLE_COLOR_CACHE_INTERVAL
   end
 
   def update(analysis)
@@ -33,6 +33,8 @@ class ParticleSystem
     explosion_probability = [explosion_probability + 0.3 * imp_overall, 0.9].min
     explosion_force += 0.35 * imp_overall
 
+    explosions = { bass: 0, mid: 0, high: 0 }
+
     @particles.each_with_index do |particle, idx|
       freq_type = idx % 3
 
@@ -43,6 +45,7 @@ class ParticleSystem
           direction = normalize_vector(particle[:position])
           force = explosion_force * (2.0 + imp_bass * 1.0)
           particle[:velocity] = direction.map { |d| d * force }
+          explosions[:bass] += 1
         end
 
       when 1  # mid: spiral motion
@@ -55,6 +58,7 @@ class ParticleSystem
             force,
             Math.sin(angle) * force
           ]
+          explosions[:mid] += 1
         end
 
       when 2  # high: upward burst
@@ -66,6 +70,7 @@ class ParticleSystem
             force,
             rand_range(-explosion_force, explosion_force) * 0.5
           ]
+          explosions[:high] += 1
         end
       end
 
@@ -93,6 +98,10 @@ class ParticleSystem
           particle[:velocity][i] = 0
         end
       end
+    end
+
+    if explosions[:bass] + explosions[:mid] + explosions[:high] > 0
+      JSBridge.log("particle.explosion.bass=#{explosions[:bass]} particle.explosion.mid=#{explosions[:mid]} particle.explosion.high=#{explosions[:high]} particle.explosion.force=#{explosion_force.round(3)}")
     end
 
     @color_cache_counter = (@color_cache_counter + 1) % @color_cache_interval

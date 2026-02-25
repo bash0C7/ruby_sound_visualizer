@@ -218,4 +218,16 @@ class TestColorPalette < Test::Unit::TestCase
     half_range = color_half.max - color_half.min
     assert full_range > half_range, "Full saturation should have wider color range"
   end
+
+  def test_constants_defined_in_visualizer_policy
+    assert_equal({ 1 => 0.0, 2 => 60.0, 3 => 180.0 }, VisualizerPolicy::COLOR_BASE_HUES)
+    assert_in_delta 140.0, VisualizerPolicy::COLOR_HUE_RANGE, 0.001
+  end
+
+  def test_color_palette_uses_policy_constants
+    assert !defined?(ColorPalette::BASE_HUES),
+           'ColorPalette::BASE_HUES should be removed (use VisualizerPolicy)'
+    assert !defined?(ColorPalette::HUE_RANGE),
+           'ColorPalette::HUE_RANGE should be removed (use VisualizerPolicy)'
+  end
 end

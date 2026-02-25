@@ -201,3 +201,42 @@ class TestSerialManager < Test::Unit::TestCase
     assert_match(/38400/, result)
   end
 end
+
+class TestSerialManagerLogging < Test::Unit::TestCase
+  def setup
+    @manager = SerialManager.new
+    @log_messages = []
+    captured = @log_messages
+    mock_console = Object.new
+    mock_console.define_singleton_method(:log) { |msg| captured << msg.to_s }
+    mock_console.define_singleton_method(:error) { |msg| }
+    JS.global['console'] = mock_console
+  end
+
+  def teardown
+    JS.reset_global!
+  end
+
+  def test_logs_on_connect
+    @manager.on_connect(115_200)
+    ruby_logs = @log_messages.select { |m| m.include?('[Ruby]') }
+    assert ruby_logs.any? { |m| m.include?('serial.state=connected') },
+           "Expected log with serial.state=connected, got: #{ruby_logs.inspect}"
+  end
+
+  def test_connect_log_includes_baud_rate
+    @manager.on_connect(38_400)
+    ruby_logs = @log_messages.select { |m| m.include?('[Ruby]') }
+    assert ruby_logs.any? { |m| m.include?('serial.baud_rate=38400') },
+           "Expected log with serial.baud_rate=38400, got: #{ruby_logs.inspect}"
+  end
+
+  def test_logs_on_disconnect
+    @manager.on_connect(115_200)
+    @log_messages.clear
+    @manager.on_disconnect
+    ruby_logs = @log_messages.select { |m| m.include?('[Ruby]') }
+    assert ruby_logs.any? { |m| m.include?('serial.state=disconnected') },
+           "Expected log with serial.state=disconnected, got: #{ruby_logs.inspect}"
+  end
+end
