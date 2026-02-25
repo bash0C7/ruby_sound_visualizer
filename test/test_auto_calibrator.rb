@@ -72,10 +72,10 @@ class TestAutoCalibrator < Test::Unit::TestCase
   def test_calculate_includes_key_params
     measurements = Array.new(100) { make_measurement(overall: 0.3) }
     result = @calibrator.calculate(measurements)
-    assert result.key?('input_gain'), "Should include input_gain"
-    assert result.key?('sensitivity'), "Should include sensitivity"
-    assert result.key?('bloom_base_strength'), "Should include bloom_base_strength"
-    assert result.key?('bloom_energy_scale'), "Should include bloom_energy_scale"
+    assert result.key?('input_gain'), 'Should include input_gain'
+    assert result.key?('sensitivity'), 'Should include sensitivity'
+    assert result.key?('bloom_base_strength'), 'Should include bloom_base_strength'
+    assert result.key?('bloom_energy_scale'), 'Should include bloom_energy_scale'
   end
 
   def test_calculate_silent_input_boosts_gain
@@ -94,7 +94,7 @@ class TestAutoCalibrator < Test::Unit::TestCase
     measurements = Array.new(100) { make_measurement(overall: AutoCalibrator::TARGET_ENERGY) }
     result = @calibrator.calculate(measurements)
     assert_in_delta 0.0, result['input_gain'], 3.0,
-      "Medium input should have near-zero gain, got #{result['input_gain']}"
+                    "Medium input should have near-zero gain, got #{result['input_gain']}"
   end
 
   def test_calculate_params_within_valid_ranges
@@ -104,14 +104,15 @@ class TestAutoCalibrator < Test::Unit::TestCase
 
       VisualizerPolicy::RUNTIME_PARAMS.each do |name, spec|
         next unless result.key?(name.to_s)
+
         val = result[name.to_s]
         if spec[:min]
           assert val >= spec[:min],
-            "#{name}=#{val} below min #{spec[:min]} for energy=#{energy}"
+                 "#{name}=#{val} below min #{spec[:min]} for energy=#{energy}"
         end
         if spec[:max]
           assert val <= spec[:max],
-            "#{name}=#{val} above max #{spec[:max]} for energy=#{energy}"
+                 "#{name}=#{val} above max #{spec[:max]} for energy=#{energy}"
         end
       end
     end
@@ -141,16 +142,16 @@ class TestAutoCalibrator < Test::Unit::TestCase
   def test_apply_baseline_sets_policy_params
     complete_calibration(0.1)
     result = @calibrator.apply_baseline
-    assert result.length > 0, "Should return changed params"
+    assert result.length > 0, 'Should return changed params'
     assert_in_delta result['input_gain'], VisualizerPolicy.input_gain, 0.01,
-      "apply_baseline should set VisualizerPolicy.input_gain"
+                    'apply_baseline should set VisualizerPolicy.input_gain'
   end
 
   def test_apply_baseline_quiet_input_boosts_gain
     complete_calibration(0.05)
     @calibrator.apply_baseline
     assert VisualizerPolicy.input_gain > 0.0,
-      "Quiet input should boost gain, got #{VisualizerPolicy.input_gain}"
+           "Quiet input should boost gain, got #{VisualizerPolicy.input_gain}"
   end
 
   def test_apply_baseline_returns_valid_policy_keys
@@ -158,7 +159,7 @@ class TestAutoCalibrator < Test::Unit::TestCase
     result = @calibrator.apply_baseline
     result.each_key do |key|
       assert VisualizerPolicy::MUTABLE_KEYS.key?(key),
-        "Changed param '#{key}' should be a valid MUTABLE_KEYS entry"
+             "Changed param '#{key}' should be a valid MUTABLE_KEYS entry"
     end
   end
 
@@ -173,7 +174,7 @@ class TestAutoCalibrator < Test::Unit::TestCase
     result = @calibrator.intensity_params(0, baseline)
     baseline.each do |key, val|
       assert_in_delta val, result[key], 0.001,
-        "Level 0 should match baseline for #{key}"
+                      "Level 0 should match baseline for #{key}"
     end
   end
 
@@ -185,9 +186,9 @@ class TestAutoCalibrator < Test::Unit::TestCase
     }
     result = @calibrator.intensity_params(3, baseline)
     assert result['bloom_base_strength'] > baseline['bloom_base_strength'],
-      "Positive intensity should increase bloom_base_strength"
+           'Positive intensity should increase bloom_base_strength'
     assert result['max_emissive'] > baseline['max_emissive'],
-      "Positive intensity should increase max_emissive"
+           'Positive intensity should increase max_emissive'
   end
 
   def test_intensity_negative_decreases_bloom
@@ -198,9 +199,9 @@ class TestAutoCalibrator < Test::Unit::TestCase
     }
     result = @calibrator.intensity_params(-3, baseline)
     assert result['bloom_base_strength'] < baseline['bloom_base_strength'],
-      "Negative intensity should decrease bloom_base_strength"
+           'Negative intensity should decrease bloom_base_strength'
     assert result['max_emissive'] < baseline['max_emissive'],
-      "Negative intensity should decrease max_emissive"
+           'Negative intensity should decrease max_emissive'
   end
 
   def test_intensity_clamped_to_range
@@ -225,13 +226,14 @@ class TestAutoCalibrator < Test::Unit::TestCase
       result.each do |key, val|
         spec = VisualizerPolicy::RUNTIME_PARAMS[key.to_sym]
         next unless spec
+
         if spec[:min]
           assert val >= spec[:min],
-            "#{key}=#{val} below min #{spec[:min]} at level #{level}"
+                 "#{key}=#{val} below min #{spec[:min]} at level #{level}"
         end
         if spec[:max]
           assert val <= spec[:max],
-            "#{key}=#{val} above max #{spec[:max]} at level #{level}"
+                 "#{key}=#{val} above max #{spec[:max]} at level #{level}"
         end
       end
     end
@@ -247,7 +249,7 @@ class TestAutoCalibrator < Test::Unit::TestCase
     (-5..5).each do |level|
       result = @calibrator.intensity_params(level, baseline)
       assert result['bloom_base_strength'] >= prev_bloom,
-        "bloom_base_strength should increase with level (level=#{level})"
+             "bloom_base_strength should increase with level (level=#{level})"
       prev_bloom = result['bloom_base_strength']
     end
   end
@@ -258,7 +260,24 @@ class TestAutoCalibrator < Test::Unit::TestCase
     original_emissive = VisualizerPolicy.max_emissive
     @calibrator.set_intensity(5)
     assert VisualizerPolicy.max_emissive >= original_emissive,
-      "Intensity +5 should increase max_emissive"
+           'Intensity +5 should increase max_emissive'
+  end
+
+  def test_set_intensity_after_calibration_updates_all_intensity_keys
+    complete_calibration(0.3)
+    @calibrator.apply_baseline
+    original_emissive = VisualizerPolicy.max_emissive
+    original_impulse_scale = VisualizerPolicy.bloom_impulse_scale
+    original_impulse_decay = VisualizerPolicy.impulse_decay
+
+    @calibrator.set_intensity(5)
+
+    assert VisualizerPolicy.max_emissive > original_emissive,
+           'Intensity +5 after calibration should increase max_emissive'
+    assert VisualizerPolicy.bloom_impulse_scale > original_impulse_scale,
+           'Intensity +5 after calibration should increase bloom_impulse_scale'
+    assert VisualizerPolicy.impulse_decay > original_impulse_decay,
+           'Intensity +5 after calibration should increase impulse_decay'
   end
 
   def test_set_intensity_works_without_calibration
@@ -274,7 +293,7 @@ class TestAutoCalibrator < Test::Unit::TestCase
     assert_equal 1, params[:hue_mode]
     assert_in_delta 0.0, params[:hue_offset], 1.0
     assert_equal 100, params[:max_saturation]
-    assert params[:max_emissive] > 2.0, "Vivid red should have high emissive"
+    assert params[:max_emissive] > 2.0, 'Vivid red should have high emissive'
   end
 
   def test_mood_yellow_preset
@@ -303,7 +322,7 @@ class TestAutoCalibrator < Test::Unit::TestCase
   def test_mood_neon_preset
     params = AutoCalibrator.mood_params(:neon)
     assert_equal 100, params[:max_saturation]
-    assert params[:max_emissive] >= 3.5, "Neon should have very high emissive"
+    assert params[:max_emissive] >= 3.5, 'Neon should have very high emissive'
     assert_equal 255, params[:max_brightness]
   end
 
@@ -313,7 +332,7 @@ class TestAutoCalibrator < Test::Unit::TestCase
   end
 
   def test_mood_all_presets_have_required_keys
-    [:red, :yellow, :green, :blue, :neon].each do |mood|
+    %i[red yellow green blue neon].each do |mood|
       params = AutoCalibrator.mood_params(mood)
       assert params.key?(:hue_mode), "#{mood} should have :hue_mode"
       assert params.key?(:max_saturation), "#{mood} should have :max_saturation"
@@ -354,11 +373,11 @@ class TestAutoCalibrator < Test::Unit::TestCase
     end
 
     assert_equal :done, @calibrator.state
-    result = @calibrator.apply_baseline
+    @calibrator.apply_baseline
 
     # Quiet input should have boosted gain
     assert VisualizerPolicy.input_gain > 0.0,
-      "Quiet input should boost gain, got #{VisualizerPolicy.input_gain}"
+           "Quiet input should boost gain, got #{VisualizerPolicy.input_gain}"
 
     # Intensity adjustment should work after calibration
     @calibrator.set_intensity(3)

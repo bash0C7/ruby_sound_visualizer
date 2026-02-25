@@ -1,15 +1,15 @@
 class AutoCalibrator
-  MEASUREMENT_DURATION_FRAMES = 600  # ~10 seconds at 60fps
+  MEASUREMENT_DURATION_FRAMES = 600 # ~10 seconds at 60fps
   TARGET_ENERGY = 0.35
 
   # Per-level adjustment amounts for intensity macro (-5..+5)
   INTENSITY_ADJUSTMENTS = {
     'bloom_base_strength' => 0.15,
-    'bloom_energy_scale'  => 0.20,
+    'bloom_energy_scale' => 0.20,
     'bloom_impulse_scale' => 0.15,
-    'max_emissive'        => 0.30,
+    'max_emissive' => 0.30,
     'particle_explosion_base_prob' => 0.03,
-    'impulse_decay'       => 0.02,
+    'impulse_decay' => 0.02
   }.freeze
 
   # Vivid color mood presets
@@ -38,7 +38,7 @@ class AutoCalibrator
       hue_mode: 1, hue_offset: 0.0,
       max_saturation: 100, max_brightness: 255, max_lightness: 255,
       max_emissive: 4.0, bloom_energy_scale: 3.0
-    },
+    }
   }.freeze
 
   attr_reader :state, :progress, :baseline_params, :intensity_level
@@ -72,10 +72,10 @@ class AutoCalibrator
 
     @progress = @measurements.length.to_f / MEASUREMENT_DURATION_FRAMES
 
-    if @measurements.length >= MEASUREMENT_DURATION_FRAMES
-      @baseline_params = calculate(@measurements)
-      @state = :done
-    end
+    return unless @measurements.length >= MEASUREMENT_DURATION_FRAMES
+
+    @baseline_params = calculate(@measurements)
+    @state = :done
   end
 
   # Pure function: measurements array -> parameter hash (no side effects)
@@ -83,9 +83,6 @@ class AutoCalibrator
     return {} if measurements.empty?
 
     avg_overall = average(measurements.map { |m| m[:overall] })
-    avg_bass = average(measurements.map { |m| m[:bass] })
-    avg_mid = average(measurements.map { |m| m[:mid] })
-    avg_high = average(measurements.map { |m| m[:high] })
     peak_overall = measurements.map { |m| m[:overall] }.max
 
     # Input gain: normalize average energy to TARGET_ENERGY
@@ -107,12 +104,13 @@ class AutoCalibrator
       'sensitivity' => clamp_param(:sensitivity, sensitivity),
       'bloom_base_strength' => clamp_param(:bloom_base_strength, bloom_base),
       'bloom_energy_scale' => clamp_param(:bloom_energy_scale, bloom_energy_scale),
-      'particle_explosion_base_prob' => clamp_param(:particle_explosion_base_prob, particle_prob),
+      'particle_explosion_base_prob' => clamp_param(:particle_explosion_base_prob, particle_prob)
     }
   end
 
   def apply_baseline
     return {} unless @state == :done
+
     apply(@baseline_params)
     @baseline_params
   end
@@ -126,7 +124,7 @@ class AutoCalibrator
   def set_intensity(level)
     level = [[-5, level].max, 5].min
     @intensity_level = level
-    base = @baseline_params.empty? ? default_baseline : @baseline_params
+    base = default_baseline.merge(@baseline_params)
     params = intensity_params(level, base)
     apply(params)
     params
@@ -138,6 +136,7 @@ class AutoCalibrator
     INTENSITY_ADJUSTMENTS.each do |key, step|
       base_val = baseline[key]
       next unless base_val
+
       adjusted = base_val + (step * level)
       result[key] = clamp_param(key.to_sym, adjusted)
     end
@@ -156,8 +155,8 @@ class AutoCalibrator
     ColorPalette.set_hue_mode(params[:hue_mode])
     ColorPalette.set_hue_offset(params[:hue_offset]) if params[:hue_offset]
 
-    policy_keys = [:max_saturation, :max_brightness, :max_lightness,
-                   :max_emissive, :bloom_energy_scale]
+    policy_keys = %i[max_saturation max_brightness max_lightness
+                     max_emissive bloom_energy_scale]
     policy_keys.each do |key|
       VisualizerPolicy.send(:"#{key}=", params[key]) if params[key]
     end
@@ -169,12 +168,14 @@ class AutoCalibrator
 
   def average(values)
     return 0.0 if values.empty?
+
     values.sum / values.length.to_f
   end
 
   def calculate_input_gain(avg_energy)
     # Avoid log of zero
     return 20.0 if avg_energy < 0.001
+
     20.0 * Math.log10(TARGET_ENERGY / avg_energy)
   end
 
@@ -230,6 +231,7 @@ class AutoCalibrator
   def clamp_param(name, value)
     spec = VisualizerPolicy::RUNTIME_PARAMS[name.to_sym]
     return value unless spec
+
     val = value.to_f
     val = [val, spec[:min]].max if spec[:min]
     val = [val, spec[:max]].min if spec[:max]

@@ -2372,8 +2372,6 @@
         // --- Auto Tune section ---
         window.syncSlidersFromRuby = function() {
           syncControlPanelValues();
-          // Also sync hue wheel from Ruby state
-          if (typeof initHueWheel === 'function') initHueWheel();
         };
 
         document.getElementById('cpCalBtn').addEventListener('click', () => {
@@ -2586,6 +2584,8 @@
     function initHueWheel() {
       const canvas = document.getElementById('hueWheel');
       if (!canvas) return;
+      if (canvas.dataset.hueWheelReady) return;
+      canvas.dataset.hueWheelReady = 'true';
       const ctx = canvas.getContext('2d');
       const cx = canvas.width / 2;
       const cy = canvas.height / 2;
