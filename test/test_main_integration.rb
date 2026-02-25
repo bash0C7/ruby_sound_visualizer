@@ -9,7 +9,7 @@ class TestMainIntegration < Test::Unit::TestCase
   end
 
   def test_all_components_can_be_initialized
-    # Verify all components can be created without errors
+    # Verify all components can be created without errors (16 components)
     audio_analyzer = AudioAnalyzer.new
     audio_input_manager = AudioInputManager.new
     effect_manager = EffectManager.new
@@ -20,6 +20,21 @@ class TestMainIntegration < Test::Unit::TestCase
     bpm_estimator = BPMEstimator.new
     frame_counter = FrameCounter.new
     vj_pad = VJPad.new(audio_input_manager)
+    effect_dispatcher = EffectDispatcher.new(effect_manager)
+    serial_manager = SerialManager.new
+    serial_audio_source = SerialAudioSource.new
+    oscilloscope_renderer = OscilloscopeRenderer.new
+    pen_input = PenInput.new
+    wordart_renderer = WordartRenderer.new
+    synth_patch = SynthPatch.build(adapter: SynthPatch::MockAdapter.new) do |syn|
+      mod     = syn.fm_op(:sine, freq: 220, amp: 80, name: :mod)
+      carrier = syn.fm_op(:sine, freq: 440, name: :carrier).fm(mod)
+      sub     = syn.osc(:sawtooth, freq: 220, name: :sub)
+      syn.mix(carrier, sub, name: :mixer)
+         .filter(:lowpass, cutoff: 1200, q: 0.9, name: :main_filter)
+         .gain(0.35, name: :master_gain)
+         .out
+    end
 
     assert_not_nil audio_analyzer
     assert_not_nil audio_input_manager
@@ -31,6 +46,13 @@ class TestMainIntegration < Test::Unit::TestCase
     assert_not_nil bpm_estimator
     assert_not_nil frame_counter
     assert_not_nil vj_pad
+    assert_not_nil effect_dispatcher
+    assert_not_nil serial_manager
+    assert_not_nil serial_audio_source
+    assert_not_nil oscilloscope_renderer
+    assert_not_nil pen_input
+    assert_not_nil wordart_renderer
+    assert_not_nil synth_patch
   end
 
   def test_audio_input_manager_wiring_to_keyboard_handler
@@ -200,5 +222,102 @@ class TestMainIntegration < Test::Unit::TestCase
 
     # Verify BPM estimation (i=30, 60, 90 -> 3 beats recorded)
     assert bpm_estimator.estimated_bpm > 0, "BPM should be estimated after recording 3+ beats"
+  end
+
+  def test_synth_patch_initialization_in_app_context
+    # Verify SynthPatch with main.rb FM config works in integration context
+    adapter = SynthPatch::MockAdapter.new
+    patch = SynthPatch.build(adapter: adapter) do |syn|
+      mod     = syn.fm_op(:sine, freq: 220, amp: 80, name: :mod)
+      carrier = syn.fm_op(:sine, freq: 440, name: :carrier).fm(mod)
+      sub     = syn.osc(:sawtooth, freq: 220, name: :sub)
+      syn.mix(carrier, sub, name: :mixer)
+         .filter(:lowpass, cutoff: 1200, q: 0.9, name: :main_filter)
+         .gain(0.35, name: :master_gain)
+         .out
+    end
+
+    # Verify all 6 named nodes exist
+    assert_not_nil patch[:mod],         "mod node should exist"
+    assert_not_nil patch[:carrier],     "carrier node should exist"
+    assert_not_nil patch[:sub],         "sub node should exist"
+    assert_not_nil patch[:mixer],       "mixer node should exist"
+    assert_not_nil patch[:main_filter], "main_filter node should exist"
+    assert_not_nil patch[:master_gain], "master_gain node should exist"
+
+    # Verify compiled spec has FM connections
+    spec = JSON.parse(adapter.graph_spec)
+    refute spec['fm_connections'].empty?, "FM connections should be present"
+
+    # Verify output node
+    assert_equal 'master_gain', spec['output_node']
+
+    # Verify note_on / note_off work without errors
+    assert_nothing_raised { patch.note_on(440, 100) }
+    assert patch.active?
+    assert_nothing_raised { patch.note_off }
+    refute patch.active?
+  end
+
+  def test_vj_pad_with_all_dependencies_including_synth
+    # Build the same SynthPatch as main.rb
+    serial_manager = SerialManager.new
+    serial_audio_source = SerialAudioSource.new
+    oscilloscope_renderer = OscilloscopeRenderer.new
+    wordart_renderer = WordartRenderer.new
+    pen_input = PenInput.new
+    synth_patch = SynthPatch.build(adapter: SynthPatch::MockAdapter.new) do |syn|
+      mod     = syn.fm_op(:sine, freq: 220, amp: 80, name: :mod)
+      carrier = syn.fm_op(:sine, freq: 440, name: :carrier).fm(mod)
+      sub     = syn.osc(:sawtooth, freq: 220, name: :sub)
+      syn.mix(carrier, sub, name: :mixer)
+         .filter(:lowpass, cutoff: 1200, q: 0.9, name: :main_filter)
+         .gain(0.35, name: :master_gain)
+         .out
+    end
+
+    vj_pad = VJPad.new(nil,
+                       serial_manager: serial_manager,
+                       serial_audio_source: serial_audio_source,
+                       oscilloscope_renderer: oscilloscope_renderer,
+                       wordart_renderer: wordart_renderer,
+                       pen_input: pen_input,
+                       synth_patch: synth_patch)
+
+    # sp_i should return patch status
+    result = vj_pad.exec("sp_i")
+    assert result[:ok], "sp_i should succeed: #{result[:msg]}"
+
+    # sp_co should update filter cutoff
+    result2 = vj_pad.exec("sp_co 3000")
+    assert result2[:ok], "sp_co should succeed: #{result2[:msg]}"
+    assert_match(/3000/, result2[:msg])
+  end
+
+  def test_phase_m_runtime_params_exist_with_correct_defaults
+    # Verify Phase M 6 new parameters have correct defaults
+    assert_in_delta 2.5, VisualizerPolicy.bloom_strength_scale,    0.001
+    assert_in_delta 2.0, VisualizerPolicy.bloom_flash_multiplier,  0.001
+    assert_in_delta 0.5, VisualizerPolicy.capture_overlay_opacity, 0.001
+    assert_in_delta 1.0, VisualizerPolicy.capture_video_opacity,   0.001
+    assert_equal 30,  VisualizerPolicy.serial_audio_volume
+    assert_equal 100, VisualizerPolicy.max_saturation
+
+    # Verify clamping works (bloom_strength_scale min: 0.0)
+    VisualizerPolicy.bloom_strength_scale = -99.0
+    assert_in_delta 0.0, VisualizerPolicy.bloom_strength_scale, 0.001
+
+    # Reset for other tests
+    VisualizerPolicy.reset_runtime
+  end
+
+  def test_visualizer_policy_mutable_keys_matches_runtime_params
+    # Structural consistency: MUTABLE_KEYS and RUNTIME_PARAMS must have same key set
+    runtime_keys = VisualizerPolicy::RUNTIME_PARAMS.keys.map(&:to_s).sort
+    mutable_keys = VisualizerPolicy::MUTABLE_KEYS.keys.sort
+    assert_equal runtime_keys, mutable_keys,
+      "MUTABLE_KEYS and RUNTIME_PARAMS key sets must match. " \
+      "Only in RUNTIME_PARAMS: #{(runtime_keys - mutable_keys).inspect}. " \
+      "Only in MUTABLE_KEYS: #{(mutable_keys - runtime_keys).inspect}"
   end
 end

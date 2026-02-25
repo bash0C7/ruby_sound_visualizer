@@ -20,7 +20,7 @@ class TestSerialAudioSource < Test::Unit::TestCase
   end
 
   def test_initial_volume
-    assert_in_delta 0.1, @source.volume, 0.01
+    assert_in_delta 0.30, @source.volume, 0.01
   end
 
   # --- Start/Stop ---
@@ -111,7 +111,7 @@ class TestSerialAudioSource < Test::Unit::TestCase
     assert_equal 880, data[:frequency]
     assert_equal 75, data[:duty]
     assert_equal true, data[:active]
-    assert_in_delta 0.1, data[:volume], 0.01
+    assert_in_delta 0.30, data[:volume], 0.01
   end
 
   def test_consume_update_after_stop_returns_inactive
