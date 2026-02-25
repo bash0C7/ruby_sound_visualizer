@@ -28,13 +28,15 @@ class VisualizerApp
          .gain(0.35, name: :master_gain)
          .out
     end
+    @auto_calibrator = AutoCalibrator.new
     @vj_pad = VJPad.new(@audio_input_manager,
                         serial_manager: @serial_manager,
                         serial_audio_source: @serial_audio_source,
                         oscilloscope_renderer: @oscilloscope_renderer,
                         wordart_renderer: @wordart_renderer,
                         pen_input: @pen_input,
-                        synth_patch: @synth_patch)
+                        synth_patch: @synth_patch,
+                        auto_calibrator: @auto_calibrator)
   end
 
   def register_callbacks
@@ -130,6 +132,7 @@ class VisualizerApp
 
     dispatch_vj_actions
     analysis = analyze_audio(freq_array)
+    update_calibration(analysis)
     update_effects(analysis)
     update_vrm(analysis)
     update_serial(analysis)
@@ -147,6 +150,24 @@ class VisualizerApp
   def dispatch_vj_actions
     @vj_pad.consume_actions.each do |action|
       @effect_dispatcher.dispatch(action[:effects]) if action[:effects]
+    end
+  end
+
+  def update_calibration(analysis)
+    return unless @auto_calibrator.state == :measuring
+
+    @auto_calibrator.feed(analysis)
+
+    # Report progress to UI
+    pct = (@auto_calibrator.progress * 100).round(0)
+    JS.global[:calibrationProgress] = pct
+
+    if @auto_calibrator.state == :done
+      changed = @auto_calibrator.apply_baseline
+      JSBridge.log "Calibration complete: #{changed.map { |k, v| "#{k}=#{v.round(2)}" }.join(', ')}"
+      JS.global[:calibrationProgress] = 100
+      # Notify JS to sync slider positions
+      JS.global.syncSlidersFromRuby() rescue nil
     end
   end
 

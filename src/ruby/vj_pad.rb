@@ -41,10 +41,12 @@ class VJPad
     end
   end
 
+  MOOD_NAMES = AutoCalibrator::MOOD_PRESETS.keys.freeze
+
   def initialize(audio_input_manager = nil, serial_manager: nil, serial_audio_source: nil,
                  wordart_renderer: nil, pen_input: nil,
                  synth_engine: nil, synth_effects: nil, oscilloscope_renderer: nil,
-                 synth_patch: nil)
+                 synth_patch: nil, auto_calibrator: nil)
     @audio_input_manager = audio_input_manager
     @serial_manager = serial_manager
     @serial_audio_source = serial_audio_source
@@ -54,6 +56,7 @@ class VJPad
     @synth_effects = synth_effects
     @oscilloscope_renderer = oscilloscope_renderer
     @synth_patch = synth_patch
+    @auto_calibrator = auto_calibrator
     @history = []
     @last_result = nil
     @pending_actions = []
@@ -170,6 +173,40 @@ class VJPad
     return "pen: not available" unless @pen_input
     @pen_input.clear
     "pen: cleared"
+  end
+
+  # --- Auto-Calibration Commands ---
+
+  def cal
+    return "cal: unavailable" unless @auto_calibrator
+    if @auto_calibrator.state == :measuring
+      pct = (@auto_calibrator.progress * 100).round(0)
+      return "cal: measuring #{pct}%"
+    end
+    @auto_calibrator.start
+    "cal: measuring 0%"
+  end
+
+  def cali(level = :_get)
+    return "cali: unavailable" unless @auto_calibrator
+    if level == :_get
+      return "intensity: #{@auto_calibrator.intensity_level}"
+    end
+    @auto_calibrator.set_intensity(level.to_i)
+    "intensity: #{@auto_calibrator.intensity_level}"
+  end
+
+  def mood(name = :_get)
+    return "mood: unavailable" unless @auto_calibrator
+    if name == :_get
+      return "mood: none"
+    end
+    params = AutoCalibrator.mood_params(name)
+    if params.empty?
+      return "mood: unknown '#{name}'"
+    end
+    AutoCalibrator.apply_mood(name)
+    "mood: #{name}"
   end
 
   # --- Plugin Discovery ---

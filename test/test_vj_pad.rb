@@ -610,4 +610,122 @@ class TestVJPad < Test::Unit::TestCase
     assert_equal false, result[:ok]
     assert_instance_of String, result[:msg]
   end
+
+  # === Auto-calibration commands ===
+
+  def test_cal_starts_calibration
+    calibrator = AutoCalibrator.new
+    pad = VJPad.new(nil, auto_calibrator: calibrator)
+    result = pad.cal
+    assert_match(/measuring/, result)
+    assert_equal :measuring, calibrator.state
+  end
+
+  def test_cal_shows_status_when_already_measuring
+    calibrator = AutoCalibrator.new
+    calibrator.start
+    pad = VJPad.new(nil, auto_calibrator: calibrator)
+    result = pad.cal
+    assert_match(/measuring/, result)
+  end
+
+  def test_cal_without_calibrator
+    pad = VJPad.new(nil)
+    result = pad.cal
+    assert_match(/unavailable/, result)
+  end
+
+  def test_cal_via_exec
+    calibrator = AutoCalibrator.new
+    pad = VJPad.new(nil, auto_calibrator: calibrator)
+    result = pad.exec("cal")
+    assert_equal true, result[:ok]
+    assert_equal :measuring, calibrator.state
+  end
+
+  # === Intensity commands ===
+
+  def test_cali_sets_intensity
+    calibrator = AutoCalibrator.new
+    pad = VJPad.new(nil, auto_calibrator: calibrator)
+    result = pad.cali(3)
+    assert_match(/intensity.*3/, result)
+    assert_equal 3, calibrator.intensity_level
+  end
+
+  def test_cali_getter_shows_current
+    calibrator = AutoCalibrator.new
+    pad = VJPad.new(nil, auto_calibrator: calibrator)
+    result = pad.cali
+    assert_match(/intensity.*0/, result)
+  end
+
+  def test_cali_without_calibrator
+    pad = VJPad.new(nil)
+    result = pad.cali
+    assert_match(/unavailable/, result)
+  end
+
+  def test_cali_via_exec
+    calibrator = AutoCalibrator.new
+    pad = VJPad.new(nil, auto_calibrator: calibrator)
+    result = pad.exec("cali 3")
+    assert_equal true, result[:ok]
+    assert_equal 3, calibrator.intensity_level
+  end
+
+  def test_cali_negative_via_exec
+    calibrator = AutoCalibrator.new
+    pad = VJPad.new(nil, auto_calibrator: calibrator)
+    pad.exec("cali -2")
+    assert_equal(-2, calibrator.intensity_level)
+  end
+
+  # === Mood commands ===
+
+  def test_mood_sets_preset
+    calibrator = AutoCalibrator.new
+    pad = VJPad.new(nil, auto_calibrator: calibrator)
+    result = pad.mood(:red)
+    assert_match(/mood.*red/, result)
+    assert_equal 1, ColorPalette.get_hue_mode
+    assert_equal 100, VisualizerPolicy.max_saturation
+  end
+
+  def test_mood_getter_shows_current
+    calibrator = AutoCalibrator.new
+    pad = VJPad.new(nil, auto_calibrator: calibrator)
+    result = pad.mood
+    assert_match(/mood/, result)
+  end
+
+  def test_mood_unknown_returns_error
+    calibrator = AutoCalibrator.new
+    pad = VJPad.new(nil, auto_calibrator: calibrator)
+    result = pad.mood(:nonexistent)
+    assert_match(/unknown/, result.downcase)
+  end
+
+  def test_mood_without_calibrator
+    pad = VJPad.new(nil)
+    result = pad.mood(:red)
+    assert_match(/unavailable/, result)
+  end
+
+  def test_mood_via_exec
+    calibrator = AutoCalibrator.new
+    pad = VJPad.new(nil, auto_calibrator: calibrator)
+    result = pad.exec('mood :red')
+    assert_equal true, result[:ok]
+    assert_equal 1, ColorPalette.get_hue_mode
+  end
+
+  def test_mood_all_presets_via_exec
+    calibrator = AutoCalibrator.new
+    pad = VJPad.new(nil, auto_calibrator: calibrator)
+    [:red, :yellow, :green, :blue, :neon].each do |m|
+      result = pad.exec("mood :#{m}")
+      assert_equal true, result[:ok], "mood :#{m} should succeed"
+    end
+  end
 end
