@@ -277,6 +277,31 @@
         <button class="cp-btn cp-vj-btn" data-cmd="rave"      style="flex:1;padding:2px 0;font-size:9px;">rave</button>
       </div>
     </div>
+    <div class="cp-group" id="cpAutoTuneGroup" style="border-top:1px solid #444;padding-top:6px;">
+      <div class="cp-group-title" style="color:#0ff;">Auto Tune</div>
+      <div style="display:flex;gap:3px;align-items:center;margin-bottom:4px;">
+        <button class="cp-btn" id="cpCalBtn" style="flex:0 0 auto;padding:2px 10px;font-size:10px;">Calibrate</button>
+        <div id="cpCalProgress" style="flex:1;height:12px;background:rgba(0,0,0,0.3);border-radius:3px;overflow:hidden;display:none;">
+          <div id="cpCalBar" style="height:100%;width:0%;background:#0ff;transition:width 0.15s;"></div>
+        </div>
+        <span id="cpCalStatus" style="color:#0ff;font-size:9px;font-family:monospace;"></span>
+      </div>
+      <div class="cp-slider-row">
+        <span class="cp-label" title="Visual intensity (-5..+5)">Intensity</span>
+        <input type="range" id="cpIntensity" min="-5" max="5" step="1" value="0">
+        <span class="cp-value" id="cpIntensityVal">0</span>
+      </div>
+      <div style="margin-top:3px;">
+        <span style="color:#888;font-size:9px;">Mood:</span>
+        <div style="display:flex;gap:3px;margin-top:2px;">
+          <button class="cp-btn cp-mood-btn" data-mood="red"    style="flex:1;padding:2px 0;font-size:9px;color:#f44;">Red</button>
+          <button class="cp-btn cp-mood-btn" data-mood="yellow" style="flex:1;padding:2px 0;font-size:9px;color:#ff0;">Yel</button>
+          <button class="cp-btn cp-mood-btn" data-mood="green"  style="flex:1;padding:2px 0;font-size:9px;color:#0f0;">Grn</button>
+          <button class="cp-btn cp-mood-btn" data-mood="blue"   style="flex:1;padding:2px 0;font-size:9px;color:#08f;">Blu</button>
+          <button class="cp-btn cp-mood-btn" data-mood="neon"   style="flex:1;padding:2px 0;font-size:9px;color:#f0f;">Neon</button>
+        </div>
+      </div>
+    </div>
     <div class="cp-actions">
       <button class="cp-btn" id="cpLoadVrmBtn" title="Toggle VRM (Alt+V)">VRM</button>
       <button class="cp-btn" id="cpCaptureTabBtn" title="Toggle Tab Capture (Alt+T)">Capture Tab</button>
@@ -451,6 +476,7 @@
   <script type="text/ruby" src="src/ruby/synth_patch/synth_patch.rb"></script>
   <script type="text/ruby" src="src/ruby/synth_patch/web_adapter.rb"></script>
   <script type="text/ruby" src="src/ruby/vj_synth_patch_commands.rb"></script>
+  <script type="text/ruby" src="src/ruby/auto_calibrator.rb"></script>
   <script type="text/ruby" src="src/ruby/vj_pad.rb"></script>
 
   <!-- VJ Pad Plugins (src/ruby/plugins/vj_*.rb) -->
@@ -2346,6 +2372,54 @@
           btn.addEventListener('click', () => {
             const param = document.getElementById('cpVJParam').value.trim();
             vjExec(param ? btn.dataset.cmd + ' ' + param : btn.dataset.cmd);
+          });
+        });
+
+        // --- Auto Tune section ---
+        window.syncSlidersFromRuby = function() {
+          syncControlPanelValues();
+          // Also sync hue wheel from Ruby state
+          if (typeof initHueWheel === 'function') initHueWheel();
+        };
+
+        document.getElementById('cpCalBtn').addEventListener('click', () => {
+          vjExec('cal');
+          const bar = document.getElementById('cpCalBar');
+          const prog = document.getElementById('cpCalProgress');
+          const status = document.getElementById('cpCalStatus');
+          bar.style.width = '0%';
+          prog.style.display = 'block';
+          status.textContent = '0%';
+          // Poll calibration progress
+          if (window._calTimer) clearInterval(window._calTimer);
+          window._calTimer = setInterval(() => {
+            const pct = Number(window.calibrationProgress || 0);
+            bar.style.width = pct + '%';
+            status.textContent = pct + '%';
+            if (pct >= 100) {
+              clearInterval(window._calTimer);
+              status.textContent = 'Done';
+              setTimeout(() => {
+                prog.style.display = 'none';
+                status.textContent = '';
+                syncControlPanelValues();
+              }, 1500);
+            }
+          }, 200);
+        });
+
+        const cpIntensity = document.getElementById('cpIntensity');
+        const cpIntensityVal = document.getElementById('cpIntensityVal');
+        cpIntensity.addEventListener('input', function() {
+          cpIntensityVal.textContent = this.value;
+          vjExec('cali ' + this.value);
+        });
+        cpIntensity.addEventListener('keydown', e => e.stopPropagation());
+
+        document.querySelectorAll('.cp-mood-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            vjExec('mood :' + btn.dataset.mood);
+            syncControlPanelValues();
           });
         });
 
