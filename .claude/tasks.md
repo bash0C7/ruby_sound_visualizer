@@ -108,6 +108,22 @@ These can be fixed with `bundle exec rubocop --autocorrect` per cop. Verify test
 
 ## SynthPatch Integration Tasks (syn_fm_and_module branch)
 
+### CI Failure (Run 22398472576)
+
+RuboCop violations in newly added test files (not yet in `.rubocop_todo.yml`).
+
+- [S-0] PENDING: Fix RuboCop offenses in SynthPatch tests
+  - **`test/test_synth_patch_dsl.rb`**:
+    - `Metrics/AbcSize` (too high: 18.11, 19.24, 18.44, 56.01, 30.82 vs threshold 17)
+    - `Metrics/CyclomaticComplexity` (10/7) & `PerceivedComplexity` (10/8) for `test_full_dsl_example`
+    - `Style/HashConversion`: use `ary.to_h` instead of `Hash[ary]` (Line 123)
+  - **`test/test_synth_patch_nodes.rb`**:
+    - `Metrics/AbcSize` (20.1, 23.09 vs 17) in `test_set_param_calls_adapter_after_compile`, `test_filter_node_to_h_includes_chain`
+  - **`test/test_synth_patch_note.rb`**:
+    - `Metrics/AbcSize` (17.03 vs 17) in `test_note_on_includes_adsr_params`
+  - **`test/test_vj_pad.rb`**:
+    - `Lint/EmptyBlock` (Line 658) in `mock_console.define_singleton_method(:error) { |msg| }`
+
 ### 調査結果サマリー（2025-02-24時点）
 
 #### 確認済み実装（index.html 変更済み）
