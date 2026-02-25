@@ -11,17 +11,6 @@ class TestVJPad < Test::Unit::TestCase
 
   # === Getter tests (no args = show current value) ===
 
-  def test_c_getter_default
-    result = @pad.c
-    assert_equal "color: gray", result
-  end
-
-  def test_c_getter_after_set
-    ColorPalette.set_hue_mode(1)
-    result = @pad.c
-    assert_equal "color: red", result
-  end
-
   def test_h_getter_default
     result = @pad.h
     assert_equal "hue: 0.0", result
@@ -77,77 +66,6 @@ class TestVJPad < Test::Unit::TestCase
   end
 
   # === Setter tests (with args = change value) ===
-
-  def test_c_set_by_number
-    result = @pad.c(1)
-    assert_equal "color: red", result
-    assert_equal 1, ColorPalette.get_hue_mode
-  end
-
-  def test_c_set_mode_0_is_gray
-    @pad.c(1)
-    result = @pad.c(0)
-    assert_equal "color: gray", result
-    assert_nil ColorPalette.get_hue_mode
-  end
-
-  def test_c_set_mode_2
-    result = @pad.c(2)
-    assert_equal "color: yellow", result
-    assert_equal 2, ColorPalette.get_hue_mode
-  end
-
-  def test_c_set_mode_3
-    result = @pad.c(3)
-    assert_equal "color: blue", result
-    assert_equal 3, ColorPalette.get_hue_mode
-  end
-
-  def test_c_set_by_symbol_red
-    result = @pad.c(:red)
-    assert_equal "color: red", result
-    assert_equal 1, ColorPalette.get_hue_mode
-  end
-
-  def test_c_set_by_symbol_yellow
-    result = @pad.c(:yellow)
-    assert_equal "color: yellow", result
-    assert_equal 2, ColorPalette.get_hue_mode
-  end
-
-  def test_c_set_by_symbol_blue
-    result = @pad.c(:blue)
-    assert_equal "color: blue", result
-    assert_equal 3, ColorPalette.get_hue_mode
-  end
-
-  def test_c_set_by_symbol_gray
-    @pad.c(1)
-    result = @pad.c(:gray)
-    assert_equal "color: gray", result
-    assert_nil ColorPalette.get_hue_mode
-  end
-
-  def test_c_short_alias_r
-    result = @pad.c(:r)
-    assert_equal "color: red", result
-  end
-
-  def test_c_short_alias_y
-    result = @pad.c(:y)
-    assert_equal "color: yellow", result
-  end
-
-  def test_c_short_alias_b
-    result = @pad.c(:b)
-    assert_equal "color: blue", result
-  end
-
-  def test_c_short_alias_g
-    @pad.c(1)
-    result = @pad.c(:g)
-    assert_equal "color: gray", result
-  end
 
   def test_h_set_absolute
     result = @pad.h(45)
@@ -213,7 +131,7 @@ class TestVJPad < Test::Unit::TestCase
   end
 
   def test_r_resets_all
-    @pad.c(1)
+    ColorPalette.set_hue_mode(1)
     @pad.s(1.5)
     @pad.ig(6.0)
     @pad.br(100)
@@ -235,10 +153,10 @@ class TestVJPad < Test::Unit::TestCase
   # === exec method ===
 
   def test_exec_simple_command
-    result = @pad.exec("c 1")
+    result = @pad.exec("h 45")
     assert_equal true, result[:ok]
-    assert_equal "color: red", result[:msg]
-    assert_equal 1, ColorPalette.get_hue_mode
+    assert_equal "hue: 45.0", result[:msg]
+    assert_in_delta 45.0, ColorPalette.get_hue_offset, 0.001
   end
 
   def test_exec_getter
@@ -248,12 +166,12 @@ class TestVJPad < Test::Unit::TestCase
   end
 
   def test_exec_multiple_with_semicolons
-    result = @pad.exec("c 1; s 1.5")
+    result = @pad.exec("h 45; s 1.5")
     assert_equal true, result[:ok]
     # Last expression result
     assert_equal "sens: 1.5", result[:msg]
     # Both should have taken effect
-    assert_equal 1, ColorPalette.get_hue_mode
+    assert_in_delta 45.0, ColorPalette.get_hue_offset, 0.001
     assert_in_delta 1.5, VisualizerPolicy.sensitivity, 0.001
   end
 
@@ -305,8 +223,8 @@ class TestVJPad < Test::Unit::TestCase
   # === last_result ===
 
   def test_last_result_tracks_success
-    @pad.exec("c 1")
-    assert_equal "color: red", @pad.last_result
+    @pad.exec("h 45")
+    assert_equal "hue: 45.0", @pad.last_result
   end
 
   def test_last_result_tracks_error
@@ -423,16 +341,16 @@ class TestVJPad < Test::Unit::TestCase
   end
 
   def test_mixed_commands_and_plugins_via_exec
-    result = @pad.exec("c 1; burst; flash 2.0")
+    result = @pad.exec("h 45; burst; flash 2.0")
     assert_equal true, result[:ok]
-    assert_equal 1, ColorPalette.get_hue_mode
+    assert_in_delta 45.0, ColorPalette.get_hue_offset, 0.001
     assert_equal 2, @pad.pending_actions.length
   end
 
   # === i (info) reflects changed state ===
 
   def test_i_after_changes
-    @pad.c(2)
+    ColorPalette.set_hue_mode(2)
     @pad.h(90)
     @pad.s(1.5)
     result = @pad.i
@@ -511,8 +429,8 @@ class TestVJPad < Test::Unit::TestCase
   def test_vj_pad_backward_compatibility_without_audio_input_manager
     pad = VJPad.new(nil)
     # Should not raise on other commands
-    result = pad.c(1)
-    assert_equal "color: red", result
+    result = pad.h(45)
+    assert_equal "hue: 45.0", result
   end
 
   def test_id_setter
@@ -609,6 +527,124 @@ class TestVJPad < Test::Unit::TestCase
     result = @pad.exec("nil.nonexistent_method")
     assert_equal false, result[:ok]
     assert_instance_of String, result[:msg]
+  end
+
+  # === Auto-calibration commands ===
+
+  def test_cal_starts_calibration
+    calibrator = AutoCalibrator.new
+    pad = VJPad.new(nil, auto_calibrator: calibrator)
+    result = pad.cal
+    assert_match(/measuring/, result)
+    assert_equal :measuring, calibrator.state
+  end
+
+  def test_cal_shows_status_when_already_measuring
+    calibrator = AutoCalibrator.new
+    calibrator.start
+    pad = VJPad.new(nil, auto_calibrator: calibrator)
+    result = pad.cal
+    assert_match(/measuring/, result)
+  end
+
+  def test_cal_without_calibrator
+    pad = VJPad.new(nil)
+    result = pad.cal
+    assert_match(/unavailable/, result)
+  end
+
+  def test_cal_via_exec
+    calibrator = AutoCalibrator.new
+    pad = VJPad.new(nil, auto_calibrator: calibrator)
+    result = pad.exec("cal")
+    assert_equal true, result[:ok]
+    assert_equal :measuring, calibrator.state
+  end
+
+  # === Intensity commands ===
+
+  def test_cali_sets_intensity
+    calibrator = AutoCalibrator.new
+    pad = VJPad.new(nil, auto_calibrator: calibrator)
+    result = pad.cali(3)
+    assert_match(/intensity.*3/, result)
+    assert_equal 3, calibrator.intensity_level
+  end
+
+  def test_cali_getter_shows_current
+    calibrator = AutoCalibrator.new
+    pad = VJPad.new(nil, auto_calibrator: calibrator)
+    result = pad.cali
+    assert_match(/intensity.*0/, result)
+  end
+
+  def test_cali_without_calibrator
+    pad = VJPad.new(nil)
+    result = pad.cali
+    assert_match(/unavailable/, result)
+  end
+
+  def test_cali_via_exec
+    calibrator = AutoCalibrator.new
+    pad = VJPad.new(nil, auto_calibrator: calibrator)
+    result = pad.exec("cali 3")
+    assert_equal true, result[:ok]
+    assert_equal 3, calibrator.intensity_level
+  end
+
+  def test_cali_negative_via_exec
+    calibrator = AutoCalibrator.new
+    pad = VJPad.new(nil, auto_calibrator: calibrator)
+    pad.exec("cali -2")
+    assert_equal(-2, calibrator.intensity_level)
+  end
+
+  # === Mood commands ===
+
+  def test_mood_sets_preset
+    calibrator = AutoCalibrator.new
+    pad = VJPad.new(nil, auto_calibrator: calibrator)
+    result = pad.mood(:red)
+    assert_match(/mood.*red/, result)
+    assert_equal 1, ColorPalette.get_hue_mode
+    assert_equal 100, VisualizerPolicy.max_saturation
+  end
+
+  def test_mood_getter_shows_current
+    calibrator = AutoCalibrator.new
+    pad = VJPad.new(nil, auto_calibrator: calibrator)
+    result = pad.mood
+    assert_match(/mood/, result)
+  end
+
+  def test_mood_unknown_returns_error
+    calibrator = AutoCalibrator.new
+    pad = VJPad.new(nil, auto_calibrator: calibrator)
+    result = pad.mood(:nonexistent)
+    assert_match(/unknown/, result.downcase)
+  end
+
+  def test_mood_without_calibrator
+    pad = VJPad.new(nil)
+    result = pad.mood(:red)
+    assert_match(/unavailable/, result)
+  end
+
+  def test_mood_via_exec
+    calibrator = AutoCalibrator.new
+    pad = VJPad.new(nil, auto_calibrator: calibrator)
+    result = pad.exec('mood :red')
+    assert_equal true, result[:ok]
+    assert_equal 1, ColorPalette.get_hue_mode
+  end
+
+  def test_mood_all_presets_via_exec
+    calibrator = AutoCalibrator.new
+    pad = VJPad.new(nil, auto_calibrator: calibrator)
+    %i[gray red yellow green blue neon].each do |m|
+      result = pad.exec("mood :#{m}")
+      assert_equal true, result[:ok], "mood :#{m} should succeed"
+    end
   end
 end
 

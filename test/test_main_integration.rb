@@ -159,9 +159,9 @@ class TestMainIntegration < Test::Unit::TestCase
     keyboard_handler.handle_color_mode(1)
     assert_equal 1, ColorPalette.get_hue_mode
 
-    # Verify VJPad sees the change
-    result = vj_pad.exec("c")
-    assert_equal "color: red", result[:msg]
+    # Verify VJPad sees the change via i command
+    result = vj_pad.exec("i")
+    assert_match(/c:red/, result[:msg])
 
     # Verify debug formatter sees the change
     analysis = { bass: 0.5, mid: 0.3, high: 0.2, overall_energy: 0.4 }
@@ -316,8 +316,8 @@ class TestMainIntegration < Test::Unit::TestCase
     runtime_keys = VisualizerPolicy::RUNTIME_PARAMS.keys.map(&:to_s).sort
     mutable_keys = VisualizerPolicy::MUTABLE_KEYS.keys.sort
     assert_equal runtime_keys, mutable_keys,
-      "MUTABLE_KEYS and RUNTIME_PARAMS key sets must match. " \
-      "Only in RUNTIME_PARAMS: #{(runtime_keys - mutable_keys).inspect}. " \
-      "Only in MUTABLE_KEYS: #{(mutable_keys - runtime_keys).inspect}"
+                 "MUTABLE_KEYS and RUNTIME_PARAMS key sets must match. " \
+                 "Only in RUNTIME_PARAMS: #{(runtime_keys - mutable_keys).inspect}. " \
+                 "Only in MUTABLE_KEYS: #{(mutable_keys - runtime_keys).inspect}"
   end
 end

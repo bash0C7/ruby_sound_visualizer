@@ -232,11 +232,15 @@
         <div>
           <div style="color:#aaa;font-size:10px;">Hue</div>
           <span id="hueValueDisplay" style="color:#0f0;font-size:11px;">0.0°</span>
-          <div style="margin-top:6px;">
-            <div style="color:#aaa;font-size:10px;margin-bottom:3px;">Mode</div>
-            <div id="colorModeButtons" style="display:flex;gap:3px;flex-wrap:wrap;"></div>
-          </div>
         </div>
+      </div>
+      <div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:4px;">
+        <button class="cp-btn cp-mood-btn" data-mood="gray"   style="flex:1;padding:2px 0;font-size:9px;color:#888;">Gray</button>
+        <button class="cp-btn cp-mood-btn" data-mood="red"    style="flex:1;padding:2px 0;font-size:9px;color:#f44;">Red</button>
+        <button class="cp-btn cp-mood-btn" data-mood="yellow" style="flex:1;padding:2px 0;font-size:9px;color:#ff0;">Yel</button>
+        <button class="cp-btn cp-mood-btn" data-mood="green"  style="flex:1;padding:2px 0;font-size:9px;color:#0f0;">Grn</button>
+        <button class="cp-btn cp-mood-btn" data-mood="blue"   style="flex:1;padding:2px 0;font-size:9px;color:#08f;">Blu</button>
+        <button class="cp-btn cp-mood-btn" data-mood="neon"   style="flex:1;padding:2px 0;font-size:9px;color:#f0f;">Neon</button>
       </div>
       <div class="cp-slider-row">
         <span class="cp-label" title="max_brightness">Brightness</span>
@@ -253,7 +257,7 @@
     <div class="cp-group" id="cpVJPadGroup" style="border-top:1px solid #444;padding-top:6px;">
       <div class="cp-group-title">VJ Pad</div>
       <div style="display:flex;gap:3px;margin-bottom:3px;">
-        <input id="cpVJInput" type="text" placeholder="c 1; s 2.0; wa text"
+        <input id="cpVJInput" type="text" placeholder="mood :red; s 2.0; wa text"
                autocomplete="off" spellcheck="false"
                style="flex:1;background:rgba(0,0,0,0.25);color:#0f0;border:none;border-radius:3px;
                       padding:2px 6px;font-family:monospace;font-size:10px;outline:none;">
@@ -275,6 +279,21 @@
         <button class="cp-btn cp-vj-btn" data-cmd="shockwave" style="flex:1;padding:2px 0;font-size:9px;">shock</button>
         <button class="cp-btn cp-vj-btn" data-cmd="strobe"    style="flex:1;padding:2px 0;font-size:9px;">strobe</button>
         <button class="cp-btn cp-vj-btn" data-cmd="rave"      style="flex:1;padding:2px 0;font-size:9px;">rave</button>
+      </div>
+    </div>
+    <div class="cp-group" id="cpAutoTuneGroup" style="border-top:1px solid #444;padding-top:6px;">
+      <div class="cp-group-title" style="color:#0ff;">Auto Tune</div>
+      <div style="display:flex;gap:3px;align-items:center;margin-bottom:4px;">
+        <button class="cp-btn" id="cpCalBtn" style="flex:0 0 auto;padding:2px 10px;font-size:10px;">Calibrate</button>
+        <div id="cpCalProgress" style="flex:1;height:12px;background:rgba(0,0,0,0.3);border-radius:3px;overflow:hidden;display:none;">
+          <div id="cpCalBar" style="height:100%;width:0%;background:#0ff;transition:width 0.15s;"></div>
+        </div>
+        <span id="cpCalStatus" style="color:#0ff;font-size:9px;font-family:monospace;"></span>
+      </div>
+      <div class="cp-slider-row">
+        <span class="cp-label" title="Visual intensity (-5..+5)">Intensity</span>
+        <input type="range" id="cpIntensity" min="-5" max="5" step="1" value="0">
+        <span class="cp-value" id="cpIntensityVal">0</span>
       </div>
     </div>
     <div class="cp-actions">
@@ -451,6 +470,7 @@
   <script type="text/ruby" src="src/ruby/synth_patch/synth_patch.rb"></script>
   <script type="text/ruby" src="src/ruby/synth_patch/web_adapter.rb"></script>
   <script type="text/ruby" src="src/ruby/vj_synth_patch_commands.rb"></script>
+  <script type="text/ruby" src="src/ruby/auto_calibrator.rb"></script>
   <script type="text/ruby" src="src/ruby/vj_pad.rb"></script>
 
   <!-- VJ Pad Plugins (src/ruby/plugins/vj_*.rb) -->
@@ -2343,6 +2363,52 @@
           });
         });
 
+        // --- Auto Tune section ---
+        window.syncSlidersFromRuby = function() {
+          syncControlPanelValues();
+        };
+
+        document.getElementById('cpCalBtn').addEventListener('click', () => {
+          vjExec('cal');
+          const bar = document.getElementById('cpCalBar');
+          const prog = document.getElementById('cpCalProgress');
+          const status = document.getElementById('cpCalStatus');
+          bar.style.width = '0%';
+          prog.style.display = 'block';
+          status.textContent = '0%';
+          // Poll calibration progress
+          if (window._calTimer) clearInterval(window._calTimer);
+          window._calTimer = setInterval(() => {
+            const pct = Number(window.calibrationProgress || 0);
+            bar.style.width = pct + '%';
+            status.textContent = pct + '%';
+            if (pct >= 100) {
+              clearInterval(window._calTimer);
+              status.textContent = 'Done';
+              setTimeout(() => {
+                prog.style.display = 'none';
+                status.textContent = '';
+                syncControlPanelValues();
+              }, 1500);
+            }
+          }, 200);
+        });
+
+        const cpIntensity = document.getElementById('cpIntensity');
+        const cpIntensityVal = document.getElementById('cpIntensityVal');
+        cpIntensity.addEventListener('input', function() {
+          cpIntensityVal.textContent = this.value;
+          vjExec('cali ' + this.value);
+        });
+        cpIntensity.addEventListener('keydown', e => e.stopPropagation());
+
+        document.querySelectorAll('.cp-mood-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            vjExec('mood :' + btn.dataset.mood);
+            syncControlPanelValues();
+          });
+        });
+
         // Apply URL snapshot before audio init (restores Ruby params + camera)
         const _snapRaw = String(window.rubySnapshotApply?.(window.location.search) || '');
         if (_snapRaw) {
@@ -2512,6 +2578,8 @@
     function initHueWheel() {
       const canvas = document.getElementById('hueWheel');
       if (!canvas) return;
+      if (canvas.dataset.hueWheelReady) return;
+      canvas.dataset.hueWheelReady = 'true';
       const ctx = canvas.getContext('2d');
       const cx = canvas.width / 2;
       const cy = canvas.height / 2;
@@ -2565,18 +2633,6 @@
         document.getElementById('hueValueDisplay').textContent = hue.toFixed(1) + '°';
       }
 
-      // Helper: restore saturation from 0 when switching to color mode
-      function restoreSatIfZero() {
-        const curSat = window.rubyConfigGet?.('max_saturation') || 0;
-        if (curSat === 0) {
-          if (window.rubyConfigSet) window.rubyConfigSet('max_saturation', 100);
-          const s = document.getElementById('cpSlider_max_saturation');
-          const v = document.getElementById('cpVal_max_saturation');
-          if (s) s.value = 100;
-          if (v) v.textContent = '100';
-        }
-      }
-
       // Click handler: calculate angle from click position
       canvas.addEventListener('click', function(e) {
         const rect = canvas.getBoundingClientRect();
@@ -2589,11 +2645,10 @@
         if (angle >= 360) angle -= 360;
         const hue = Math.round(angle);
         if (window.rubyExecPrompt) {
-          // If in Gray mode, auto-switch to Red (user is picking a color)
-          const modeResult = String(window.rubyExecPrompt('c'));
-          if (modeResult.includes('gray')) {
-            window.rubyExecPrompt('c 1');
-            restoreSatIfZero();
+          // If in Gray mode (saturation=0), auto-switch to Red (user is picking a color)
+          const curSat = window.rubyConfigGet?.('max_saturation') ?? 100;
+          if (curSat === 0) {
+            window.rubyExecPrompt('mood :red');
           }
           window.rubyExecPrompt('h ' + hue);
         }
@@ -2622,7 +2677,7 @@
           if (window.rubyConfigSet) window.rubyConfigSet(id, v);
           // Saturation = 0: auto-switch to Gray mode + sync wheel to 0°
           if (id === 'max_saturation' && v === 0 && window.rubyExecPrompt) {
-            window.rubyExecPrompt('c 0');
+            window.rubyExecPrompt('mood :gray');
             syncWheelTo(0);
           }
           scheduleURLUpdate();
@@ -2630,42 +2685,6 @@
         slider.addEventListener('keydown', function(e) { e.stopPropagation(); });
       });
 
-      // Mode buttons (c 0/1/2/3) with Saturation slider sync
-      const modes = [
-        { label: 'Gray', cmd: 'c 0', isGray: true },
-        { label: 'Red',  cmd: 'c 1', isGray: false },
-        { label: 'Green', cmd: 'c 2', isGray: false },
-        { label: 'Blue', cmd: 'c 3', isGray: false },
-      ];
-      const modeContainer = document.getElementById('colorModeButtons');
-      if (modeContainer) {
-        modes.forEach(m => {
-          const btn = document.createElement('button');
-          btn.className = 'cp-btn';
-          btn.textContent = m.label;
-          btn.style.flex = '0 0 auto';
-          btn.style.padding = '3px 6px';
-          btn.style.fontSize = '10px';
-          btn.addEventListener('click', () => {
-            if (window.rubyExecPrompt) window.rubyExecPrompt(m.cmd);
-            const satSlider = document.getElementById('cpSlider_max_saturation');
-            const satVal = document.getElementById('cpVal_max_saturation');
-            if (m.isGray) {
-              // Gray: set saturation to 0 + sync wheel to 0°
-              if (window.rubyConfigSet) window.rubyConfigSet('max_saturation', 0);
-              if (satSlider) satSlider.value = 0;
-              if (satVal) satVal.textContent = '0';
-              syncWheelTo(0);
-            } else {
-              // Color mode: restore saturation if 0, sync wheel to 0° (mode resets offset)
-              restoreSatIfZero();
-              syncWheelTo(0);
-            }
-            scheduleURLUpdate();
-          });
-          modeContainer.appendChild(btn);
-        });
-      }
     }
 
     function buildControlPanel() {

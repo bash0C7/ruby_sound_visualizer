@@ -4,15 +4,6 @@ class VJPad
 
   attr_reader :history, :last_result, :pending_actions
 
-  COLOR_ALIASES = {
-    red: 1, r: 1,
-    yellow: 2, y: 2,
-    blue: 3, b: 3,
-    gray: 0, g: 0
-  }.freeze
-
-  COLOR_NAMES = { 0 => 'gray', 1 => 'red', 2 => 'yellow', 3 => 'blue' }.freeze
-
   # VisualizerPolicy parameter commands: { command => { label:, policy:, cast:, suffix: } }
   PARAM_COMMANDS = {
     s:   { label: 'sens',           policy: :sensitivity,                    cast: :to_f },
@@ -41,10 +32,12 @@ class VJPad
     end
   end
 
+  MOOD_NAMES = AutoCalibrator::MOOD_PRESETS.keys.freeze
+
   def initialize(audio_input_manager = nil, serial_manager: nil, serial_audio_source: nil,
                  wordart_renderer: nil, pen_input: nil,
                  synth_engine: nil, synth_effects: nil, oscilloscope_renderer: nil,
-                 synth_patch: nil)
+                 synth_patch: nil, auto_calibrator: nil)
     @audio_input_manager = audio_input_manager
     @serial_manager = serial_manager
     @serial_audio_source = serial_audio_source
@@ -54,6 +47,7 @@ class VJPad
     @synth_effects = synth_effects
     @oscilloscope_renderer = oscilloscope_renderer
     @synth_patch = synth_patch
+    @auto_calibrator = auto_calibrator
     @history = []
     @last_result = nil
     @pending_actions = []
@@ -81,17 +75,6 @@ class VJPad
 
   # --- Color & Hue Commands ---
 
-  def c(mode = :_get)
-    if mode == :_get
-      name = COLOR_NAMES[ColorPalette.get_hue_mode] || 'gray'
-      return "color: #{name}"
-    end
-    resolved = mode.is_a?(Symbol) ? (COLOR_ALIASES[mode] || 0) : mode.to_i
-    actual_mode = resolved == 0 ? nil : resolved
-    ColorPalette.set_hue_mode(actual_mode)
-    "color: #{COLOR_NAMES[resolved] || 'gray'}"
-  end
-
   def h(deg = :_get)
     if deg == :_get
       return "hue: #{ColorPalette.get_hue_offset.round(1)}"
@@ -112,7 +95,8 @@ class VJPad
   end
 
   def i
-    cn = COLOR_NAMES[ColorPalette.get_hue_mode] || 'gray'
+    mode_names = { nil => 'gray', 1 => 'red', 2 => 'yellow', 3 => 'blue' }
+    cn = mode_names[ColorPalette.get_hue_mode] || 'gray'
     ho = ColorPalette.get_hue_offset.round(1)
     se = VisualizerPolicy.sensitivity
     ig = VisualizerPolicy.input_gain
@@ -170,6 +154,40 @@ class VJPad
     return "pen: not available" unless @pen_input
     @pen_input.clear
     "pen: cleared"
+  end
+
+  # --- Auto-Calibration Commands ---
+
+  def cal
+    return "cal: unavailable" unless @auto_calibrator
+    if @auto_calibrator.state == :measuring
+      pct = (@auto_calibrator.progress * 100).round(0)
+      return "cal: measuring #{pct}%"
+    end
+    @auto_calibrator.start
+    "cal: measuring 0%"
+  end
+
+  def cali(level = :_get)
+    return "cali: unavailable" unless @auto_calibrator
+    if level == :_get
+      return "intensity: #{@auto_calibrator.intensity_level}"
+    end
+    @auto_calibrator.set_intensity(level.to_i)
+    "intensity: #{@auto_calibrator.intensity_level}"
+  end
+
+  def mood(name = :_get)
+    return "mood: unavailable" unless @auto_calibrator
+    if name == :_get
+      return "mood: none"
+    end
+    params = AutoCalibrator.mood_params(name)
+    if params.empty?
+      return "mood: unknown '#{name}'"
+    end
+    AutoCalibrator.apply_mood(name)
+    "mood: #{name}"
   end
 
   # --- Plugin Discovery ---
