@@ -14,6 +14,11 @@ class AutoCalibrator
 
   # Vivid color mood presets
   MOOD_PRESETS = {
+    gray: {
+      hue_mode: nil, hue_offset: 0.0,
+      max_saturation: 0, max_brightness: 255, max_lightness: 255,
+      max_emissive: 2.0, bloom_energy_scale: 1.0
+    },
     red: {
       hue_mode: 1, hue_offset: 0.0,
       max_saturation: 100, max_brightness: 255, max_lightness: 255,

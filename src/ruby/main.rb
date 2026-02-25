@@ -72,7 +72,7 @@ class VisualizerApp
 
     JS.global[:rubyVJHistoryAt] = lambda do |idx|
       entry = app.vj_history_at(idx.to_i)
-      entry ? entry : ''
+      entry || ''
     end
 
     JS.global[:rubyUpdateVisuals] = lambda do |freq_array, timestamp|
@@ -176,7 +176,11 @@ class VisualizerApp
       JSBridge.log "Calibration complete: #{changed.map { |k, v| "#{k}=#{v.round(2)}" }.join(', ')}"
       JS.global[:calibrationProgress] = 100
       # Notify JS to sync slider positions
-      JS.global.syncSlidersFromRuby() rescue nil
+      begin
+        JS.global.syncSlidersFromRuby
+      rescue
+        nil
+      end
     end
   end
 

@@ -13,7 +13,7 @@ class SynthPatch
       @@node_id_counter = 0
     end
 
-    attr_reader :name, :handle, :chain
+    attr_reader :name, :handle, :chain, :fm_modulator
 
     def initialize(name: nil)
       @name = name || Node.next_id
@@ -28,8 +28,6 @@ class SynthPatch
       @fm_modulator = mod_node
       self
     end
-
-    attr_reader :fm_modulator
 
     def filter(type, cutoff:, q: 1.0, name: nil)
       node = FilterNode.new(type, cutoff: cutoff, q: q, name: name)

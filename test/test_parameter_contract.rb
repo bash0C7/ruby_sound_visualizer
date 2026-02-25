@@ -35,28 +35,28 @@ class TestParameterContract < Test::Unit::TestCase
   def test_runtime_params_contain_expected_names
     EXPECTED_PARAM_NAMES.each do |name|
       assert VisualizerPolicy::RUNTIME_PARAMS.key?(name),
-        "RUNTIME_PARAMS missing expected key: #{name}"
+             "RUNTIME_PARAMS missing expected key: #{name}"
     end
   end
 
   def test_runtime_params_have_defaults
     VisualizerPolicy::RUNTIME_PARAMS.each do |name, spec|
       assert spec.key?(:default),
-        "RUNTIME_PARAMS[:#{name}] missing :default"
+             "RUNTIME_PARAMS[:#{name}] missing :default"
     end
   end
 
   def test_runtime_params_have_types
     VisualizerPolicy::RUNTIME_PARAMS.each do |name, spec|
       assert %i[int float bool].include?(spec[:type]),
-        "RUNTIME_PARAMS[:#{name}] has invalid type: #{spec[:type]}"
+             "RUNTIME_PARAMS[:#{name}] has invalid type: #{spec[:type]}"
     end
   end
 
   def test_all_runtime_params_in_mutable_keys
     VisualizerPolicy::RUNTIME_PARAMS.each_key do |name|
       assert VisualizerPolicy::MUTABLE_KEYS.key?(name.to_s),
-        "RUNTIME_PARAMS[:#{name}] not in MUTABLE_KEYS (breaks UI sliders)"
+             "RUNTIME_PARAMS[:#{name}] not in MUTABLE_KEYS (breaks UI sliders)"
     end
   end
 
@@ -69,7 +69,7 @@ class TestParameterContract < Test::Unit::TestCase
       result = calibrator.calculate(measurements)
       result.each_key do |key|
         assert VisualizerPolicy::MUTABLE_KEYS.key?(key),
-          "AutoCalibrator output key '#{key}' not in MUTABLE_KEYS (energy=#{energy})"
+               "AutoCalibrator output key '#{key}' not in MUTABLE_KEYS (energy=#{energy})"
       end
     end
   end
@@ -115,7 +115,7 @@ class TestParameterContract < Test::Unit::TestCase
     }
 
     result = calibrator.intensity_params(5, extreme_baseline)
-    assert_params_within_ranges(result, "intensity(level=5, extreme baseline)")
+    assert_params_within_ranges(result, 'intensity(level=5, extreme baseline)')
   end
 
   # === 4. Manual override after calibration ===
@@ -131,7 +131,7 @@ class TestParameterContract < Test::Unit::TestCase
     # Manual override should take effect
     VisualizerPolicy.sensitivity = 1.8
     assert_in_delta 1.8, VisualizerPolicy.sensitivity, 0.001,
-      "Manual override should work after calibration"
+                    'Manual override should work after calibration'
   end
 
   def test_intensity_after_manual_override
@@ -148,7 +148,7 @@ class TestParameterContract < Test::Unit::TestCase
     # Intensity should not clobber unrelated params
     calibrator.set_intensity(3)
     assert_equal 128, VisualizerPolicy.max_brightness,
-      "Intensity should not overwrite manually set max_brightness"
+                 'Intensity should not overwrite manually set max_brightness'
   end
 
   # === 5. Mood preset safety ===
@@ -166,26 +166,26 @@ class TestParameterContract < Test::Unit::TestCase
 
     # input_gain should not be changed by mood preset
     assert_in_delta saved_gain, VisualizerPolicy.input_gain, 0.001,
-      "Mood preset should not change input_gain"
+                    'Mood preset should not change input_gain'
   end
 
   def test_mood_preset_values_valid
     AutoCalibrator::MOOD_PRESETS.each do |name, params|
       if params[:max_saturation]
         assert params[:max_saturation] >= 0 && params[:max_saturation] <= 100,
-          "#{name} max_saturation out of range: #{params[:max_saturation]}"
+               "#{name} max_saturation out of range: #{params[:max_saturation]}"
       end
       if params[:max_brightness]
         assert params[:max_brightness] >= 0 && params[:max_brightness] <= 255,
-          "#{name} max_brightness out of range: #{params[:max_brightness]}"
+               "#{name} max_brightness out of range: #{params[:max_brightness]}"
       end
       if params[:max_lightness]
         assert params[:max_lightness] >= 0 && params[:max_lightness] <= 255,
-          "#{name} max_lightness out of range: #{params[:max_lightness]}"
+               "#{name} max_lightness out of range: #{params[:max_lightness]}"
       end
       if params[:hue_mode]
         assert [1, 2, 3].include?(params[:hue_mode]),
-          "#{name} hue_mode invalid: #{params[:hue_mode]}"
+               "#{name} hue_mode invalid: #{params[:hue_mode]}"
       end
     end
   end
@@ -209,9 +209,9 @@ class TestParameterContract < Test::Unit::TestCase
     VisualizerPolicy::RUNTIME_PARAMS.each do |name, spec|
       actual = VisualizerPolicy.send(name)
       assert_equal spec[:default], actual,
-        "After reset, #{name} should be #{spec[:default]}, got #{actual}"
+                   "After reset, #{name} should be #{spec[:default]}, got #{actual}"
     end
-    assert_nil ColorPalette.get_hue_mode, "After reset, hue_mode should be nil"
+    assert_nil ColorPalette.get_hue_mode, 'After reset, hue_mode should be nil'
   end
 
   private
@@ -245,13 +245,14 @@ class TestParameterContract < Test::Unit::TestCase
     params_hash.each do |key, val|
       spec = VisualizerPolicy::RUNTIME_PARAMS[key.to_sym]
       next unless spec
+
       if spec[:min]
         assert val >= spec[:min],
-          "[#{context}] #{key}=#{val} below min #{spec[:min]}"
+               "[#{context}] #{key}=#{val} below min #{spec[:min]}"
       end
       if spec[:max]
         assert val <= spec[:max],
-          "[#{context}] #{key}=#{val} above max #{spec[:max]}"
+               "[#{context}] #{key}=#{val} above max #{spec[:max]}"
       end
     end
   end

@@ -4,15 +4,6 @@ class VJPad
 
   attr_reader :history, :last_result, :pending_actions
 
-  COLOR_ALIASES = {
-    red: 1, r: 1,
-    yellow: 2, y: 2,
-    blue: 3, b: 3,
-    gray: 0, g: 0
-  }.freeze
-
-  COLOR_NAMES = { 0 => 'gray', 1 => 'red', 2 => 'yellow', 3 => 'blue' }.freeze
-
   # VisualizerPolicy parameter commands: { command => { label:, policy:, cast:, suffix: } }
   PARAM_COMMANDS = {
     s:   { label: 'sens',           policy: :sensitivity,                    cast: :to_f },
@@ -84,17 +75,6 @@ class VJPad
 
   # --- Color & Hue Commands ---
 
-  def c(mode = :_get)
-    if mode == :_get
-      name = COLOR_NAMES[ColorPalette.get_hue_mode] || 'gray'
-      return "color: #{name}"
-    end
-    resolved = mode.is_a?(Symbol) ? (COLOR_ALIASES[mode] || 0) : mode.to_i
-    actual_mode = resolved == 0 ? nil : resolved
-    ColorPalette.set_hue_mode(actual_mode)
-    "color: #{COLOR_NAMES[resolved] || 'gray'}"
-  end
-
   def h(deg = :_get)
     if deg == :_get
       return "hue: #{ColorPalette.get_hue_offset.round(1)}"
@@ -115,7 +95,8 @@ class VJPad
   end
 
   def i
-    cn = COLOR_NAMES[ColorPalette.get_hue_mode] || 'gray'
+    mode_names = { nil => 'gray', 1 => 'red', 2 => 'yellow', 3 => 'blue' }
+    cn = mode_names[ColorPalette.get_hue_mode] || 'gray'
     ho = ColorPalette.get_hue_offset.round(1)
     se = VisualizerPolicy.sensitivity
     ig = VisualizerPolicy.input_gain

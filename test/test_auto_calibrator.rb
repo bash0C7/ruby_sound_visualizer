@@ -332,7 +332,7 @@ class TestAutoCalibrator < Test::Unit::TestCase
   end
 
   def test_mood_all_presets_have_required_keys
-    %i[red yellow green blue neon].each do |mood|
+    %i[gray red yellow green blue neon].each do |mood|
       params = AutoCalibrator.mood_params(mood)
       assert params.key?(:hue_mode), "#{mood} should have :hue_mode"
       assert params.key?(:max_saturation), "#{mood} should have :max_saturation"
@@ -341,6 +341,21 @@ class TestAutoCalibrator < Test::Unit::TestCase
       assert params.key?(:max_lightness), "#{mood} should have :max_lightness"
       assert params.key?(:hue_offset), "#{mood} should have :hue_offset"
     end
+  end
+
+  def test_mood_gray_preset
+    params = AutoCalibrator.mood_params(:gray)
+    assert_nil params[:hue_mode], 'Gray should have nil hue_mode'
+    assert_in_delta 0.0, params[:hue_offset], 0.001
+    assert_equal 0, params[:max_saturation]
+    assert params.key?(:max_emissive), 'Gray should have max_emissive key'
+    assert params.key?(:max_brightness), 'Gray should have max_brightness key'
+  end
+
+  def test_apply_mood_gray_sets_grayscale
+    AutoCalibrator.apply_mood(:gray)
+    assert_nil ColorPalette.get_hue_mode, 'Gray mood should set hue_mode to nil'
+    assert_equal 0, VisualizerPolicy.max_saturation, 'Gray mood should set max_saturation to 0'
   end
 
   def test_apply_mood_sets_color_palette
